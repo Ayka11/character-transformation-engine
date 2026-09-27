@@ -90,7 +90,8 @@ class InterventionService:
             dict(decision_logic),dict(evidence_scope),status,content_hash(payload)))
 
     def assign(self,assignment_id,user_id,rule_id,domain,required_inputs:dict,current_level:str,
-               safety_status:str,data_quality_status:str,source_assessment_id=None,source_claim_ids=None)->Assignment:
+               safety_status:str,data_quality_status:str,source_assessment_id=None,source_claim_ids=None,
+               context_flags:set[str]|None=None)->Assignment:
         if assignment_id in self.assignments: raise ValueError("assignment already registered")
         rule=self.rules.get(rule_id)
         if rule is None: raise ValueError("rule is not registered")
@@ -101,6 +102,10 @@ class InterventionService:
         if current_level not in LEVELS: raise ValueError("unsupported capacity level")
         if safety_status not in {"PASS","HOLD","BLOCK"}: raise ValueError("unsupported safety gate status")
         if data_quality_status not in {"PASS","UNKNOWN","FAIL"}: raise ValueError("unsupported data quality status")
+        flags=set(context_flags or ())
+        contraindication_hit=bool(flags.intersection(rule.contraindications))
+        if contraindication_hit:
+            safety_status="BLOCK"
         if safety_status=="BLOCK" or data_quality_status=="FAIL":
             level=current_level; gate="BLOCK"
         elif safety_status=="HOLD" or data_quality_status=="UNKNOWN":
@@ -108,7 +113,8 @@ class InterventionService:
         else:
             level=current_level; gate="PASS"
         reason={"domain":domain,"missing_inputs":missing,"capacity_level":current_level,
-                "safety_status":safety_status,"data_quality_status":data_quality_status}
+                "safety_status":safety_status,"data_quality_status":data_quality_status,
+                "contraindication_hit":contraindication_hit,"context_flags":sorted(flags)}
         assignment=Assignment(assignment_id,user_id,rule_id,rule.rule_version,level,source_assessment_id,
             tuple(source_claim_ids or ()),reason,gate)
         self.assignments[assignment_id]=assignment
@@ -183,6 +189,10 @@ class InterventionService:
             raise ValueError("unsupported research link relation")
         if relation in {"SUPPORTS_CLAIM","LIMITS_CLAIM","CONTRADICTS_CLAIM"} and not claim_id:
             raise ValueError("claim_id is required for claim relation")
+        if result_node_id and (result_node_id not in self.registry.nodes or self.registry.nodes[result_node_id].node_type!="RESULT"):
+            raise ValueError("result_node_id must reference a registered RESULT")
+        if claim_id and (claim_id not in self.registry.nodes or self.registry.nodes[claim_id].node_type!="CLAIM"):
+            raise ValueError("claim_id must reference a registered CLAIM")
         link={"session_id":session_id,"relation":relation,"research_result_node_id":result_node_id,"claim_id":claim_id,
               "runtime_observation_is_evidence":False}
         assignment.links.append(link)
