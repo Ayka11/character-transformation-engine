@@ -96,6 +96,30 @@ class SQLiteRuntimeStore:
             conn.commit()
         return Snapshot(namespace,key,version,payload,payload_hash)
 
+    def put_snapshots_atomic(self, items:list[tuple[str,str,dict,str]])->list[Snapshot]:
+        """Insert immutable snapshots atomically; identical existing rows are idempotent."""
+        prepared=[(ns,key,payload,version,content_hash(payload)) for ns,key,payload,version in items]
+        with self._connect() as conn:
+            results=[]
+            try:
+                for namespace,key,payload,version,payload_hash in prepared:
+                    row=conn.execute("SELECT version,payload_hash FROM runtime_snapshots WHERE namespace=? AND key=?",
+                                     (namespace,key)).fetchone()
+                    if row is not None:
+                        if row[1] != payload_hash:
+                            if namespace in MUTABLE_SNAPSHOT_NAMESPACES:
+                                raise ValueError("atomic mutation of existing mutable snapshot is not supported")
+                            raise ValueError("immutable snapshot conflict")
+                        results.append(Snapshot(namespace,key,row[0],payload,payload_hash)); continue
+                    conn.execute("INSERT INTO runtime_snapshots(namespace,key,version,payload_json,payload_hash) VALUES(?,?,?,?,?)",
+                                 (namespace,key,version,json.dumps(payload,sort_keys=True,separators=(",",":")),payload_hash))
+                    results.append(Snapshot(namespace,key,version,payload,payload_hash))
+                conn.commit()
+            except Exception:
+                conn.rollback()
+                raise
+        return results
+
     def get_snapshot(self, namespace:str, key:str)->Snapshot|None:
         with self._connect() as conn:
             row=conn.execute(
