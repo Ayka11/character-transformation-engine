@@ -70,11 +70,12 @@ class ClaimGateInput(BaseModel):
 
 class ClaimInput(BaseModel):
     claim_id: str
-    result_id: str
+    result_id: str | None = None
     current_state: str
     target_state: str
     provenance_class: str = "DRV"
     metadata: dict = Field(default_factory=dict)
+    previous_claim_id: str | None = None
 
 class GraphEdgeInput(BaseModel):
     edge_id: str
@@ -182,8 +183,15 @@ def graph_claim_gate(p: ClaimGateInput):
 
 @app.post("/graph/claim")
 def graph_claim(p: ClaimInput):
-    claim=GRAPH_REGISTRY.register_claim(p.claim_id,p.result_id,p.current_state,p.target_state,p.provenance_class,p.metadata)
-    return {"claim":asdict(claim),"supported_result_id":p.result_id}
+    claim=GRAPH_REGISTRY.register_claim(p.claim_id,p.result_id,p.current_state,p.target_state,p.provenance_class,p.metadata,p.previous_claim_id)
+    return {"claim":asdict(claim),"supported_result_id":claim.metadata.get("result_id") if p.result_id is None else p.result_id}
+
+@app.get("/graph/lineage/{node_id}")
+def graph_lineage(node_id: str):
+    if node_id not in GRAPH_REGISTRY.nodes:
+        raise ValueError("node is not registered")
+    nodes=GRAPH_REGISTRY._upstream_nodes(node_id) if GRAPH_REGISTRY.nodes[node_id].node_type=="RESULT" else []
+    return {"node_id":node_id,"node_type":GRAPH_REGISTRY.nodes[node_id].node_type,"upstream_nodes":[asdict(n) for n in nodes]}
 
 @app.post("/graph/register-node")
 def graph_register_node(p: GraphEdgeInput):
@@ -204,7 +212,14 @@ def validation_paired(p: RegisteredPairedInput):
     manifest=lock_manifest(p.baseline,p.current,manifest_id=p.manifest_id,analysis_spec_id=p.analysis_spec_id)
     result=paired_effect(p.baseline,p.current,manifest)
     node=build_result(result_id=p.result_id,analysis_id=p.analysis_id,manifest_id=manifest.manifest_id,analysis_spec_id=manifest.analysis_spec_id,qc_status="PASS" if result.status.startswith("ESTIMABLE") else result.status,n=result.n,estimate=result.mean_change,ci95_low=result.ci95_low,ci95_high=result.ci95_high)
-    return {"manifest": asdict(manifest), "result": asdict(result), "graph_node": graph_node(node)}
+    dataset=register_node(manifest.manifest_id,"DATASET",manifest.manifest_id,"DRV",manifest.analysis_spec_id,{"values_hash":manifest.values_hash,"n_total":manifest.n_total,"n_complete":manifest.n_complete,"missing":manifest.missing})
+    analysis=register_node(p.analysis_id,"ANALYSIS",p.analysis_id,"DRV",manifest.analysis_spec_id,{"manifest_id":manifest.manifest_id,"analysis_spec_id":manifest.analysis_spec_id})
+    result_graph=register_node(node.result_id,"RESULT",node.result_id,node.provenance.tag.value,node.analysis_spec_id,graph_node(node)["metadata_json"])
+    GRAPH_REGISTRY.add_node(dataset); GRAPH_REGISTRY.add_node(analysis); GRAPH_REGISTRY.add_node(result_graph)
+    GRAPH_REGISTRY.add_edge(register_edge(f"{p.analysis_id}:dataset:{manifest.manifest_id}",analysis,dataset,"ANALYZED_FROM",rationale="registered analysis manifest"))
+    GRAPH_REGISTRY.add_edge(register_edge(f"{p.analysis_id}:result:{p.result_id}",analysis,result_graph,"RESULTS_IN",rationale="registered analysis result"))
+    GRAPH_REGISTRY.require_lineage_for_result(p.result_id)
+    return {"manifest": asdict(manifest), "result": asdict(result), "graph_node": graph_node(node), "graph_lineage": sorted(GRAPH_REGISTRY.claim_upstream_types(p.result_id))}
 
 @app.post("/validation/longitudinal")
 def validation_longitudinal(p: LongitudinalInput):
