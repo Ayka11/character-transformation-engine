@@ -25,6 +25,7 @@ from .generalization_engine import register_spec as register_generalization_spec
 from .evidence_engine import register_criteria
 from .reporting_api import install_reporting_api
 from .intervention_api import install_intervention_api
+from .orchestrator_api import install_orchestrator_api
 
 app = FastAPI(title="Character Transformation Engine", version="2.1.0")
 GRAPH_REGISTRY = build_registry()
@@ -529,3 +530,6 @@ REPORT_SERVICE = install_reporting_api(app, GRAPH_REGISTRY)
 
 
 INTERVENTION_SERVICE = install_intervention_api(app, GRAPH_REGISTRY)
+
+
+ORCHESTRATOR_SERVICE = install_orchestrator_api(app)
