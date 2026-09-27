@@ -1,6 +1,9 @@
 import os
 from dataclasses import asdict
 from fastapi import FastAPI
+from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
+from pathlib import Path
 from pydantic import BaseModel, Field
 from .models import DailyState
 from .capacity import compute_capacity
@@ -34,6 +37,15 @@ from .science_lab_api import install_science_lab_api
 from .persistence import SQLiteRuntimeStore
 
 app = FastAPI(title="Character Transformation Engine", version="2.1.0")
+
+FRONTEND_DIR = Path(__file__).resolve().parents[2] / "frontend"
+if FRONTEND_DIR.exists():
+    app.mount("/science-lab/assets", StaticFiles(directory=str(FRONTEND_DIR)), name="science-lab-assets")
+
+    @app.get("/science-lab/ui", include_in_schema=False)
+    def science_lab_ui():
+        return FileResponse(FRONTEND_DIR / "index.html")
+
 RUNTIME_DB_PATH = os.getenv("CTE_RUNTIME_DB", "data/cte-runtime.sqlite3")
 RUNTIME_STORE = SQLiteRuntimeStore(RUNTIME_DB_PATH)
 GRAPH_REGISTRY = build_registry(RUNTIME_STORE)
