@@ -1,0 +1,49 @@
+"""Executable Evidence Graph boundary.
+
+In-memory runtime contract for immutable graph nodes and typed provenance edges.
+Persistence is intentionally left to the database layer.
+"""
+from __future__ import annotations
+from dataclasses import dataclass
+from .provenance import Provenance, ProvenanceTag, content_hash
+
+NODE_TYPES={"OBSERVATION","MEASUREMENT","DATASET","ANALYSIS","RESULT","REPLICATION","GENERALIZATION","CLAIM","PROTOCOL","REPORT","SOURCE"}
+EDGE_TYPES={"MEASURED_FROM","DERIVED_FROM","ANALYZED_FROM","RESULTS_IN","REPLICATES","GENERALIZES","SUPPORTS","CONTRADICTS","QUALIFIES","LIMITS","BLOCKS","DOCUMENTS","USES_PROTOCOL","CITES_SOURCE"}
+
+@dataclass(frozen=True)
+class GraphNode:
+    node_id: str
+    node_type: str
+    entity_id: str
+    provenance_class: str
+    version: str
+    immutable_hash: str
+    metadata: dict
+
+@dataclass(frozen=True)
+class GraphEdge:
+    edge_id: str
+    from_node_id: str
+    to_node_id: str
+    edge_type: str
+    relation_status: str
+    input_hash: str
+    rationale: str
+
+def register_node(node_id: str, node_type: str, entity_id: str, provenance_class: str, version: str, metadata: dict) -> GraphNode:
+    if node_type not in NODE_TYPES:
+        raise ValueError("unsupported graph node type")
+    if provenance_class not in {x.value for x in ProvenanceTag}:
+        raise ValueError("unsupported provenance class")
+    payload={"node_id":node_id,"node_type":node_type,"entity_id":entity_id,"metadata":metadata}
+    return GraphNode(node_id,node_type,entity_id,provenance_class,version,content_hash(payload),metadata)
+
+def register_edge(edge_id: str, from_node: GraphNode, to_node: GraphNode, edge_type: str, *, rationale: str="") -> GraphEdge:
+    if edge_type not in EDGE_TYPES:
+        raise ValueError("unsupported graph edge type")
+    if edge_type=="RESULTS_IN" and not (from_node.node_type=="ANALYSIS" and to_node.node_type=="RESULT"):
+        raise ValueError("RESULTS_IN requires ANALYSIS -> RESULT")
+    if edge_type=="ANALYZED_FROM" and from_node.node_type!="ANALYSIS":
+        raise ValueError("ANALYZED_FROM must originate from ANALYSIS")
+    payload={"edge_id":edge_id,"from":from_node.node_id,"to":to_node.node_id,"type":edge_type,"rationale":rationale}
+    return GraphEdge(edge_id,from_node.node_id,to_node.node_id,edge_type,"ACTIVE",content_hash(payload),rationale)
