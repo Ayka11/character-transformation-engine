@@ -40,6 +40,43 @@ GENERALIZATION_SPECS = {}
 GENERALIZATION_RUNS = {}
 EVIDENCE_CRITERIA = {}
 
+def _hydrate_research_runtime():
+    from .provenance import Provenance, ProvenanceTag
+    from .replication_engine import ReplicationSpec, ReplicationRun as EngineReplicationRun
+    from .generalization_engine import GeneralizationSpec, GeneralizationRun as EngineGeneralizationRun
+    for node in GRAPH_REGISTRY.nodes.values():
+        md=node.metadata or {}
+        if node.node_type=="PROTOCOL" and md.get("kind")=="REPLICATION_SPEC":
+            REPLICATION_SPECS[node.node_id]=ReplicationSpec(
+                node.node_id,md.get("source_claim_id",""),md.get("primary_outcome_id",""),
+                md.get("criteria",{}),node.version,
+                Provenance(ProvenanceTag(node.provenance_class),"cte.replication.spec",node.version,node.immutable_hash)
+            )
+        elif node.node_type=="REPLICATION":
+            run_id=node.node_id
+            REPLICATION_RUNS[run_id]=EngineReplicationRun(
+                run_id,md.get("replication_spec_id",""),md.get("source_result_id",""),
+                md.get("independent_study_id",""),md.get("dataset_manifest_id",""),
+                md.get("protocol_hash",""),md.get("input_hash",""),md.get("status","REGISTERED"),
+                Provenance(ProvenanceTag(node.provenance_class),"cte.replication.run",node.version,node.immutable_hash)
+            )
+        elif node.node_type=="PROTOCOL" and md.get("kind")=="GENERALIZATION_SPEC":
+            GENERALIZATION_SPECS[node.node_id]=GeneralizationSpec(
+                node.node_id,md.get("source_claim_id",""),{}, {},{}, md.get("target_context",{}),
+                md.get("transport_dimensions",[]),md.get("acceptance_rules",{}),node.version,
+                Provenance(ProvenanceTag(node.provenance_class),"cte.generalization.spec",node.version,node.immutable_hash)
+            )
+        elif node.node_type=="GENERALIZATION":
+            run_id=node.node_id
+            GENERALIZATION_RUNS[run_id]=EngineGeneralizationRun(
+                run_id,md.get("generalization_spec_id",""),md.get("source_result_id",""),
+                md.get("dataset_manifest_id",""),md.get("transport_analysis_version","1.5"),
+                md.get("input_hash",""),md.get("run_status","REGISTERED"),
+                Provenance(ProvenanceTag(node.provenance_class),"cte.generalization.run",node.version,node.immutable_hash)
+            )
+
+_hydrate_research_runtime()
+
 class StateInput(BaseModel):
     sleep_quality: float | None = Field(None, ge=0, le=10)
     recovery_index: float | None = Field(None, ge=0, le=10)
