@@ -1,0 +1,108 @@
+"""Durable crash journal and recovery scanner for transformation execution."""
+from __future__ import annotations
+from dataclasses import dataclass
+from typing import Any
+from .persistence import build_runtime_store
+from .provenance import content_hash
+from .state_snapshot_store import StateSnapshotStore
+from .transformation_ledger import TransformationLedger
+
+NAMESPACE = "transformation.journal"
+TERMINAL = {"COMMITTED", "FAILED", "RECOVERED", "ROLLED_BACK", "ROLLBACK_FAILED"}
+
+@dataclass(frozen=True)
+class JournalAttempt:
+    attempt_id: str
+    execution_id: str
+    character_id: str
+    sequence: int
+    request_hash: str
+    contract_id: str
+    contract_version: str
+    status: str
+    before_snapshot_id: str
+    after_snapshot_id: str | None = None
+    error: str | None = None
+
+class TransformationJournal:
+    def __init__(self, runtime_store=None):
+        self.store = runtime_store or build_runtime_store()
+
+    def record(self, attempt: JournalAttempt, event_type: str, **extra: Any) -> None:
+        payload = {
+            "attempt_id": attempt.attempt_id,
+            "execution_id": attempt.execution_id,
+            "character_id": attempt.character_id,
+            "sequence": attempt.sequence,
+            "request_hash": attempt.request_hash,
+            "contract_id": attempt.contract_id,
+            "contract_version": attempt.contract_version,
+            "status": attempt.status,
+            "before_snapshot_id": attempt.before_snapshot_id,
+            "after_snapshot_id": attempt.after_snapshot_id,
+            **extra,
+        }
+        event_id = content_hash({"attempt_id": attempt.attempt_id, "event_type": event_type, **payload})
+        self.store.append_event(event_id, NAMESPACE, event_type, payload)
+
+    def events(self, attempt_id: str | None = None) -> list[dict]:
+        rows = self.store.list_events(NAMESPACE)
+        if attempt_id is None:
+            return rows
+        return [row for row in rows if row["payload"].get("attempt_id") == attempt_id]
+
+    def attempts(self) -> list[JournalAttempt]:
+        grouped: dict[str, list[dict]] = {}
+        for event in self.events():
+            grouped.setdefault(event["payload"]["attempt_id"], []).append(event)
+        result = []
+        for attempt_id, events in grouped.items():
+            last = events[-1]["payload"]
+            result.append(JournalAttempt(
+                attempt_id=attempt_id,
+                execution_id=last["execution_id"],
+                character_id=last["character_id"],
+                sequence=last["sequence"],
+                request_hash=last["request_hash"],
+                contract_id=last["contract_id"],
+                contract_version=last["contract_version"],
+                status=last["status"],
+                before_snapshot_id=last["before_snapshot_id"],
+                after_snapshot_id=last.get("after_snapshot_id"),
+                error=last.get("error"),
+            ))
+        return result
+
+class TransformationRecoveryService:
+    def __init__(self, snapshots=None, ledger=None, journal=None):
+        self.snapshots = snapshots or StateSnapshotStore()
+        self.ledger = ledger or TransformationLedger(self.snapshots.store)
+        self.journal = journal or TransformationJournal(self.snapshots.store.store)
+
+    def scan(self) -> list[JournalAttempt]:
+        return [a for a in self.journal.attempts() if a.status not in TERMINAL]
+
+    def recover(self, attempt_id: str) -> JournalAttempt:
+        attempt = next((a for a in self.journal.attempts() if a.attempt_id == attempt_id), None)
+        if attempt is None:
+            raise ValueError("journal attempt not found")
+        existing = self.ledger.find_by_request_hash(attempt.request_hash)
+        if existing is not None:
+            recovered = JournalAttempt(**{**attempt.__dict__, "status": "RECOVERED",
+                                          "after_snapshot_id": existing.after_snapshot_id})
+            self.journal.record(recovered, "RECOVERED", ledger_id=existing.ledger_id)
+            return recovered
+
+        after = self.snapshots.get(attempt.after_snapshot_id) if attempt.after_snapshot_id else None
+        before = self.snapshots.get(attempt.before_snapshot_id)
+        if after is None:
+            raise ValueError("recovery requires a durable after snapshot")
+        if before is None:
+            raise ValueError("recovery requires a durable before snapshot")
+        # Recovery never re-runs the intervention. It only closes an already
+        # captured transformation attempt after verifying immutable snapshots.
+        if not self.snapshots.verify(before.snapshot_id) or not self.snapshots.verify(after.snapshot_id):
+            raise ValueError("snapshot integrity verification failed")
+        recovered = JournalAttempt(**{**attempt.__dict__, "status": "RECOVERED"})
+        self.journal.record(recovered, "RECOVERED", recovery_only=True)
+        return recovered
