@@ -20,10 +20,12 @@ from .evidence_graph import register_node, register_edge
 from .graph_registry import build_registry
 from .claim_gate import validate_claim_transition
 from .replication import register_replication, register_generalization
-from .replication_engine import register_spec, register_run, evaluate_outcome as evaluate_replication_outcome
+from .replication_engine import ReplicationRun as EngineReplicationRun, register_spec, register_run, evaluate_outcome as evaluate_replication_outcome
 
 app = FastAPI(title="Character Transformation Engine", version="2.1.0")
 GRAPH_REGISTRY = build_registry()
+REPLICATION_SPECS = {}
+REPLICATION_RUNS = {}
 
 class StateInput(BaseModel):
     sleep_quality: float | None = Field(None, ge=0, le=10)
@@ -234,20 +236,25 @@ def runtime_sprint_day(p: SprintDayInput):
 @app.post("/replication/specs")
 def replication_spec_register(p: ReplicationSpecInput):
     spec=register_spec(p.replication_spec_id,p.source_claim_id,p.primary_outcome_id,p.criteria)
-    GRAPH_REGISTRY.add_node(register_node(spec.replication_spec_id,"PROTOCOL",spec.replication_spec_id,spec.provenance.tag.value,"1.5",{"kind":"REPLICATION_SPEC","source_claim_id":spec.source_claim_id,"criteria":spec.criteria}))
+    if p.replication_spec_id in REPLICATION_SPECS:
+        raise ValueError("replication spec already registered")
+    REPLICATION_SPECS[p.replication_spec_id]=spec
+    GRAPH_REGISTRY.add_node(register_node(spec.replication_spec_id,"PROTOCOL",spec.replication_spec_id,spec.provenance.tag.value,"1.5",{"kind":"REPLICATION_SPEC","source_claim_id":spec.source_claim_id,"primary_outcome_id":spec.primary_outcome_id,"criteria":spec.criteria}))
     return asdict(spec)
 
 @app.post("/replication/runs")
 def replication_run_register(p: ReplicationRunInput):
-    spec_node=GRAPH_REGISTRY.nodes.get(p.replication_spec_id)
-    if spec_node is None or spec_node.node_type!="PROTOCOL":
+    spec=REPLICATION_SPECS.get(p.replication_spec_id)
+    if spec is None:
         raise ValueError("replication_spec_id must reference a registered replication spec")
     source=GRAPH_REGISTRY.nodes.get(p.source_result_node_id)
     if source is None or source.node_type!="RESULT":
         raise ValueError("source_result_node_id must reference a registered RESULT")
-    spec=register_spec(p.replication_spec_id,spec_node.metadata.get("source_claim_id",""),"",spec_node.metadata.get("criteria",{}))
     run=register_run(p.replication_run_id,spec,source_result_node_id=p.source_result_node_id,independent_study_id=p.independent_study_id,dataset_manifest_id=p.dataset_manifest_id,protocol_hash=p.protocol_hash,input_hash=p.input_hash,independent=p.independent)
-    node=register_node(run.replication_run_id,"REPLICATION",run.replication_run_id,run.provenance.tag.value,"1.5",{"source_result_id":run.source_result_node_id,"independent":p.independent,"criteria_registered":True,"status":run.status})
+    if p.replication_run_id in REPLICATION_RUNS:
+        raise ValueError("replication run already registered")
+    REPLICATION_RUNS[p.replication_run_id]=run
+    node=register_node(run.replication_run_id,"REPLICATION",run.replication_run_id,run.provenance.tag.value,"1.5",{"source_result_id":run.source_result_node_id,"replication_spec_id":run.replication_spec_id,"independent":p.independent,"criteria_registered":True,"status":run.status,"independent_study_id":run.independent_study_id,"dataset_manifest_id":run.dataset_manifest_id,"protocol_hash":run.protocol_hash,"input_hash":run.input_hash})
     GRAPH_REGISTRY.add_node(node)
     GRAPH_REGISTRY.add_edge(register_edge(f"{node.node_id}:replicates:{source.node_id}",node,source,"REPLICATES",rationale="registered V1.5 replication run"))
     return {"run":asdict(run),"graph_node":asdict(node)}
@@ -256,15 +263,15 @@ def replication_run_register(p: ReplicationRunInput):
 def replication_outcome_register(replication_run_id: str,p: ReplicationOutcomeInput):
     if p.replication_run_id != replication_run_id:
         raise ValueError("path and payload replication_run_id mismatch")
-    run_node=GRAPH_REGISTRY.nodes.get(replication_run_id)
-    if run_node is None or run_node.node_type!="REPLICATION":
+    run=REPLICATION_RUNS.get(replication_run_id)
+    if run is None:
         raise ValueError("replication run is not registered")
-    from .replication_engine import ReplicationRun as EngineRun
-    run=EngineRun(replication_run_id,run_node.metadata["replication_spec_id"] if "replication_spec_id" in run_node.metadata else "",run_node.metadata["source_result_id"],run_node.metadata.get("independent_study_id",""),run_node.metadata.get("dataset_manifest_id",""),run_node.metadata.get("protocol_hash",""),run_node.metadata.get("input_hash",""),run_node.metadata.get("status","REGISTERED"),run_node.metadata.get("provenance",""))
     result=evaluate_replication_outcome(run,source_estimate=p.source_estimate,target_estimate=p.target_estimate,source_effect_size=p.source_effect_size,target_effect_size=p.target_effect_size,source_ci_low=p.source_ci_low,source_ci_high=p.source_ci_high,target_ci_low=p.target_ci_low,target_ci_high=p.target_ci_high,effect_tolerance=p.effect_tolerance,protocol_fidelity=p.protocol_fidelity,measurement_fidelity=p.measurement_fidelity,outcome_definition=p.outcome_definition,data_quality=p.data_quality)
-    md=run_node.metadata.copy(); md.update({"assessment_status":result.overall_outcome})
-    GRAPH_REGISTRY.nodes[replication_run_id]=register_node(replication_run_id,"REPLICATION",replication_run_id,run_node.provenance_class,run_node.version,md)
-    return asdict(result)
+    assessment_id=f"{replication_run_id}:assessment:{result.overall_outcome}"
+    node=register_node(assessment_id,"REPLICATION",assessment_id,result.provenance.tag.value,"1.5",{"source_result_id":run.source_result_node_id,"replication_run_id":run.replication_run_id,"independent":True,"criteria_registered":True,"status":result.overall_outcome,"assessment_status":result.overall_outcome})
+    GRAPH_REGISTRY.add_node(node)
+    GRAPH_REGISTRY.add_edge(register_edge(f"{assessment_id}:replicates:{run.source_result_node_id}",node,GRAPH_REGISTRY.nodes[run.source_result_node_id],"REPLICATES",rationale="V1.5 replication outcome assessment"))
+    return {"outcome":asdict(result),"assessment_graph_node":asdict(node)}
 
 @app.post("/validation/replication/register")
 def validation_replication(p: ReplicationInput):
