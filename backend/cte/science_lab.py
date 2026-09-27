@@ -611,8 +611,20 @@ class ScienceLabService:
                         "issues": ["TRANSFORMATION_PROVENANCE_BINDER_UNAVAILABLE"],
                     }
                 )
+                graph_lineage_ok = True
+                graph_lineage_issue = None
+                result_id = node.metadata.get("result_id")
+                try:
+                    self.registry.require_transformation_lineage_for_result(
+                        result_id, execution_id
+                    )
+                except ValueError as exc:
+                    graph_lineage_ok = False
+                    graph_lineage_issue = str(exc)
                 transformation_supported = bool(
-                    tp.get("validated") and tp.get("integrity_status") == "PASS"
+                    tp.get("validated")
+                    and tp.get("integrity_status") == "PASS"
+                    and graph_lineage_ok
                 )
                 claims.append({
                     "claim_id": node.node_id,
@@ -627,7 +639,10 @@ class ScienceLabService:
                         "ledger_id": tp.get("ledger_id"),
                         "certificate_id": tp.get("certificate_id"),
                         "integrity_status": tp.get("integrity_status"),
-                        "issues": list(tp.get("issues") or []),
+                        "issues": list(tp.get("issues") or []) + (
+                            [graph_lineage_issue] if graph_lineage_issue else []
+                        ),
+                        "graph_lineage_valid": graph_lineage_ok,
                     },
                 })
         return {"matrix_id": matrix_id, "claims": claims,
