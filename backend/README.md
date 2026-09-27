@@ -18,6 +18,9 @@ Implemented runtime layers:
 - Replication V1.5 comparison runtime
 - Generalization/transport V1.5 runtime
 - Scientific Reporting V1.6 snapshot, QC, publication and supersession runtime
+- Decision & Intervention V1.7 safety-first runtime and research bridge
+- Integrated Platform Orchestrator V1.8 execution state machine and immutable event lineage
+- V1.9 synthetic end-to-end contract fixture
 - FastAPI endpoints exposing the executable baseline
 
 Not yet implemented:
