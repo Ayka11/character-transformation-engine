@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Character Transformation Engine — Science Lab</title>
+  <link rel="stylesheet" href="/science-lab/assets/styles.css">
+</head>
+<body>
+  <main class="shell">
+    <header>
+      <div>
+        <div class="eyebrow">CHARACTER TRANSFORMATION ENGINE</div>
+        <h1>Science Lab</h1>
+        <p class="muted">Experiment Matrix → Scenario Runs → Statistics → Claim / Evidence Trace</p>
+      </div>
+      <div class="status" id="apiStatus">API: checking…</div>
+    </header>
+
+    <section class="grid">
+      <article class="card">
+        <h2>1. Experiment Matrix</h2>
+        <label>Matrix ID <input id="matrixId" value="demo-matrix"></label>
+        <label>Study ID <input id="studyId" value="demo-study"></label>
+        <label>Name <input id="matrixName" value="Science Lab Matrix"></label>
+        <label>Primary outcome <input id="primaryOutcome" value="value"></label>
+        <button id="createMatrix">Create matrix</button>
+      </article>
+
+      <article class="card">
+        <h2>2. Scenario</h2>
+        <label>Scenario ID <input id="scenarioId" value="baseline"></label>
+        <label>Name <input id="scenarioName" value="Baseline"></label>
+        <label>Description <input id="scenarioDescription" value="Baseline scenario"></label>
+        <label>Conditions JSON
+          <textarea id="conditions">{}</textarea>
+        </label>
+        <button id="createScenario">Create scenario</button>
+      </article>
+
+      <article class="card span2">
+        <h2>3. Scenario Run</h2>
+        <label>Execution ID <input id="executionId" value="demo-run-001"></label>
+        <label>E2E payload JSON
+          <textarea id="runPayload"></textarea>
+        </label>
+        <button id="runScenario">Run scenario</button>
+      </article>
+
+      <article class="card">
+        <h2>4. Statistics</h2>
+        <button id="loadStats">Refresh statistics</button>
+        <pre id="stats">{}</pre>
+      </article>
+
+      <article class="card">
+        <h2>5. Report Bundle</h2>
+        <button id="loadReport">Refresh report bundle</button>
+        <pre id="report">{}</pre>
+      </article>
+    </section>
+
+    <section class="card">
+      <h2>Runtime output</h2>
+      <pre id="output">Ready.</pre>
+    </section>
+  </main>
+<script src="/science-lab/assets/app.js"></script>
+</body>
+</html>
