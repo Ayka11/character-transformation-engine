@@ -103,10 +103,13 @@ def evaluate_outcome(run:ReplicationRun, *, source_estimate:float|None, target_e
             "outcome":outcome_definition,"data_quality":data_quality}
     unknown=[k for k,v in checks.items() if v is None]
     failed=[k for k,v in checks.items() if v is False]
+    primary_estimate_missing = source_effect_size is None or target_effect_size is None
     if failed:
         overall="NOT_REPLICATED"
+    elif primary_estimate_missing:
+        overall="NOT_ESTIMABLE"
     elif unknown:
-        overall="NOT_ESTIMABLE" if len(unknown)>=len(checks) else "PARTIAL"
+        overall="PARTIAL"
     else:
         overall="REPLICATED"
     rationale="failed="+(",".join(failed) or "none")+"; unknown="+(",".join(unknown) or "none")
