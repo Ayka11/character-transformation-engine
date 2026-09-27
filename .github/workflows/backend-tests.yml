@@ -32,6 +32,8 @@ jobs:
         run: |
           cd backend
           python -m pytest -q
+      - name: Check Science Lab UI JavaScript
+        run: node --check frontend/app.js
 
   postgres-integration:
     runs-on: ubuntu-latest
