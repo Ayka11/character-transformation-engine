@@ -1,0 +1,133 @@
+{
+  "version": "2.0",
+  "status": "ARCHITECTURE_BASELINE",
+  "lifecycle": [
+    {
+      "id": 1,
+      "stage": "INTAKE",
+      "outputs": [
+        "execution_id",
+        "root_input_hash"
+      ]
+    },
+    {
+      "id": 2,
+      "stage": "PROFILE",
+      "outputs": [
+        "profile_snapshot"
+      ]
+    },
+    {
+      "id": 3,
+      "stage": "ASSESS",
+      "outputs": [
+        "measurements",
+        "assessment_result"
+      ]
+    },
+    {
+      "id": 4,
+      "stage": "STATE",
+      "outputs": [
+        "state_estimate"
+      ]
+    },
+    {
+      "id": 5,
+      "stage": "CAPACITY",
+      "outputs": [
+        "capacity_result"
+      ]
+    },
+    {
+      "id": 6,
+      "stage": "RULE_ELIGIBILITY",
+      "outputs": [
+        "eligible_rules"
+      ]
+    },
+    {
+      "id": 7,
+      "stage": "SAFETY",
+      "outputs": [
+        "safety_gate"
+      ]
+    },
+    {
+      "id": 8,
+      "stage": "INTERVENTION",
+      "outputs": [
+        "session"
+      ]
+    },
+    {
+      "id": 9,
+      "stage": "MEASURE",
+      "outputs": [
+        "response_measurements"
+      ]
+    },
+    {
+      "id": 10,
+      "stage": "QC",
+      "outputs": [
+        "qc_result"
+      ]
+    },
+    {
+      "id": 11,
+      "stage": "ANALYZE",
+      "outputs": [
+        "analysis_result"
+      ]
+    },
+    {
+      "id": 12,
+      "stage": "CLAIM",
+      "outputs": [
+        "claim_assessment"
+      ]
+    },
+    {
+      "id": 13,
+      "stage": "REPLICATE",
+      "outputs": [
+        "replication_assessment"
+      ]
+    },
+    {
+      "id": 14,
+      "stage": "GENERALIZE",
+      "outputs": [
+        "transport_assessment"
+      ]
+    },
+    {
+      "id": 15,
+      "stage": "REPORT",
+      "outputs": [
+        "report_snapshot"
+      ]
+    },
+    {
+      "id": 16,
+      "stage": "ADAPT",
+      "outputs": [
+        "adaptation_decision"
+      ]
+    },
+    {
+      "id": 17,
+      "stage": "AUDIT",
+      "outputs": [
+        "audit_record"
+      ]
+    }
+  ],
+  "terminal_conditions": [
+    "COMPLETED only after required terminal stages pass",
+    "BLOCKED when a blocking rule remains unresolved",
+    "INDETERMINATE when required evidence is insufficient",
+    "FAILED when execution error prevents completion"
+  ]
+}
