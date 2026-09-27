@@ -1,0 +1,102 @@
+{
+  "name": "Character Transformation Engine — Integrated Platform Orchestrator API",
+  "version": "1.8",
+  "status": "MDL/DRV design specification",
+  "endpoints": [
+    [
+      "POST",
+      "/orchestrator/executions",
+      "Create a canonical execution run."
+    ],
+    [
+      "POST",
+      "/orchestrator/executions/{id}/stages",
+      "Register or advance a lifecycle stage."
+    ],
+    [
+      "POST",
+      "/orchestrator/events",
+      "Append an immutable execution event."
+    ],
+    [
+      "GET",
+      "/orchestrator/executions/{id}",
+      "Return lifecycle state and stage graph."
+    ],
+    [
+      "GET",
+      "/orchestrator/executions/{id}/events",
+      "Return event lineage."
+    ],
+    [
+      "POST",
+      "/orchestrator/modules/register",
+      "Register a module/version/contract."
+    ],
+    [
+      "POST",
+      "/orchestrator/schemas/register",
+      "Register a schema version and compatibility policy."
+    ],
+    [
+      "POST",
+      "/orchestrator/rules/register",
+      "Register a versioned rule with provenance class."
+    ],
+    [
+      "POST",
+      "/orchestrator/route",
+      "Route execution to an eligible downstream module."
+    ],
+    [
+      "POST",
+      "/orchestrator/block",
+      "Block a transition with rule-linked rationale."
+    ],
+    [
+      "POST",
+      "/orchestrator/resume",
+      "Resume a paused execution after required conditions are met."
+    ],
+    [
+      "POST",
+      "/orchestrator/complete",
+      "Complete an execution after terminal-stage checks."
+    ],
+    [
+      "GET",
+      "/orchestrator/executions/{id}/provenance",
+      "Return all artifacts/events/rules in lineage."
+    ]
+  ],
+  "invariants": [
+    "one canonical execution_id per orchestration",
+    "immutable event append",
+    "input/output hashes on stage boundaries",
+    "module and schema versions recorded",
+    "rules versioned and provenance-classified",
+    "blocked upstream stages cannot produce successful downstream stages",
+    "unknown inputs remain explicit",
+    "claim-state machine remains authoritative",
+    "safety gate remains authoritative",
+    "report-language rules remain authoritative"
+  ],
+  "routing_order": [
+    "validate_input",
+    "resolve_profile",
+    "assess_state",
+    "estimate_capacity",
+    "resolve_rule_eligibility",
+    "safety_gate",
+    "execute_intervention",
+    "capture_measurements",
+    "qc",
+    "analysis",
+    "claim",
+    "replication",
+    "generalization",
+    "report",
+    "adapt",
+    "audit"
+  ]
+}
