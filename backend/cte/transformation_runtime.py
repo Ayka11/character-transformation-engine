@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Callable, Any
 from .contracts.state import StateSnapshot
-from .contracts.transformation import TransformationContract, TransformationResult, validate_transition
+from .contracts.transformation import TransformationContract, TransformationResult, TransformationCertificate, validate_transition\nfrom .contracts.errors import CTEErrorCode
 from .state_snapshot_store import StateSnapshotStore
 from .provenance import content_hash
 
@@ -48,4 +48,7 @@ class TransformationExecutor:
             before_snapshot_id=before.snapshot_id,
             after_snapshot_id=after.snapshot_id,
         )
-        return TransformationExecution(execution_id,before.snapshot_id,after.snapshot_id,result)
+        certificate = None
+        if result.status == "VALIDATED" and result.certificate_eligible:
+            certificate = TransformationCertificate.issue(execution_id, contract, result)
+        return TransformationExecution(execution_id,before.snapshot_id,after.snapshot_id,result,certificate)
