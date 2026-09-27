@@ -69,6 +69,51 @@ const out = (value) => {
   $("output").textContent = typeof value === "string" ? value : JSON.stringify(value,null,2);
 };
 
+
+async function loadOverview(){
+  try{
+    const id=encodeURIComponent($("matrixId").value);
+    const [overview,stats]=await Promise.all([
+      api("/science-lab/matrices/"+id),
+      api("/science-lab/matrices/"+id+"/statistics")
+    ]);
+    const metrics=[
+      ["Scenarios",stats.scenario_count],
+      ["Runs",stats.run_count],
+      ["Completed",stats.completed_runs],
+      ["Blocked",stats.blocked_runs],
+      ["Primary estimate",stats.descriptive_estimate_mean ?? "—"]
+    ];
+    $("metrics").innerHTML=metrics.map(([label,value]) =>
+      "<div><span>"+label+"</span><strong>"+value+"</strong></div>"
+    ).join("");
+    const rows=overview.scenario_runs || [];
+    const defs=Object.fromEntries((overview.scenarios || []).map(x=>[x.scenario_id,x]));
+    $("scenarioTable").querySelector("tbody").innerHTML = rows.length
+      ? rows.map(row => {
+          const def=defs[row.scenario_id] || {};
+          return "<tr><td>"+row.scenario_id+"</td><td><code>"+escapeHtml(JSON.stringify(def.conditions || {}))+
+                 "</code></td><td>"+row.status+"</td><td>"+(row.estimate_by_outcome?.value ?? "—")+"</td></tr>";
+        }).join("")
+      : "<tr><td colspan="4">No scenario runs yet.</td></tr>";
+  }catch(e){
+    $("output").textContent="ERROR: "+e.message;
+  }
+}
+
+async function loadClaims(){
+  try{
+    const id=encodeURIComponent($("matrixId").value);
+    $("claims").textContent=JSON.stringify(await api("/science-lab/matrices/"+id+"/claims"),null,2);
+  }catch(e){
+    $("claims").textContent="ERROR: "+e.message;
+  }
+}
+
+function escapeHtml(value){
+  return String(value).replace(/[&<>"]/g,char=>({"&":"&amp;","<":"&lt;",">":"&gt;",""":"&quot;"}[char]));
+}
+
 async function boot(){
   const apiKeyInput = $("apiKey");
   apiKeyInput.value = localStorage.getItem("CTE_API_KEY") || "";
@@ -80,6 +125,7 @@ async function boot(){
     $("apiStatus").dataset.online = "true";
   }
   $("runPayload").value = JSON.stringify(samplePayload($("executionId").value),null,2);
+  await loadOverview();
 }
 
 $("createMatrix").onclick = async () => {
@@ -114,6 +160,7 @@ $("createScenario").onclick = async () => {
       expected_outcomes:[$("primaryOutcome").value],independent:true
     })});
     out(data);
+    await loadOverview();
   }catch(e){out("ERROR: "+e.message)}
 };
 
@@ -124,6 +171,7 @@ $("runScenario").onclick = async () => {
       {method:"POST",body:JSON.stringify({payload:JSON.parse($("runPayload").value)})}
     );
     out(data);
+    await loadOverview();
   }catch(e){out("ERROR: "+e.message)}
 };
 
@@ -146,3 +194,6 @@ $("executionId").addEventListener("change",()=>{
 });
 
 boot();
+
+$("loadOverview").onclick = loadOverview;
+$("loadClaims").onclick = loadClaims;
