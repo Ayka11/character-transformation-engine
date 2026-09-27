@@ -92,6 +92,20 @@ $("createMatrix").onclick = async () => {
   }catch(e){out("ERROR: "+e.message)}
 };
 
+$("generateScenarios").onclick = async () => {
+  try{
+    const data=await api("/science-lab/matrices/"+encodeURIComponent($("matrixId").value)+"/generate-scenarios",{
+      method:"POST",
+      body:JSON.stringify({
+        factors:JSON.parse($("factors").value),
+        max_scenarios:128,
+        name_prefix:"Factorial"
+      })
+    });
+    out(data);
+  }catch(e){out("ERROR: "+e.message)}
+};
+
 $("createScenario").onclick = async () => {
   try{
     const data=await api("/science-lab/matrices/"+encodeURIComponent($("matrixId").value)+"/scenarios",{method:"POST",body:JSON.stringify({
