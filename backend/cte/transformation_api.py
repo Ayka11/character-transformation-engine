@@ -6,12 +6,14 @@ from .state_snapshot_store import StateSnapshotStore
 from .transformation_ledger import TransformationLedger
 from .transformation_recovery import TransformationRecoveryService
 from .transformation_integrity import TransformationIntegrityVerifier
+from .transformation_provenance import TransformationProvenanceBinder
 
 def install_transformation_api(app, runtime_store):
     snapshots=StateSnapshotStore(runtime_store)
     ledger=TransformationLedger(runtime_store)
     recovery=TransformationRecoveryService(snapshots,ledger)
     integrity=TransformationIntegrityVerifier(snapshots,ledger)
+    provenance=TransformationProvenanceBinder(runtime_store)
     router=APIRouter(prefix="/transformation",tags=["transformation"])
 
     @router.get("/lineage/{character_id}")
@@ -43,6 +45,10 @@ def install_transformation_api(app, runtime_store):
     def integrity_all():
         findings=integrity.verify_all()
         return {"count":len(findings),"findings":[asdict(item) for item in findings]}
+
+    @router.get("/provenance/{execution_id}")
+    def provenance_endpoint(execution_id: str):
+        return provenance.bind_execution(execution_id)
 
     @router.get("/recovery/scan")
     def recovery_scan():
