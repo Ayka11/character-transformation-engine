@@ -11,6 +11,7 @@ from pydantic import BaseModel, Field
 from .graph_registry import GraphRegistry
 from .persistence import SQLiteRuntimeStore
 from .science_lab import ScienceLabService
+from .science_lab_report import render_report
 
 
 class MatrixInput(BaseModel):
@@ -145,6 +146,11 @@ def install_science_lab_api(
     @app.get("/science-lab/matrices/{matrix_id}/report")
     def build_report_bundle(matrix_id: str):
         return service.report_bundle(matrix_id)
+
+    @app.get("/science-lab/matrices/{matrix_id}/report.html", include_in_schema=False)
+    def render_report_html(matrix_id: str):
+        from fastapi.responses import HTMLResponse
+        return HTMLResponse(render_report(service.report_bundle(matrix_id)))
 
     @app.get("/science-lab/matrices/{matrix_id}")
     def get_matrix(matrix_id: str):
