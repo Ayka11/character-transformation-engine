@@ -110,25 +110,49 @@ class GraphRegistry:
             req.add("complete_provenance")
         return req
 
-    def register_claim(self, claim_id: str, result_id: str, current_state: str,
-                       target_state: str, provenance_class: str, metadata: dict) -> GraphNode:
+    def register_claim(self, claim_id: str, result_id: str | None, current_state: str,
+                       target_state: str, provenance_class: str, metadata: dict,
+                       previous_claim_id: str | None = None) -> GraphNode:
         if claim_id in self.nodes:
             raise ValueError("claim node already registered")
+        if previous_claim_id is not None:
+            previous=self.nodes.get(previous_claim_id)
+            if previous is None or previous.node_type!="CLAIM":
+                raise ValueError("previous claim is not registered")
+            stored_state=previous.metadata.get("state")
+            if stored_state != current_state:
+                raise ValueError("current_state does not match previous claim state")
+            if result_id is None:
+                result_id=previous.metadata.get("result_id")
+        if target_state != "REGISTERED" or current_state != "HYPOTHESIS":
+            if not result_id:
+                raise ValueError("result_id is required for result-backed claim transitions")
+        requirements={"claim_registration"} if current_state=="HYPOTHESIS" and target_state=="REGISTERED" else set()
+        if result_id:
+            requirements=self.claim_requirements(result_id) | requirements
         from .claim_gate import validate_claim_transition
-        requirements=self.claim_requirements(result_id)
         validate_claim_transition(current_state,target_state,requirements,provenance_class)
         payload=dict(metadata)
         payload.update({"current_state":current_state,"state":target_state,"result_id":result_id})
         claim=register_node(claim_id,"CLAIM",claim_id,provenance_class,"2.1.0",payload)
         self.add_node(claim)
         try:
-            self.add_edge(register_edge(
-                f"{claim_id}:supports:{result_id}",
-                self.nodes[result_id],
-                claim,
-                "SUPPORTS",
-                rationale=f"claim transition {current_state} -> {target_state}",
-            ))
+            if result_id:
+                self.add_edge(register_edge(
+                    f"{claim_id}:supports:{result_id}",
+                    self.nodes[result_id],
+                    claim,
+                    "SUPPORTS",
+                    rationale=f"claim transition {current_state} -> {target_state}",
+                ))
+            if previous_claim_id:
+                self.add_edge(register_edge(
+                    f"{claim_id}:derived-from:{previous_claim_id}",
+                    claim,
+                    self.nodes[previous_claim_id],
+                    "DERIVED_FROM",
+                    rationale=f"claim state history {current_state} -> {target_state}",
+                ))
             return claim
         except Exception:
             self.nodes.pop(claim_id, None)
