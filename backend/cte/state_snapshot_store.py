@@ -24,6 +24,11 @@ class StateSnapshotStore:
             "canonicalization_version": snapshot.canonicalization_version,
         }
 
+    def save_pair_atomic(self, before: StateSnapshot, after: StateSnapshot):
+        rows=[(NAMESPACE,before.snapshot_id,self._payload(before),before.schema_version),
+              (NAMESPACE,after.snapshot_id,self._payload(after),after.schema_version)]
+        return self.store.put_snapshots_atomic(rows)
+
     def save(self, snapshot: StateSnapshot):
         # Namespace is intentionally absent from MUTABLE_SNAPSHOT_NAMESPACES.
         return self.store.put_snapshot(NAMESPACE, snapshot.snapshot_id, self._payload(snapshot), snapshot.schema_version)
