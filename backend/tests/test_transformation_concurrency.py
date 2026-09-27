@@ -44,18 +44,20 @@ def test_concurrent_different_requests_only_one_intervention_runs():
     executor=TransformationExecutor(snapshot_store=StateSnapshotStore(db))
     contract=TransformationContract("t","1",expected_changes={"tempo":6})
     calls=[]
-    barrier=threading.Barrier(2)
+    start_barrier=threading.Barrier(2)
     results=[]
 
     def run(execution_id):
+        start_barrier.wait(timeout=5)
         def intervention(state):
             calls.append(execution_id)
-            barrier.wait()
             return {"tempo":6}
         results.append(executor.execute(execution_id,"c1",1,{"tempo":5},contract,intervention))
 
     a=threading.Thread(target=run,args=("e1",))
     b=threading.Thread(target=run,args=("e2",))
-    a.start(); b.start(); a.join(); b.join()
+    a.start(); b.start(); a.join(timeout=10); b.join(timeout=10)
+    assert not a.is_alive(), "first concurrent execution thread did not terminate"
+    assert not b.is_alive(), "second concurrent execution thread did not terminate"
     assert len(calls) == 1
     assert sum(r.result.failure_code == "VERSION_CONFLICT" for r in results) == 1
