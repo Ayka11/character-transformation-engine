@@ -3,6 +3,8 @@
 Status: **IMPLEMENTED / CI-TESTED / NOT PRODUCTION-HARDENED**
 
 Implemented:
+- configurable in-process sliding-window rate limiting with HTTP 429/Retry-After;
+- protected operational backup/restore and retention API via CTE_OPS_API_KEY;
 - optional read/write API-key authentication using environment variables;
 - read/write authorization split: GET/HEAD/OPTIONS accept read or write keys, mutating routes require the write key;
 - public health/docs/UI/assets routes remain available for deployment bootstrap;
