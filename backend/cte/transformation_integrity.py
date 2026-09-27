@@ -37,13 +37,7 @@ class TransformationIntegrityVerifier:
         expected_payload_hash=content_hash(certificate_payload)
         if expected_payload_hash != entry.payload_hash:
             issues.append("LEDGER_PAYLOAD_HASH_MISMATCH")
-        ledger_payload={
-            "ledger_id":entry.ledger_id,
-            **certificate_payload,
-            "payload_hash":entry.payload_hash,
-            "request_hash":entry.request_hash,
-        }
-        if content_hash(ledger_payload) != entry.ledger_id:
+        if entry.ledger_id != entry.payload_hash:
             issues.append("LEDGER_ID_HASH_MISMATCH")
         before=self.snapshots.get(entry.before_snapshot_id)
         if before is None:
