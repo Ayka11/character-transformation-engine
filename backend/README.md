@@ -1,24 +1,36 @@
 # Backend V2.1 Implementation Baseline
 
-This is an executable baseline for selected V2.0 contracts.
+This backend contains executable runtime implementations for selected V2.0/V1.3-V1.6 contracts. Runtime state is currently in-memory unless explicitly stated otherwise.
 
-Implemented primitives:
-- provenance tags and content hashing
-- explicit daily-state model
-- C_cap calculation with UNKNOWN handling
-- A-E capacity levels and safety precedence
-- dynamic trait-graph traversal primitive
-- V1/V2/V3 compatibility primitives
-- FastAPI health, capacity and compatibility endpoints
+Implemented runtime layers:
+- provenance tags and immutable content hashing
+- canonical Master Matrix V1.0 catalog (30 items, P1-P5)
+- assessment profile and daily-state derivation
+- C_cap calculation with UNKNOWN handling, A-E capacity levels and safety precedence
+- trait-graph traversal and intervention planning
+- 21-day sprint state machine
+- outcome evaluation and runtime lineage events
+- descriptive and longitudinal validation primitives
+- registered paired analysis with immutable dataset manifest hashing
+- canonical RESULT graph boundary
+- Evidence Graph V1.4 registry, lineage validation and immutable audit events
+- Claim V1.4 state machine, claim-bound evidence criteria, contradiction handling and inference blocks
+- Replication V1.5 comparison runtime
+- Generalization/transport V1.5 runtime
+- Scientific Reporting V1.6 snapshot, QC, publication and supersession runtime
+- FastAPI endpoints exposing the executable baseline
 
 Not yet implemented:
-- persistent database
+- persistent database connection/storage for runtime registries
 - authentication/authorization
-- full Master Matrix catalog
-- sprint persistence
-- intervention persistence
-- research/evidence/replication/report persistence
-- orchestrator event bus
-- executable V1.9 runner
+- durable sprint/intervention persistence
+- full orchestrator event bus
+- executable V1.9 integration test runner
+- empirical validation of the model or its derived rules
+
+Important status boundary:
+- SPECIFIED contracts are not automatically IMPLEMENTED.
+- Runtime acceptance is not TESTED or VALIDATED.
+- Model-derived rules remain model-derived unless separately supported by empirical evidence.
 
 Platform status: IMPLEMENTATION_BASELINE.
