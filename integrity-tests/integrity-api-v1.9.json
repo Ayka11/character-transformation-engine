@@ -1,0 +1,59 @@
+{
+  "name": "Character Transformation Engine — Integrity Test API",
+  "version": "1.9",
+  "status": "MDL/DRV",
+  "endpoints": [
+    [
+      "POST",
+      "/integrity/suites",
+      "Register a test suite."
+    ],
+    [
+      "POST",
+      "/integrity/runs",
+      "Start an implementation integrity run."
+    ],
+    [
+      "POST",
+      "/integrity/runs/{id}/execute",
+      "Execute registered test cases."
+    ],
+    [
+      "GET",
+      "/integrity/runs/{id}",
+      "Return test results and artifact checks."
+    ],
+    [
+      "POST",
+      "/integrity/runs/{id}/artifact-check",
+      "Validate artifact hashes/provenance."
+    ],
+    [
+      "POST",
+      "/integrity/runs/{id}/e2e",
+      "Execute the synthetic end-to-end fixture."
+    ],
+    [
+      "POST",
+      "/integrity/runs/{id}/finalize",
+      "Mark PASS only when blocking tests pass."
+    ],
+    [
+      "GET",
+      "/integrity/status",
+      "Return current implementation integrity status."
+    ]
+  ],
+  "pass_contract": {
+    "blocking_failures": 0,
+    "unknown_blocking_inputs": 0,
+    "provenance_failures": 0,
+    "forbidden_transition_failures": 0,
+    "synthetic_evidence_promotions": 0
+  },
+  "non_goals": [
+    "scientific efficacy validation",
+    "clinical validation",
+    "real-world intervention effectiveness proof"
+  ]
+}
