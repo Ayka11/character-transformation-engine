@@ -10,6 +10,8 @@ from dataclasses import asdict
 from typing import Any
 
 from .assessment import build_profile
+from .evidence_graph import register_node
+from .state_engine import derive_daily_state
 from .capacity import compute_capacity
 from .graph_registry import GraphRegistry
 from .intervention import plan_21_day_sprint
@@ -78,7 +80,7 @@ class ResearchE2ECoordinator:
         profile_hash=stage("PROFILE",profile_payload)
 
         for measurement in profile.measurements:
-            self.registry.add_node(__import__("cte.evidence_graph",fromlist=["register_node"]).register_node(
+            self.registry.add_node(register_node(
                 measurement.measurement_id,"MEASUREMENT",measurement.measurement_id,
                 measurement.provenance.tag.value,measurement.provenance.source_version,
                 {"item_id":measurement.item_id,"value":measurement.value,
@@ -86,7 +88,7 @@ class ResearchE2ECoordinator:
             ))
         stage("ASSESSMENT",profile_payload,metadata={"measurement_count":len(profile.measurements)})
 
-        state_result=__import__("cte.state_engine",fromlist=["derive_daily_state"]).derive_daily_state(profile)
+        state_result=derive_daily_state(profile)
         state_payload={"state":asdict(state_result.state),"missing":list(state_result.missing)}
         stage("STATE_ESTIMATION",state_payload,metadata={"missing":list(state_result.missing)})
 
@@ -160,7 +162,6 @@ class ResearchE2ECoordinator:
             experiment_id=experiment_obj.experiment_id
         )
         qc_payload=asdict(qc)
-        stage("QC",qc_payload,metadata={"passed":qc.passed})
         if not qc.passed:
             self.orchestrator.advance_stage(
                 execution_id,"QC","BLOCKED",
@@ -169,6 +170,10 @@ class ResearchE2ECoordinator:
                 reason="Research QC failed; analysis cannot proceed",
                 metadata={"qc_status":"FAIL"}
             )
+            return {"execution":asdict(self.orchestrator.executions[execution_id]),
+                    "status":"BLOCKED","safety_gate":safety_payload,
+                    "research":{"study":asdict(study_obj),"qc":qc_payload}}
+        stage("QC",qc_payload,metadata={"passed":True})
             return {"execution":asdict(self.orchestrator.executions[execution_id]),
                     "status":"BLOCKED","safety_gate":safety_payload,
                     "research":{"study":asdict(study_obj),"qc":qc_payload}}
