@@ -157,3 +157,19 @@ def test_completion_rejects_validated_intervention_without_certificate():
         assert "certificate" in str(exc)
     else:
         assert False
+
+
+def test_completion_accepts_runtime_validated_transformation():
+    from cte.contracts.transformation import TransformationContract
+    o=OrchestratorService()
+    o.create_execution("complete-ok","c",{},["SAFETY_GATE","INTERVENTION"])
+    o.start("complete-ok")
+    o.advance_stage("complete-ok","SAFETY_GATE","PASSED",metadata={"safety_status":"PASS"})
+    out=o.execute_transformation(
+        "complete-ok","character-1",1,{"tempo":5},
+        TransformationContract("t1","1",expected_changes={"tempo":6}),
+        lambda state:{**state,"tempo":6},
+    )
+    assert out.result.status=="VALIDATED"
+    done=o.complete("complete-ok")
+    assert done.state=="COMPLETED"
