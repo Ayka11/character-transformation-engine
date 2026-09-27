@@ -20,6 +20,17 @@ class Snapshot:
     payload:dict
     payload_hash:str
 
+def build_runtime_store(sqlite_path: str = "data/cte-runtime.sqlite3"):
+    """Create the configured durable store.
+    CTE_DATABASE_URL selects the PostgreSQL production adapter; otherwise SQLite is used.
+    """
+    import os
+    dsn=os.getenv("CTE_DATABASE_URL")
+    if dsn:
+        from .postgres_persistence import PostgreSQLRuntimeStore
+        return PostgreSQLRuntimeStore(dsn)
+    return SQLiteRuntimeStore(os.getenv("CTE_RUNTIME_DB", sqlite_path))
+
 class SQLiteRuntimeStore:
     def __init__(self, path: str):
         if not path or path==":memory:":
