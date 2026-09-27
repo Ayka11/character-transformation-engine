@@ -362,6 +362,35 @@ class GraphRegistry:
             self.nodes.pop(claim_id, None)
             raise
 
+    def require_transformation_lineage_for_result(self, result_id: str, execution_id: str) -> None:
+        """Require an intact graph path from the result to its transformation execution."""
+        self.require_lineage_for_result(result_id)
+        transformation_ids = {
+            node.node_id for node in self.nodes.values()
+            if node.node_type == "TRANSFORMATION"
+            and node.metadata.get("execution_id") == execution_id
+        }
+        if not transformation_ids:
+            raise ValueError("RESULT requires TRANSFORMATION lineage")
+        for run_node in self.nodes.values():
+            if run_node.node_type != "ANALYSIS" or run_node.metadata.get("execution_id") != execution_id:
+                continue
+            reaches_result = any(
+                edge.from_node_id == run_node.node_id
+                and edge.to_node_id == result_id
+                and edge.edge_type == "DERIVED_FROM"
+                for edge in self.edges.values()
+            )
+            reaches_transformation = any(
+                edge.from_node_id == run_node.node_id
+                and edge.to_node_id in transformation_ids
+                and edge.edge_type == "DERIVED_FROM"
+                for edge in self.edges.values()
+            )
+            if reaches_result and reaches_transformation:
+                return
+        raise ValueError("RESULT transformation lineage is incomplete")
+
     def require_lineage_for_result(self, result_id: str) -> None:
         result=self.nodes.get(result_id)
         if result is None or result.node_type != "RESULT":
