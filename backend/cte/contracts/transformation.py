@@ -31,7 +31,21 @@ class TransformationResult:
     def failed(cls, code: str, details: dict[str, Any] | None = None, *, before_snapshot_id: str = "", after_snapshot_id: str = "", status: str = "FAILED", before_hash: str = "", after_hash: str = "", changed_fields: tuple[str, ...] = ()):
         return cls(status, code, before_snapshot_id, after_snapshot_id, before_hash, after_hash, changed_fields, False, details or {})
 
-def validate_transition(contract, diff, *, before_snapshot_id="", after_snapshot_id=""):
+def validate_transition(contract, diff, *, before_snapshot_id="", after_snapshot_id="", before_state=None, after_state=None):
+    before_state = dict(before_state or {})
+    after_state = dict(after_state or {})
+    missing_preconditions = {
+        key: {"required": value, "actual": before_state.get(key)}
+        for key, value in contract.required_state.items()
+        if before_state.get(key) != value
+    }
+    if missing_preconditions:
+        return TransformationResult(
+            "FAILED", CTEErrorCode.PRECONDITION_FAILED.value,
+            before_snapshot_id, after_snapshot_id, diff.before_hash, diff.after_hash,
+            tuple(sorted(missing_preconditions)), False,
+            {"required_state": missing_preconditions},
+        )
     if contract.expected_changes and not diff.state_changed:
         return TransformationResult("FAILED", CTEErrorCode.NO_STATE_CHANGE.value, before_snapshot_id, after_snapshot_id, diff.before_hash, diff.after_hash, (), False, {"reason":"required transformation produced no state change"})
     if diff.forbidden:
@@ -40,6 +54,18 @@ def validate_transition(contract, diff, *, before_snapshot_id="", after_snapshot
         return TransformationResult("FAILED", CTEErrorCode.UNEXPECTED_CHANGE.value, before_snapshot_id, after_snapshot_id, diff.before_hash, diff.after_hash, tuple(diff.changed), False, {"unexpected":diff.unexpected})
     if diff.missing_expected:
         return TransformationResult("FAILED", CTEErrorCode.VALIDATION_FAILED.value, before_snapshot_id, after_snapshot_id, diff.before_hash, diff.after_hash, tuple(diff.changed), False, {"missing_expected":diff.missing_expected})
+    postcondition_failures = {
+        key: {"expected": value, "actual": after_state.get(key)}
+        for key, value in contract.postconditions
+        if after_state.get(key) != value
+    }
+    if postcondition_failures:
+        return TransformationResult(
+            "FAILED", CTEErrorCode.VALIDATION_FAILED.value,
+            before_snapshot_id, after_snapshot_id, diff.before_hash, diff.after_hash,
+            tuple(sorted(diff.changed)), False,
+            {"postconditions": postcondition_failures},
+        )
     return TransformationResult("VALIDATED", None, before_snapshot_id, after_snapshot_id, diff.before_hash, diff.after_hash, tuple(sorted(diff.changed)), True, {})
 
 @dataclass(frozen=True)
