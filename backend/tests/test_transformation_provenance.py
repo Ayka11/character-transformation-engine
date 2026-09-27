@@ -232,3 +232,82 @@ def test_transformation_provenance_survives_science_lab_reload_and_report_hash()
     assert bundle2["transformation_provenance"]["validated_run_count"] == 1
     assert bundle2["transformation_provenance"]["runs"][0]["ledger_id"] == tp["ledger_id"]
     assert bundle2["provenance"]["input_hash"] == bundle1["provenance"]["input_hash"]
+
+
+def test_science_lab_does_not_trust_tampered_run_transformation_provenance():
+    from cte.graph_registry import GraphRegistry
+    from cte.science_lab import ExperimentMatrix, ScenarioDefinition, ScenarioRun, ScienceLabService
+    from cte.evidence_graph import register_edge, register_node
+
+    db = SQLiteRuntimeStore(":memory:")
+    registry = GraphRegistry.empty(db)
+    executor = TransformationExecutor(StateSnapshotStore(db), TransformationLedger(db))
+    execution = executor.execute(
+        "tamper-source", "character-tamper", 1, {"tempo": 5},
+        TransformationContract("tamper-contract", "1", expected_changes={"tempo": 6}),
+        lambda state: {"tempo": 6},
+    )
+    trusted = TransformationProvenanceBinder(db).bind_execution("tamper-source")
+    service = object.__new__(ScienceLabService)
+    service.store = db
+    service.registry = registry
+    service.research = None
+    service.coordinator = None
+    service.transformation_provenance = TransformationProvenanceBinder(db)
+    service.matrices = {
+        "m": ExperimentMatrix("m", "study", "M", "outcome", {}, ("s",), "ACTIVE", "hash")
+    }
+    service.scenarios = {
+        "s": ScenarioDefinition("s", "m", "S", "S", {}, ("outcome",), True, "hash")
+    }
+    service.replication_assessments = {}
+    service.generalization_assessments = {}
+    service.runs = {
+        "run": ScenarioRun(
+            "run", "m", "s", "tamper-source", "COMPLETED", ("result",),
+            {"outcome": 6.0}, "PASS", "output",
+            Provenance(ProvenanceTag.EXP, "test", "1", "input", "test"),
+            {
+                **trusted,
+                "validated": False,
+                "integrity_status": "FAIL",
+                "ledger_id": "forged-ledger",
+                "certificate_id": "forged-certificate",
+            },
+        )
+    }
+    registry.add_node(register_node(
+        "result", "RESULT", "result", "EXP", "1",
+        {"qc_status": "PASS", "validated_descriptive_result": True},
+    ))
+    registry.add_node(register_node(
+        "analysis", "ANALYSIS", "analysis", "EXP", "1", {"kind": "ANALYSIS"},
+    ))
+    registry.add_node(register_node(
+        "dataset", "DATASET", "dataset", "EXP", "1", {"kind": "DATASET"},
+    ))
+    registry.add_edge(register_edge(
+        "analysis:dataset", registry.nodes["dataset"], registry.nodes["analysis"],
+        "ANALYZED_FROM", rationale="test",
+    ))
+    registry.add_edge(register_edge(
+        "result:analysis", registry.nodes["analysis"], registry.nodes["result"],
+        "RESULTS_IN", rationale="test",
+    ))
+    registry.register_claim(
+        "claim", "result", "HYPOTHESIS", "REGISTERED", "EXP",
+        {"execution_id": "tamper-source"},
+    )
+
+    claims = service.claim_validation("m")
+    support = claims["claims"][0]["transformation_support"]
+    assert support["status"] == "VALIDATED"
+    assert support["integrity_status"] == "PASS"
+    assert support["ledger_id"] == trusted["ledger_id"]
+    assert support["ledger_id"] != "forged-ledger"
+
+    report = service.report_bundle("m")
+    assert report["transformation_provenance"]["validated_run_count"] == 1
+    assert report["transformation_provenance"]["runs"][0]["ledger_id"] == trusted["ledger_id"]
+    assert report["transformation_provenance"]["runs"][0]["certificate_id"] == trusted["certificate_id"]
+    assert execution.result.status == "VALIDATED"
