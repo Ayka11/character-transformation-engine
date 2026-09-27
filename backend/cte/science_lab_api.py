@@ -135,6 +135,17 @@ def install_science_lab_api(
             matrix_id=matrix_id, **p.model_dump()
         ))
 
+    @app.get("/science-lab/matrices/{matrix_id}/provenance")
+    def matrix_provenance(matrix_id: str):
+        bundle = service.report_bundle(matrix_id)
+        return {
+            "matrix_id": matrix_id,
+            "transformation_provenance": bundle["transformation_provenance"],
+            "downstream_transformation_provenance": bundle["downstream_transformation_provenance"],
+            "claim_validation": bundle["claim_validation"],
+            "scientific_status": bundle["provenance"]["scientific_status"],
+        }
+
     @app.get("/science-lab/matrices/{matrix_id}/claims")
     def validate_claims(matrix_id: str):
         return service.claim_validation(matrix_id)
