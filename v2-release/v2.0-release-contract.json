@@ -1,0 +1,114 @@
+{
+  "name": "Character Transformation Engine V2.0 Release Contract",
+  "version": "2.0",
+  "status": "ARCHITECTURE_BASELINE",
+  "layers": [
+    {
+      "id": "L01",
+      "name": "Matrix & Measurement",
+      "source": "V1.0"
+    },
+    {
+      "id": "L02",
+      "name": "Runtime State",
+      "source": "V1.1"
+    },
+    {
+      "id": "L03",
+      "name": "Research Execution",
+      "source": "V1.2"
+    },
+    {
+      "id": "L04",
+      "name": "Validation & Analytics",
+      "source": "V1.3"
+    },
+    {
+      "id": "L05",
+      "name": "Evidence & Claim Graph",
+      "source": "V1.4"
+    },
+    {
+      "id": "L06",
+      "name": "Replication & Generalization",
+      "source": "V1.5"
+    },
+    {
+      "id": "L07",
+      "name": "Scientific Reporting",
+      "source": "V1.6"
+    },
+    {
+      "id": "L08",
+      "name": "Decision & Intervention",
+      "source": "V1.7"
+    },
+    {
+      "id": "L09",
+      "name": "Orchestrator",
+      "source": "V1.8"
+    },
+    {
+      "id": "L10",
+      "name": "Integrity Testing",
+      "source": "V1.9"
+    }
+  ],
+  "canonical_ids": [
+    "execution_id",
+    "correlation_id",
+    "artifact_id",
+    "provenance_record_id",
+    "input_hash",
+    "output_hash"
+  ],
+  "canonical_status_domains": {
+    "execution": [
+      "CREATED",
+      "RUNNING",
+      "PAUSED",
+      "BLOCKED",
+      "COMPLETED",
+      "FAILED",
+      "CANCELLED"
+    ],
+    "claim": [
+      "HYPOTHESIS",
+      "REGISTERED",
+      "DESCRIPTIVE_RESULT",
+      "ASSOCIATIONAL_RESULT",
+      "INTERVENTION_RESULT",
+      "REPLICATED_RESULT",
+      "GENERALIZED_RESULT",
+      "EVIDENCE_SUPPORTED",
+      "UNSUPPORTED",
+      "CONTRADICTED",
+      "INDETERMINATE"
+    ],
+    "intervention_level": [
+      "A",
+      "B",
+      "C",
+      "D",
+      "E"
+    ]
+  },
+  "release_gates": [
+    "V1.9 blocking integrity failures = 0",
+    "all active schemas versioned",
+    "all active rules versioned",
+    "all production decisions provenance-linked",
+    "unknown values preserved",
+    "safety precedence enforced",
+    "claim-state guardrails enforced",
+    "replication criteria registered",
+    "generalization target/boundaries registered",
+    "report publication gates enforced"
+  ],
+  "non_claims": [
+    "does not establish scientific efficacy",
+    "does not establish clinical safety",
+    "does not establish universal personality validity",
+    "does not establish a universal compatibility score"
+  ]
+}
