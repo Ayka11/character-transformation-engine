@@ -9,6 +9,7 @@ class StateSnapshot:
     sequence: int
     state: dict[str, Any]
     state_hash: str
+    lineage_hash: str
     parent_snapshot_id: str | None = None
     source_execution_id: str | None = None
     schema_version: str = "1.0"
@@ -17,7 +18,9 @@ class StateSnapshot:
     @classmethod
     def capture(cls, snapshot_id, character_id, sequence, state, *, parent_snapshot_id=None, source_execution_id=None, schema_version="1.0", canonicalization_version="1.0"):
         payload=dict(state)
-        return cls(snapshot_id, character_id, sequence, payload, content_hash(payload), parent_snapshot_id, source_execution_id, schema_version, canonicalization_version)
+        state_hash=content_hash(payload)
+        lineage_hash=content_hash({"parent_snapshot_id":parent_snapshot_id,"state_hash":state_hash,"source_execution_id":source_execution_id,"schema_version":schema_version,"canonicalization_version":canonicalization_version})
+        return cls(snapshot_id, character_id, sequence, payload, state_hash, lineage_hash, parent_snapshot_id, source_execution_id, schema_version, canonicalization_version)
 
 @dataclass(frozen=True)
 class StateDiff:
