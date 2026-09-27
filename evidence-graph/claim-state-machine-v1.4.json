@@ -1,0 +1,119 @@
+{
+  "name": "Claim State Machine V1.4",
+  "status": "MDL/DRV",
+  "states": [
+    "HYPOTHESIS",
+    "REGISTERED",
+    "DESCRIPTIVE_RESULT",
+    "ASSOCIATIONAL_RESULT",
+    "INTERVENTION_RESULT",
+    "REPLICATED_RESULT",
+    "GENERALIZED_RESULT",
+    "EVIDENCE_SUPPORTED",
+    "UNSUPPORTED",
+    "CONTRADICTED",
+    "INDETERMINATE"
+  ],
+  "transitions": [
+    {
+      "from": "HYPOTHESIS",
+      "to": "REGISTERED",
+      "requires": [
+        "claim_registration"
+      ]
+    },
+    {
+      "from": "REGISTERED",
+      "to": "DESCRIPTIVE_RESULT",
+      "requires": [
+        "validated_descriptive_result"
+      ]
+    },
+    {
+      "from": "REGISTERED",
+      "to": "ASSOCIATIONAL_RESULT",
+      "requires": [
+        "registered_analysis",
+        "valid_result",
+        "association_design"
+      ]
+    },
+    {
+      "from": "REGISTERED",
+      "to": "INTERVENTION_RESULT",
+      "requires": [
+        "registered_intervention",
+        "valid_result"
+      ]
+    },
+    {
+      "from": "ASSOCIATIONAL_RESULT",
+      "to": "REPLICATED_RESULT",
+      "requires": [
+        "independent_replication",
+        "registered_replication_criteria"
+      ]
+    },
+    {
+      "from": "INTERVENTION_RESULT",
+      "to": "REPLICATED_RESULT",
+      "requires": [
+        "independent_replication",
+        "registered_replication_criteria"
+      ]
+    },
+    {
+      "from": "REPLICATED_RESULT",
+      "to": "GENERALIZED_RESULT",
+      "requires": [
+        "generalization_run",
+        "target_population_context"
+      ]
+    },
+    {
+      "from": "GENERALIZED_RESULT",
+      "to": "EVIDENCE_SUPPORTED",
+      "requires": [
+        "registered_evidence_criteria",
+        "complete_provenance"
+      ]
+    },
+    {
+      "from": "*",
+      "to": "CONTRADICTED",
+      "requires": [
+        "unresolved_material_contradiction"
+      ]
+    },
+    {
+      "from": "*",
+      "to": "INDETERMINATE",
+      "requires": [
+        "insufficient_or_conflicting_information"
+      ]
+    }
+  ],
+  "non_transitions": [
+    [
+      "ASSOCIATIONAL_RESULT",
+      "EVIDENCE_SUPPORTED"
+    ],
+    [
+      "SINGLE_STUDY",
+      "REPLICATED_RESULT"
+    ],
+    [
+      "STATISTICAL_SIGNIFICANCE",
+      "EVIDENCE_SUPPORTED"
+    ],
+    [
+      "MODEL_OUTPUT",
+      "EVIDENCE_SUPPORTED"
+    ]
+  ],
+  "notes": [
+    "Transitions are rule-driven and auditable.",
+    "An evidence-supported claim may later be qualified or contradicted; history is never deleted.",
+    "State names describe epistemic status within the system and are not scientific conclusions by themselves."
+  ]
+}
