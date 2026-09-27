@@ -5,6 +5,7 @@ This renders registered artifacts; it does not create new evidence.
 from __future__ import annotations
 from dataclasses import dataclass, field
 from .provenance import content_hash
+from .persistence import SQLiteRuntimeStore
 
 SECTION_CODES=(
     "EXECUTIVE_SUMMARY","RESEARCH_QUESTION_HYPOTHESES","MEASUREMENT_SPECIFICATION",
@@ -134,10 +135,62 @@ def build_source_manifest(registry, artifact_ids:list[str])->str:
     return content_hash(entries)
 
 class ReportService:
-    def __init__(self,registry):
+    def __init__(self,registry,store:SQLiteRuntimeStore|None=None):
         self.registry=registry
+        self.store=store
         self.specs={}
         self.runs={}
+        self._hydrate()
+
+    def _hydrate(self):
+        if self.store is None:
+            return
+        for snap in self.store.list_snapshots("report.spec"):
+            p=snap.payload
+            self.specs[p["report_spec_id"]]=ReportSpec(
+                p["report_spec_id"],p["name"],p["version"],tuple(p["section_order"]),
+                p.get("rendering_rules",{}),p.get("claim_language_rules",{}),p["immutable_hash"])
+        for snap in self.store.list_snapshots("report.run"):
+            p=snap.payload
+            sections={k:ReportSection(v["report_section_id"],v["report_run_id"],v["section_code"],v["ordinal"],
+                v["content"],tuple(v["source_artifacts"]),v["derivation_rule_id"],v["derivation_rule_version"],
+                v["evidence_status"],tuple(v["limitations"]),v["immutable_hash"]) for k,v in p.get("sections",{}).items()}
+            bindings={k:ReportClaimBinding(v["binding_id"],v["report_run_id"],v["claim_id"],v["claim_status"],
+                tuple(v["supporting_nodes"]),tuple(v["limiting_nodes"]),tuple(v["contradiction_nodes"]),
+                v["allowed_language_rule_id"],v["generated_statement"],v["immutable_hash"]) for k,v in p.get("bindings",{}).items()}
+            qc={k:ReportQC(v["report_qc_id"],v["report_run_id"],v["check_code"],v["status"],
+                v["observed"],v.get("expected"),v["message"],v["immutable_hash"]) for k,v in p.get("qc",{}).items()}
+            self.runs[p["report_run_id"]]=ReportRun(
+                p["report_run_id"],p["report_spec_id"],p["study_id"],p["source_manifest_hash"],
+                p["report_input_hash"],p.get("status","REGISTERED"),tuple(p.get("source_artifacts",())),
+                dict(p.get("decisions",{})),sections,bindings,qc,p.get("report_output_hash"),p.get("superseded_by")
+            )
+
+    def _persist_run(self,run:ReportRun):
+        if self.store is None:
+            return
+        payload={"report_run_id":run.report_run_id,"report_spec_id":run.report_spec_id,"study_id":run.study_id,
+            "source_manifest_hash":run.source_manifest_hash,"report_input_hash":run.report_input_hash,
+            "status":run.status,"source_artifacts":list(run.source_artifacts),"decisions":run.decisions,
+            "sections":{k:{
+                "report_section_id":v.report_section_id,"report_run_id":v.report_run_id,"section_code":v.section_code,
+                "ordinal":v.ordinal,"content":v.content,"source_artifacts":list(v.source_artifacts),
+                "derivation_rule_id":v.derivation_rule_id,"derivation_rule_version":v.derivation_rule_version,
+                "evidence_status":v.evidence_status,"limitations":list(v.limitations),"immutable_hash":v.immutable_hash
+            } for k,v in run.sections.items()},
+            "bindings":{k:{
+                "binding_id":v.binding_id,"report_run_id":v.report_run_id,"claim_id":v.claim_id,"claim_status":v.claim_status,
+                "supporting_nodes":list(v.supporting_nodes),"limiting_nodes":list(v.limiting_nodes),
+                "contradiction_nodes":list(v.contradiction_nodes),"allowed_language_rule_id":v.allowed_language_rule_id,
+                "generated_statement":v.generated_statement,"immutable_hash":v.immutable_hash
+            } for k,v in run.bindings.items()},
+            "qc":{k:{
+                "report_qc_id":v.report_qc_id,"report_run_id":v.report_run_id,"check_code":v.check_code,
+                "status":v.status,"observed":v.observed,"expected":v.expected,"message":v.message,"immutable_hash":v.immutable_hash
+            } for k,v in run.qc.items()},
+            "report_output_hash":run.report_output_hash,"superseded_by":run.superseded_by}
+        self.store.put_snapshot("report.run",run.report_run_id,payload,"1.6")
+
 
     def create(self,report_run_id:str,report_spec_id:str,study_id:str,artifact_ids:list[str])->ReportRun:
         if report_run_id in self.runs: raise ValueError("report run already registered")
@@ -147,6 +200,7 @@ class ReportService:
         manifest=build_source_manifest(self.registry,artifact_ids)
         run=ReportRun(report_run_id,report_spec_id,study_id,manifest,content_hash({"report_run_id":report_run_id,"spec":report_spec_id,"manifest":manifest}),"REGISTERED",tuple(artifact_ids),{})
         self.runs[report_run_id]=run
+        self._persist_run(run)
         return run
 
     def add_decision(self,run_id:str,decision_id:str,decision_type:str,decision:str,rule_id:str,inputs:dict,rationale:str)->dict:
@@ -157,6 +211,7 @@ class ReportService:
         payload={"decision_id":decision_id,"report_run_id":run_id,"decision_type":decision_type,"decision":decision,"rule_id":rule_id,"inputs":inputs,"rationale":rationale}
         item={**payload,"immutable_hash":content_hash(payload)}
         run.decisions[decision_id]=item
+        self._persist_run(run)
         return item
 
     def add_section(self,run_id:str,section_code:str,content:dict,source_artifacts:list[str],
@@ -177,6 +232,7 @@ class ReportService:
                           derivation_rule_id,derivation_rule_version,evidence_status,tuple(limitations or []),content_hash(payload))
         if section_code in run.sections: raise ValueError("report section already registered")
         run.sections[section_code]=sec
+        self._persist_run(run)
         return sec
 
     def bind_claim(self,run_id:str,claim_id:str,allowed_claim_status:str|None=None)->ReportClaimBinding:
@@ -198,6 +254,7 @@ class ReportService:
                  "allowed_language_rule_id":rule,"generated_statement":statement}
         binding=ReportClaimBinding(payload["binding_id"],run_id,claim_id,status,support,limits,contradictions,rule,statement,content_hash(payload))
         run.bindings[claim_id]=binding
+        self._persist_run(run)
         return binding
 
     def qc_run(self,run_id:str)->dict:
@@ -229,8 +286,10 @@ class ReportService:
         limitation_ok="LIMITATIONS_BOUNDARIES" in section_codes
         add("LIMITATIONS","PASS" if limitation_ok else "FAIL",{"present":limitation_ok},{"required":True},"limitations and boundaries are required")
         run.qc=checks
+        self._persist_run(run)
         blocking=[code for code,q in checks.items() if q.status=="FAIL"]
         run.status="QC_FAILED" if blocking else "QC_PASSED"
+        self._persist_run(run)
         return {"status":run.status,"blocking_checks":blocking,"checks":{k:v.status for k,v in checks.items()}}
 
     def publish(self,run_id:str)->ReportRun:
@@ -242,6 +301,7 @@ class ReportService:
             "bindings":[b.immutable_hash for b in run.bindings.values()],
             "qc":[q.immutable_hash for q in run.qc.values()]})
         run.status="PUBLISHED"
+        self._persist_run(run)
         return run
 
     def supersede(self,old_id:str,new_id:str)->ReportRun:
@@ -250,4 +310,6 @@ class ReportService:
         if old.status!="PUBLISHED": raise ValueError("only published reports can be superseded")
         old.superseded_by=new_id
         old.status="SUPERSEDED"
+        self._persist_run(old)
+        self._persist_run(new)
         return new
