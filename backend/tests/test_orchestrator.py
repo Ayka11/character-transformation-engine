@@ -33,3 +33,26 @@ def test_claim_evidence_promotion_requires_claim_gate():
     try: o.advance_stage("x","CLAIM","PASSED",metadata={"claim_state":"EVIDENCE_SUPPORTED","claim_gate_passed":False})
     except ValueError: assert True
     else: assert False
+
+def test_blocked_upstream_stage_prevents_downstream_pass():
+    o=OrchestratorService()
+    o.create_execution("x","c",{},["SAFETY_GATE","INTERVENTION"])
+    o.start("x")
+    o.advance_stage("x","SAFETY_GATE","BLOCKED",reason="constraint",metadata={"safety_status":"BLOCK"})
+    try:
+        o.advance_stage("x","INTERVENTION","RUNNING")
+    except ValueError:
+        assert True
+    else:
+        assert False
+
+def test_downstream_stage_cannot_start_before_required_upstream():
+    o=OrchestratorService()
+    o.create_execution("x","c",{},["INTAKE","PROFILE"])
+    o.start("x")
+    try:
+        o.advance_stage("x","PROFILE","RUNNING")
+    except ValueError as e:
+        assert "upstream" in str(e)
+    else:
+        assert False
