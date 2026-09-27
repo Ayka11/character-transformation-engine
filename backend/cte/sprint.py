@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from .models import DailyState
 from .capacity import compute_capacity
+from .recovery import evaluate_bio_reset
 
 @dataclass(frozen=True)
 class SprintDayResult:
@@ -28,7 +29,7 @@ class SprintState:
 def start_sprint(sprint_id: str, target_trait: str, supporting_bio_habit: str, daily_action: str) -> SprintState:
     return SprintState(sprint_id, target_trait, 21, 0, "ACTIVE", supporting_bio_habit, daily_action)
 
-def record_day(state: SprintState, day: int, action_completed: bool, outcome: float | None, daily_state: DailyState) -> SprintDayResult:
+def record_day(state: SprintState, day: int, action_completed: bool, outcome: float | None, daily_state: DailyState, recovery_indices: list[float | None] | None = None) -> SprintDayResult:
     if state.status != "ACTIVE":
         raise ValueError("Sprint is not active")
     if day != state.current_day + 1:
@@ -38,6 +39,10 @@ def record_day(state: SprintState, day: int, action_completed: bool, outcome: fl
     capacity = compute_capacity(daily_state)
     if capacity.safety_block:
         return SprintDayResult(day, "PAUSED_SAFETY", action_completed, outcome, capacity.capacity, True, "pause_and_recover", "Safety gate overrides sprint progression")
+    if recovery_indices is not None:
+        bio_reset = evaluate_bio_reset(recovery_indices)
+        if bio_reset.triggered:
+            return SprintDayResult(day, "PAUSED_BIO_RESET", action_completed, outcome, capacity.capacity, True, "bio_reset", bio_reset.reason)
     if outcome is None:
         return SprintDayResult(day, "RECORDED_NO_OUTCOME", action_completed, None, capacity.capacity, False, "collect_outcome", "Outcome measurement is missing")
     if day == state.duration_days:
