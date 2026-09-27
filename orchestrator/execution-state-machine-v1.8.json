@@ -1,0 +1,70 @@
+{
+  "version": "1.8",
+  "status": "MDL/DRV",
+  "states": [
+    "CREATED",
+    "RUNNING",
+    "PAUSED",
+    "BLOCKED",
+    "COMPLETED",
+    "FAILED",
+    "CANCELLED"
+  ],
+  "stage_states": [
+    "PENDING",
+    "RUNNING",
+    "PASSED",
+    "BLOCKED",
+    "FAILED",
+    "SKIPPED"
+  ],
+  "terminal_rules": [
+    "COMPLETED requires all required stages PASSED or explicitly SKIPPED with reason.",
+    "BLOCKED requires an unresolved blocking condition.",
+    "FAILED requires a recorded failure code and provenance-linked rationale.",
+    "PAUSED requires a resumable condition and preserved execution state."
+  ],
+  "transition_guards": [
+    {
+      "from": "CREATED",
+      "to": "RUNNING",
+      "guard": "input_valid"
+    },
+    {
+      "from": "RUNNING",
+      "to": "PAUSED",
+      "guard": "resumable_condition"
+    },
+    {
+      "from": "RUNNING",
+      "to": "BLOCKED",
+      "guard": "blocking_rule"
+    },
+    {
+      "from": "RUNNING",
+      "to": "FAILED",
+      "guard": "execution_failure"
+    },
+    {
+      "from": "RUNNING",
+      "to": "COMPLETED",
+      "guard": "all_required_stages_terminal"
+    },
+    {
+      "from": "PAUSED",
+      "to": "RUNNING",
+      "guard": "resume_conditions_met"
+    },
+    {
+      "from": "BLOCKED",
+      "to": "RUNNING",
+      "guard": "blocking_condition_resolved"
+    }
+  ],
+  "forbidden": [
+    "BLOCKED -> COMPLETED without resolution",
+    "FAILED -> COMPLETED without new execution or explicit recovery path",
+    "unknown_required_input -> PASSED",
+    "unsafe_intervention -> PASSED"
+  ]
+}
