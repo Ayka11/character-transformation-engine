@@ -4,6 +4,7 @@ from dataclasses import asdict
 from fastapi import HTTPException
 from pydantic import BaseModel, Field
 from .orchestrator import OrchestratorService
+from .persistence import SQLiteRuntimeStore
 
 class ExecutionCreateInput(BaseModel):
     execution_id:str
@@ -61,8 +62,8 @@ class FailureInput(BaseModel):
     failure_code:str
     rationale:str
 
-def install_orchestrator_api(app):
-    service=OrchestratorService()
+def install_orchestrator_api(app, store: SQLiteRuntimeStore | None = None):
+    service=OrchestratorService(store)
 
     @app.post("/orchestrator/executions")
     def create_execution(p:ExecutionCreateInput):
