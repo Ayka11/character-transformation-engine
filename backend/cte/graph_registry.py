@@ -32,6 +32,32 @@ class GraphRegistry:
         self.edges[edge.edge_id]=edge
         return edge
 
+
+    def upstream_types(self, node_id: str) -> set[str]:
+        if node_id not in self.nodes:
+            raise ValueError("node is not registered")
+        return {self.nodes[e.from_node_id].node_type for e in self.edges.values()
+                if e.to_node_id == node_id and e.from_node_id in self.nodes}
+
+    def claim_upstream_types(self, result_id: str) -> set[str]:
+        """Return types reachable upstream from a RESULT through registered edges."""
+        if result_id not in self.nodes or self.nodes[result_id].node_type != "RESULT":
+            raise ValueError("RESULT node is not registered")
+        found: set[str] = {"RESULT"}
+        frontier=[result_id]
+        seen={result_id}
+        while frontier:
+            current=frontier.pop()
+            for edge in self.edges.values():
+                if edge.to_node_id != current or edge.from_node_id in seen:
+                    continue
+                if edge.from_node_id not in self.nodes:
+                    continue
+                seen.add(edge.from_node_id)
+                found.add(self.nodes[edge.from_node_id].node_type)
+                frontier.append(edge.from_node_id)
+        return found
+
     def require_lineage_for_result(self, result_id: str) -> None:
         result=self.nodes.get(result_id)
         if result is None or result.node_type != "RESULT":
