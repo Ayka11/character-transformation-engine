@@ -164,13 +164,11 @@ class GraphRegistry:
         queue=[claim_id]
         while queue:
             current=queue.pop()
-            for edge in self.edges.values():
-                if edge.to_node_id != current or edge.from_node_id in seen:
+            for node_id in self._lineage_neighbors(current):
+                if node_id in seen or node_id not in self.nodes:
                     continue
-                if edge.from_node_id not in self.nodes:
-                    continue
-                seen.add(edge.from_node_id)
-                queue.append(edge.from_node_id)
+                seen.add(node_id)
+                queue.append(node_id)
         nodes=[self.nodes[nid] for nid in seen]
         edges=[e for e in self.edges.values() if e.from_node_id in seen and e.to_node_id in seen]
         return nodes,edges
