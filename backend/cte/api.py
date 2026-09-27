@@ -68,6 +68,14 @@ class ClaimGateInput(BaseModel):
     target_level: str
     provenance_class: str = "DRV"
 
+class ClaimInput(BaseModel):
+    claim_id: str
+    result_id: str
+    current_state: str
+    target_state: str
+    provenance_class: str = "DRV"
+    metadata: dict = Field(default_factory=dict)
+
 class GraphEdgeInput(BaseModel):
     edge_id: str
     from_node_id: str
@@ -171,6 +179,11 @@ def runtime_sprint_day(p: SprintDayInput):
 def graph_claim_gate(p: ClaimGateInput):
     upstream=GRAPH_REGISTRY.claim_upstream_types(p.result_id)
     return validate_claim_transition(p.current_state,p.target_level,upstream,p.provenance_class)
+
+@app.post("/graph/claim")
+def graph_claim(p: ClaimInput):
+    claim=GRAPH_REGISTRY.register_claim(p.claim_id,p.result_id,p.current_state,p.target_state,p.provenance_class,p.metadata)
+    return {"claim":asdict(claim),"supported_result_id":p.result_id}
 
 @app.post("/graph/register-node")
 def graph_register_node(p: GraphEdgeInput):
