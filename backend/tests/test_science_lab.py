@@ -142,3 +142,21 @@ def test_lab_replication_and_generalization_are_explicit(tmp_path):
     assert gen.status=="GENERALIZABLE"
     validation=lab.claim_validation("m1")
     assert any(x["claim_id"]==claim_id for x in validation["claims"])
+
+
+def test_lab_descriptive_statistics_is_explicitly_non_inferential(tmp_path):
+    lab=make_lab(tmp_path)
+    matrix=lab.register_matrix(
+        matrix_id="m1",study_id="study-root",name="Matrix",
+        primary_outcome="value",design={"type":"scenario_matrix"}
+    )
+    lab.register_scenario(
+        scenario_id="s1",matrix_id="m1",name="Baseline",
+        description="Baseline",conditions={},expected_outcomes=["value"]
+    )
+    run=lab.run_scenario(matrix_id="m1",scenario_id="s1",
+                          payload=e2e_payload("m1-s1-run"))
+    stats=lab.descriptive_statistics("m1")
+    assert stats["completed_runs"]==1
+    assert stats["descriptive_estimate_mean"]==7.0
+    assert stats["scientific_status"]=="DESCRIPTIVE_ONLY_MODEL_DERIVED_RUNTIME"
