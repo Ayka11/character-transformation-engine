@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from .transformation_ledger import TransformationLedger
 from .state_snapshot_store import StateSnapshotStore
+from .provenance import content_hash
 
 @dataclass(frozen=True)
 class IntegrityFinding:
@@ -20,6 +21,30 @@ class TransformationIntegrityVerifier:
         if entry is None:
             return IntegrityFinding(ledger_id,"MISSING_LEDGER",("ledger entry not found",))
         issues=[]
+        certificate_payload={
+            "execution_id":entry.execution_id,
+            "character_id":entry.character_id,
+            "contract_id":entry.contract_id,
+            "contract_version":entry.contract_version,
+            "status":entry.status,
+            "failure_code":entry.failure_code,
+            "before_snapshot_id":entry.before_snapshot_id,
+            "after_snapshot_id":entry.after_snapshot_id,
+            "before_hash":entry.before_hash,
+            "after_hash":entry.after_hash,
+            "certificate_id":entry.certificate_id,
+        }
+        expected_payload_hash=content_hash(certificate_payload)
+        if expected_payload_hash != entry.payload_hash:
+            issues.append("LEDGER_PAYLOAD_HASH_MISMATCH")
+        ledger_payload={
+            "ledger_id":entry.ledger_id,
+            **certificate_payload,
+            "payload_hash":entry.payload_hash,
+            "request_hash":entry.request_hash,
+        }
+        if content_hash(ledger_payload) != entry.ledger_id:
+            issues.append("LEDGER_ID_HASH_MISMATCH")
         before=self.snapshots.get(entry.before_snapshot_id)
         if before is None:
             issues.append("BEFORE_SNAPSHOT_MISSING")
