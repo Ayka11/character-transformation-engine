@@ -55,6 +55,6 @@ As of the current V2.1 backend baseline:
 - V1.9 synthetic E2E contract coverage and the V2.2 Research E2E coordinator are executed successfully in GitHub Actions run #86.
 - Durable SQLite runtime adapters are implemented for graph, orchestration, reporting and intervention state; research runtime hydration is graph-backed.
 - Production PostgreSQL migration/transactions, authentication, observability and empirical validation remain open release gates.
-- GitHub CI workflow is registered and the latest current-main run (#68) completed successfully with 131 backend tests passing.
+- GitHub CI workflow is registered and the latest current-main run (#86) completed successfully with 136 backend tests passing.
 
 **Important:** a checked architecture item does not imply that the corresponding implementation, executed test status, or scientific validation exists.
