@@ -14,6 +14,7 @@ from .outcome import evaluate_outcome
 from .runtime_events import make_event, lineage_descriptor
 from .analysis import descriptive
 from .longitudinal import longitudinal_change
+from .registered_analysis import lock_manifest, paired_effect
 
 app = FastAPI(title="Character Transformation Engine", version="2.1.0")
 
@@ -55,6 +56,12 @@ class SprintStartInput(BaseModel):
     target_trait: str
     supporting_bio_habit: str
     daily_action: str
+
+class RegisteredPairedInput(BaseModel):
+    baseline: list[float | None]
+    current: list[float | None]
+    manifest_id: str
+    analysis_spec_id: str
 
 class LongitudinalInput(BaseModel):
     baseline: list[float | None]
@@ -137,6 +144,11 @@ def runtime_sprint_day(p: SprintDayInput):
     sprint.supporting_bio_habit=p.supporting_bio_habit
     sprint.daily_action=p.daily_action
     return asdict(record_day(sprint,p.day,p.action_completed,p.outcome,state))
+
+@app.post("/validation/paired")
+def validation_paired(p: RegisteredPairedInput):
+    manifest=lock_manifest(p.baseline,p.current,manifest_id=p.manifest_id,analysis_spec_id=p.analysis_spec_id)
+    return {"manifest": asdict(manifest), "result": asdict(paired_effect(p.baseline,p.current,manifest))}
 
 @app.post("/validation/longitudinal")
 def validation_longitudinal(p: LongitudinalInput):
