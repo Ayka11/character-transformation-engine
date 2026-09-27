@@ -1,0 +1,43 @@
+{
+  "version": "1.9",
+  "status": "MDL/DRV",
+  "test_suites": [
+    "SCHEMA_CONTRACT",
+    "STATE_MACHINE_NEGATIVE",
+    "PROVENANCE_INTEGRITY",
+    "EVIDENCE_GUARDRAILS",
+    "SAFETY_PRECEDENCE",
+    "REPLICATION_GATES",
+    "GENERALIZATION_GATES",
+    "REPORT_GATES",
+    "E2E_SYNTHETIC"
+  ],
+  "required_artifacts": [
+    "master-matrix",
+    "runtime",
+    "research-execution",
+    "validation-analytics",
+    "evidence-claim-graph",
+    "replication-generalization",
+    "scientific-reporting",
+    "decision-intervention",
+    "orchestrator"
+  ],
+  "mandatory_fields": [
+    "version",
+    "status",
+    "provenance",
+    "input_hash",
+    "rule_id_or_manual_marker"
+  ],
+  "forbidden_conditions": [
+    "unknown_required_input_passes",
+    "unsafe_intervention_passes",
+    "blocked_execution_completes",
+    "single_study_becomes_replicated",
+    "association_becomes_evidence_supported",
+    "model_output_becomes_evidence_supported",
+    "generalized_result_becomes_universal_claim",
+    "synthetic_data_becomes_evidence"
+  ]
+}
