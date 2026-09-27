@@ -236,6 +236,24 @@ class OrchestratorService:
                 raise ValueError(f"required stage not terminal-passed-or-skipped: {name}")
             if stage.state=="SKIPPED" and not stage.reason:
                 raise ValueError(f"skipped stage requires reason: {name}")
+
+        # A production transformation cannot be considered complete merely because
+        # the INTERVENTION stage was marked PASSED. It must carry the runtime's
+        # validated-transition certificate and immutable snapshot references.
+        if "INTERVENTION" in e.required_stages:
+            intervention=e.stages["INTERVENTION"]
+            md=intervention.metadata
+            if intervention.state != "PASSED":
+                raise ValueError("INTERVENTION must be PASSED before completion")
+            if md.get("transition_status") != "VALIDATED":
+                raise ValueError("INTERVENTION completion requires VALIDATED transition")
+            if not md.get("certificate_id"):
+                raise ValueError("INTERVENTION completion requires transformation certificate")
+            if not md.get("before_snapshot_id") or not md.get("after_snapshot_id"):
+                raise ValueError("INTERVENTION completion requires before/after snapshots")
+            if not intervention.input_hash or not intervention.output_hash:
+                raise ValueError("INTERVENTION completion requires before/after state hashes")
+
         e.output_hash=content_hash({name:(e.stages[name].output_hash,e.stages[name].state) for name in e.required_stages})
         e.state="COMPLETED"
         self.append_event(execution_id,"EXECUTION_COMPLETED",e.input_hash,e.output_hash,f"{execution_id}:complete",{})
