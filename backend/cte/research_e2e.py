@@ -175,9 +175,6 @@ class ResearchE2ECoordinator:
                     "status":"BLOCKED","safety_gate":safety_payload,
                     "research":{"study":asdict(study_obj),"qc":qc_payload}}
         stage("QC",qc_payload,metadata={"passed":True})
-            return {"execution":asdict(self.orchestrator.executions[execution_id]),
-                    "status":"BLOCKED","safety_gate":safety_payload,
-                    "research":{"study":asdict(study_obj),"qc":qc_payload}}
 
         manifest=self.research.create_manifest(
             dataset_manifest_id=f"{execution_id}:manifest",
