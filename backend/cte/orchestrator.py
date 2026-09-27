@@ -108,12 +108,28 @@ class OrchestratorService:
         stage=e.stages[stage_name]
         if stage.state not in {"PENDING","RUNNING"}: raise ValueError("stage is already terminal")
         md=dict(metadata or {})
+        if state=="RUNNING" and stage.state=="PENDING":
+            if stage_name in e.required_stages:
+                idx=list(e.required_stages).index(stage_name)
+                prior=list(e.required_stages)[:idx]
+                incomplete=[name for name in prior if e.stages[name].state not in {"PASSED","SKIPPED"}]
+                if incomplete:
+                    raise ValueError("upstream required stages not terminal: "+",".join(incomplete))
         if state=="PASSED":
             if md.get("unknown_required_input"): raise ValueError("unknown required input cannot produce PASSED stage")
-            if stage_name=="INTERVENTION":
-                safety=e.stages["SAFETY_GATE"]
+            if stage_name in e.required_stages:
+                idx=list(e.required_stages).index(stage_name)
+                prior=list(e.required_stages)[:idx]
+                blocked=[name for name in prior if e.stages[name].state in {"BLOCKED","FAILED"}]
+                if blocked:
+                    raise ValueError("blocked or failed upstream stage prevents PASSED: "+",".join(blocked))
+            safety=e.stages["SAFETY_GATE"]
+            if stage_name!="SAFETY_GATE" and "SAFETY_GATE" in e.required_stages:
                 if safety.state=="BLOCKED" or safety.metadata.get("safety_status")=="BLOCK":
-                    raise ValueError("unsafe intervention cannot produce PASSED stage")
+                    idx=list(e.required_stages).index(stage_name)
+                    safety_idx=list(e.required_stages).index("SAFETY_GATE")
+                    if idx>safety_idx:
+                        raise ValueError("safety gate blocks downstream PASSED stage")
             if stage_name=="CLAIM" and md.get("claim_state")=="EVIDENCE_SUPPORTED" and not md.get("claim_gate_passed",False):
                 raise ValueError("orchestrator cannot promote claim to EVIDENCE_SUPPORTED without claim gate")
         if state=="SKIPPED" and not reason:
