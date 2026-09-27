@@ -188,8 +188,21 @@ class GraphRegistry:
         return {self.nodes[e.from_node_id].node_type for e in self.edges.values()
                 if e.to_node_id == node_id and e.from_node_id in self.nodes}
 
+    def _lineage_neighbors(self, current: str) -> list[str]:
+        """Return research-lineage neighbors with edge semantics respected."""
+        neighbors=[]
+        node=self.nodes[current]
+        for edge in self.edges.values():
+            # Most research/result edges point into the object they qualify.
+            if edge.to_node_id == current and edge.from_node_id != current:
+                neighbors.append(edge.from_node_id)
+            # ANALYZED_FROM and USES_PROTOCOL point outward from ANALYSIS.
+            if edge.from_node_id == current and edge.edge_type in {"ANALYZED_FROM","USES_PROTOCOL"} and edge.to_node_id != current:
+                neighbors.append(edge.to_node_id)
+        return neighbors
+
     def claim_upstream_types(self, result_id: str) -> set[str]:
-        """Return types reachable upstream from a RESULT through registered edges."""
+        """Return lineage types reachable from a RESULT using typed edge semantics."""
         if result_id not in self.nodes or self.nodes[result_id].node_type != "RESULT":
             raise ValueError("RESULT node is not registered")
         found: set[str] = {"RESULT"}
@@ -197,16 +210,13 @@ class GraphRegistry:
         seen={result_id}
         while frontier:
             current=frontier.pop()
-            for edge in self.edges.values():
-                if edge.to_node_id != current or edge.from_node_id in seen:
+            for node_id in self._lineage_neighbors(current):
+                if node_id in seen or node_id not in self.nodes:
                     continue
-                if edge.from_node_id not in self.nodes:
-                    continue
-                seen.add(edge.from_node_id)
-                found.add(self.nodes[edge.from_node_id].node_type)
-                frontier.append(edge.from_node_id)
+                seen.add(node_id)
+                found.add(self.nodes[node_id].node_type)
+                frontier.append(node_id)
         return found
-
 
     def _upstream_nodes(self, result_id: str) -> list[GraphNode]:
         if result_id not in self.nodes or self.nodes[result_id].node_type != "RESULT":
@@ -216,15 +226,13 @@ class GraphRegistry:
         seen={result_id}
         while frontier:
             current=frontier.pop()
-            for edge in self.edges.values():
-                if edge.to_node_id != current or edge.from_node_id in seen:
+            for node_id in self._lineage_neighbors(current):
+                node=self.nodes.get(node_id)
+                if node is None or node_id in seen:
                     continue
-                node=self.nodes.get(edge.from_node_id)
-                if node is None:
-                    continue
-                seen.add(node.node_id)
+                seen.add(node_id)
                 found.append(node)
-                frontier.append(node.node_id)
+                frontier.append(node_id)
         return found
 
     def claim_requirements(self, result_id: str, claim_ids: set[str] | None = None) -> set[str]:
@@ -316,6 +324,8 @@ class GraphRegistry:
             requirements |= self.indeterminate_requirements(linked_claim_ids,result_id)
         if result_id and not terminal_state:
             requirements=self.claim_requirements(result_id,linked_claim_ids) | requirements
+        if result_id and terminal_state:
+            requirements.add("RESULT")
         if result_id:
             blocked=self.blocked_by_inference_rules(result_id,target_state)
             if blocked:
@@ -358,7 +368,16 @@ class GraphRegistry:
         for analysis_id in analysis_ids:
             if self.nodes[analysis_id].node_type != "ANALYSIS":
                 raise ValueError("RESULT lineage source must be ANALYSIS")
-            upstream={e.from_node_id for e in self.edges.values() if e.to_node_id==analysis_id and e.edge_type=="ANALYZED_FROM"}
+            upstream={
+                e.to_node_id for e in self.edges.values()
+                if e.from_node_id==analysis_id and e.edge_type=="ANALYZED_FROM"
+            }
+            if not upstream:
+                # Legacy persisted edge shape: tolerate DATASET/MEASUREMENT -> ANALYSIS.
+                upstream={
+                    e.from_node_id for e in self.edges.values()
+                    if e.to_node_id==analysis_id and e.edge_type=="ANALYZED_FROM"
+                }
             if not any(self.nodes[x].node_type in {"DATASET","MEASUREMENT"} for x in upstream):
                 raise ValueError("ANALYSIS requires DATASET or MEASUREMENT upstream")
 
