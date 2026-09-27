@@ -351,8 +351,7 @@ def test_postgres_backup_restore_preserves_transformation_provenance_chain():
     from cte.transformation_ledger import TransformationLedger
     from cte.transformation_provenance import TransformationProvenanceBinder
     from cte.transformation_runtime import TransformationExecutor
-    from cte.science_lab import ScenarioRun
-    from cte.provenance import Provenance, ProvenanceTag
+    from cte.provenance import ProvenanceTag
 
     dsn = os.environ["CTE_DATABASE_URL"]
     store = PostgreSQLRuntimeStore(dsn)
@@ -448,6 +447,10 @@ def test_postgres_backup_restore_preserves_transformation_provenance_chain():
                 (binding_before["ledger_id"],),
             )
             cur.execute(
+                "DELETE FROM runtime_snapshots WHERE namespace='transformation.lock' AND key=%s",
+                (f"{character_id}:1",),
+            )
+            cur.execute(
                 "DELETE FROM runtime_snapshots WHERE namespace='state.snapshot' "
                 "AND payload_json->>'source_execution_id'=%s",
                 (execution_id,),
@@ -463,10 +466,15 @@ def test_postgres_backup_restore_preserves_transformation_provenance_chain():
     restored_ledger = TransformationLedger(store).get(binding_before["ledger_id"])
     binding_after = binder.bind_execution(execution_id)
     restored_run = store.get_snapshot("science_lab.run", run_id)
+    restored_journal = [
+        event for event in store.list_events("transformation.journal")
+        if event["payload"].get("execution_id") == execution_id
+    ]
 
     assert restored_before is not None and restored_after is not None
     assert restored_ledger is not None
     assert restored_run is not None
+    assert restored_journal
     assert restored_before.payload["state_hash"] == backup_before["before_state_hash"]
     assert restored_after.payload["state_hash"] == backup_before["after_state_hash"]
     assert restored_before.payload["lineage_hash"] == backup_before["before_lineage_hash"]
