@@ -1,0 +1,52 @@
+{
+  "title": "Replication & Generalization Analysis Specification V1.5",
+  "status": "MDL/DRV",
+  "replication_workflow": [
+    "REGISTER_CRITERIA",
+    "LOCK_SOURCE_RESULT",
+    "LOCK_TARGET_DATASET",
+    "VERIFY_INDEPENDENCE",
+    "COMPARE_PROTOCOL",
+    "COMPARE_MEASUREMENT",
+    "COMPARE_OUTCOME",
+    "COMPARE_DIRECTION",
+    "COMPARE_EFFECT",
+    "ASSESS_DATA_QUALITY",
+    "RUN_REPLICATION_RULES",
+    "REGISTER_RESULT",
+    "UPDATE_CLAIM_GRAPH"
+  ],
+  "generalization_workflow": [
+    "REGISTER_TRANSPORT_TARGET",
+    "LOCK_SOURCE_RESULT",
+    "LOCK_TARGET_DATASET",
+    "MAP_POPULATION",
+    "MAP_CONTEXT",
+    "MAP_TASK",
+    "MAP_MEASUREMENT",
+    "MAP_INTERVENTION",
+    "MAP_TIME",
+    "ASSESS_TRANSPORT_ERROR",
+    "ASSESS_HETEROGENEITY",
+    "DEFINE_BOUNDARIES",
+    "REGISTER_RESULT",
+    "UPDATE_CLAIM_GRAPH"
+  ],
+  "required_outputs": [
+    "replication status",
+    "generalization status",
+    "dimension-level comparisons",
+    "transport distances or qualitative status",
+    "heterogeneity metrics when estimable",
+    "explicit boundaries",
+    "limitations",
+    "provenance"
+  ],
+  "rule_principles": [
+    "Pre-register criteria before looking at target results when feasible.",
+    "Do not use a single threshold as a universal replication standard.",
+    "Do not infer transportability from statistical significance alone.",
+    "Preserve uncertainty and missingness.",
+    "Keep target-population claims bounded by the registered target."
+  ]
+}
