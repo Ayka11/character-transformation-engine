@@ -10,6 +10,7 @@ from .state_engine import derive_daily_state
 from .trait_graph import TraitGraph
 from .intervention import plan_bio_reset, plan_21_day_sprint
 from .sprint import start_sprint, record_day
+from .outcome import evaluate_outcome
 
 app = FastAPI(title="Character Transformation Engine", version="2.1.0")
 
@@ -51,6 +52,12 @@ class SprintStartInput(BaseModel):
     target_trait: str
     supporting_bio_habit: str
     daily_action: str
+
+class OutcomeInput(BaseModel):
+    baseline: float | None = Field(None, ge=0, le=10)
+    current: float | None = Field(None, ge=0, le=10)
+    tolerance: float = Field(0.25, ge=0)
+    safety_block: bool = False
 
 class SprintDayInput(BaseModel):
     sprint_id: str
@@ -118,6 +125,10 @@ def runtime_sprint_day(p: SprintDayInput):
     sprint.supporting_bio_habit=p.supporting_bio_habit
     sprint.daily_action=p.daily_action
     return asdict(record_day(sprint,p.day,p.action_completed,p.outcome,state))
+
+@app.post("/runtime/outcome")
+def runtime_outcome(p: OutcomeInput):
+    return asdict(evaluate_outcome(p.baseline, p.current, tolerance=p.tolerance, safety_block=p.safety_block))
 
 @app.post("/runtime/capacity")
 def runtime_capacity(p: StateInput):
