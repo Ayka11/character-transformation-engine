@@ -10,6 +10,7 @@ from cte.transformation_api import install_transformation_api
 from cte.transformation_integrity import TransformationIntegrityVerifier
 from cte.transformation_ledger import TransformationLedger
 from cte.transformation_runtime import TransformationExecutor
+from cte.transformation_api import install_transformation_api
 
 def test_integrity_detects_lineage_hash_tampering():
     db=SQLiteRuntimeStore(":memory:")
@@ -84,3 +85,24 @@ def test_integrity_detects_forged_certificate_id():
     finding=TransformationIntegrityVerifier(snapshots,ledger).verify(entry.ledger_id)
     assert finding.status=="FAIL"
     assert "CERTIFICATE_HASH_MISMATCH" in finding.issues
+
+
+
+def test_transformation_provenance_api_exposes_validated_binding():
+    db=SQLiteRuntimeStore(":memory:")
+    snapshots=StateSnapshotStore(db)
+    ledger=TransformationLedger(db)
+    TransformationExecutor(snapshots,ledger).execute(
+        "api-prov-1","c1",1,{"tempo":5},
+        TransformationContract("t","1",expected_changes={"tempo":6}),
+        lambda s:{"tempo":6},
+    )
+    app=FastAPI()
+    install_transformation_api(app,db)
+    client=TestClient(app)
+    response=client.get("/transformation/provenance/api-prov-1")
+    assert response.status_code==200
+    body=response.json()
+    assert body["validated"] is True
+    assert body["integrity_status"]=="PASS"
+    assert body["certificate_id"]
