@@ -5,7 +5,7 @@ def _replicated_graph():
     g=build_registry()
     d=register_node("d","DATASET","d","DRV","1",{})
     a=register_node("a","ANALYSIS","a","DRV","1",{})
-    r=register_node("r","RESULT","r","DRV","1",{"qc_status":"PASS"})
+    r=register_node("r","RESULT","r","DRV","1",{"qc_status":"PASS","validated_descriptive_result":True})
     rep=register_node("rep","REPLICATION","rep","DRV","1",{"independent":True,"criteria_registered":True})
     for n in (d,a,r,rep): g.add_node(n)
     g.add_edge(register_edge("ed",a,d,"ANALYZED_FROM"))
