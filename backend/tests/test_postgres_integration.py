@@ -2,6 +2,9 @@ import os
 import pytest
 
 from cte.postgres_persistence import PostgreSQLRuntimeStore
+from cte.runtime_backup import build_backup, restore_backup, validate_backup
+from cte.audit_retention import apply_retention, build_policy
+from datetime import datetime, timezone, timedelta
 
 
 @pytest.mark.skipif(
@@ -44,3 +47,17 @@ def test_postgres_snapshot_event_roundtrip():
     latest=store.get_snapshot("science_lab.matrix","case-1")
     assert latest is not None
     assert latest.payload["scenario_ids"]==["s1"]
+
+    backup=build_backup(store)
+    validate_backup(backup)
+    assert backup["manifest_hash"]
+    restored=restore_backup(store,backup)
+    assert restored["dry_run"] is False
+
+    policy=build_policy("pg-audit-retention",retention_days=1,namespace="integration")
+    retention=apply_retention(
+        store,policy,archive_manifest_hash=backup["manifest_hash"],
+        now=datetime.now(timezone.utc)+timedelta(days=2)
+    )
+    assert retention["deleted_events"]>=1
+    assert store.list_events("integration")==[]
