@@ -54,11 +54,11 @@ def validate_transition(contract, diff, *, before_snapshot_id="", after_snapshot
         return TransformationResult("FAILED", CTEErrorCode.UNEXPECTED_CHANGE.value, before_snapshot_id, after_snapshot_id, diff.before_hash, diff.after_hash, tuple(diff.changed), False, {"unexpected":diff.unexpected})
     if diff.missing_expected:
         return TransformationResult("FAILED", CTEErrorCode.VALIDATION_FAILED.value, before_snapshot_id, after_snapshot_id, diff.before_hash, diff.after_hash, tuple(diff.changed), False, {"missing_expected":diff.missing_expected})
-    postcondition_failures = {
-        key: {"expected": value, "actual": after_state.get(key)}
-        for key, value in contract.postconditions
-        if after_state.get(key) != value
-    }
+    postcondition_failures = {}
+    for condition in contract.postconditions:
+        for key, value in condition.items():
+            if after_state.get(key) != value:
+                postcondition_failures[key] = {"expected": value, "actual": after_state.get(key)}
     if postcondition_failures:
         return TransformationResult(
             "FAILED", CTEErrorCode.VALIDATION_FAILED.value,
