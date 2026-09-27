@@ -7,6 +7,7 @@ from pathlib import Path
 import json
 
 from .provenance import content_hash
+from .persistence import MUTABLE_SNAPSHOT_NAMESPACES
 
 BACKUP_VERSION = "1.0"
 
