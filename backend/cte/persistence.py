@@ -106,6 +106,28 @@ class SQLiteRuntimeStore:
             return None
         return Snapshot(namespace,key,row[0],json.loads(row[1]),row[2])
 
+    def list_snapshot_namespaces(self) -> list[str]:
+        with self._connect() as conn:
+            rows=conn.execute(
+                "SELECT DISTINCT namespace FROM runtime_snapshots ORDER BY namespace"
+            ).fetchall()
+        return [row[0] for row in rows]
+
+    def list_event_namespaces(self) -> list[str]:
+        with self._connect() as conn:
+            rows=conn.execute(
+                "SELECT DISTINCT namespace FROM runtime_events ORDER BY namespace"
+            ).fetchall()
+        return [row[0] for row in rows]
+
+    def prune_events_before(self, cutoff: str, namespace: str | None = None) -> int:
+        with self._connect() as conn:
+            if namespace is None:
+                cursor=conn.execute("DELETE FROM runtime_events WHERE created_at < ?", (cutoff,))
+            else:
+                cursor=conn.execute("DELETE FROM runtime_events WHERE created_at < ? AND namespace = ?", (cutoff, namespace))
+            conn.commit()
+            return cursor.rowcount
     def list_snapshots(self, namespace:str)->list[Snapshot]:
         with self._connect() as conn:
             rows=conn.execute(
