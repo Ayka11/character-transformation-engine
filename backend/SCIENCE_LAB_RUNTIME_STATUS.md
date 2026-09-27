@@ -25,7 +25,7 @@ Science Lab descriptive statistics are not inferential evidence. Replication/gen
 
 ## CI
 
-GitHub Actions run **#106** passed with **140 backend tests**.
+GitHub Actions run **#124** passed the main backend suite and the live PostgreSQL integration job. The main suite includes **147 tests**; the PostgreSQL job also passed its live snapshot/event round-trip test.
 
 ## Next open layers
 
