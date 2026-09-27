@@ -165,3 +165,117 @@ def test_evidence_graph_claim_lineage_survives_backup_restore():
     assert trusted["validated"] is True
     assert trusted["integrity_status"] == "PASS"
     assert trusted["ledger_id"] == tp["ledger_id"]
+
+
+def test_adversarial_lineage_damage_blocks_transformation_backed_claim():
+    from cte.contracts.transformation import TransformationContract
+    from cte.evidence_graph import register_edge, register_node
+    from cte.graph_registry import GraphRegistry
+    from cte.science_lab import ExperimentMatrix, ScenarioDefinition, ScenarioRun, ScienceLabService
+    from cte.provenance import Provenance, ProvenanceTag
+    from cte.state_snapshot_store import StateSnapshotStore
+    from cte.transformation_ledger import TransformationLedger
+    from cte.transformation_provenance import TransformationProvenanceBinder
+    from cte.transformation_runtime import TransformationExecutor
+
+    db = SQLiteRuntimeStore(":memory:")
+    registry = GraphRegistry.empty(db)
+    execution = TransformationExecutor(
+        StateSnapshotStore(db), TransformationLedger(db)
+    ).execute(
+        "attack-exec", "attack-character", 1, {"tempo": 5},
+        TransformationContract("attack-contract", "1", expected_changes={"tempo": 6}),
+        lambda state: {"tempo": 6},
+    )
+    assert execution.result.status == "VALIDATED"
+    tp = TransformationProvenanceBinder(db).bind_execution("attack-exec")
+
+    matrix = ExperimentMatrix("attack-matrix", "attack-study", "Attack", "outcome", {}, ("attack-scenario",), "ACTIVE", "matrix")
+    scenario = ScenarioDefinition("attack-scenario", "attack-matrix", "Scenario", "Attack", {}, ("outcome",), True, "scenario")
+    service = object.__new__(ScienceLabService)
+    service.store = db
+    service.registry = registry
+    service.research = None
+    service.coordinator = None
+    service.transformation_provenance = TransformationProvenanceBinder(db)
+    service.matrices = {"attack-matrix": matrix}
+    service.scenarios = {"attack-scenario": scenario}
+    service.runs = {
+        "attack-run": ScenarioRun(
+            "attack-run", "attack-matrix", "attack-scenario", "attack-exec",
+            "COMPLETED", ("attack-result",), {"outcome": 6.0}, "PASS", "output",
+            Provenance(ProvenanceTag.EXP, "attack", "1", "input", "test"), tp,
+        )
+    }
+    service.replication_assessments = {}
+    service.generalization_assessments = {}
+
+    registry.add_node(register_node(
+        "attack-dataset", "DATASET", "attack-dataset", "EXP", "1", {"kind": "DATASET"},
+    ))
+    registry.add_node(register_node(
+        "attack-analysis", "ANALYSIS", "attack-analysis", "EXP", "1", {"kind": "ANALYSIS"},
+    ))
+    registry.add_node(register_node(
+        "attack-result", "RESULT", "attack-result", "EXP", "1",
+        {"qc_status": "PASS", "validated_descriptive_result": True},
+    ))
+    registry.add_node(register_node(
+        "attack-transform", "TRANSFORMATION", "attack-exec", "EXP", "1",
+        {"execution_id": "attack-exec", "ledger_id": tp["ledger_id"], "certificate_id": tp["certificate_id"]},
+    ))
+    registry.add_edge(register_edge(
+        "attack-analysis:dataset", registry.nodes["attack-analysis"],
+        registry.nodes["attack-dataset"], "ANALYZED_FROM",
+    ))
+    registry.add_edge(register_edge(
+        "attack-result:analysis", registry.nodes["attack-analysis"],
+        registry.nodes["attack-result"], "RESULTS_IN",
+    ))
+    registry.add_node(register_node(
+        "attack-run-node", "ANALYSIS", "attack-run", "EXP", "1",
+        {"execution_id": "attack-exec"},
+    ))
+    registry.add_edge(register_edge(
+        "attack-run:transform", registry.nodes["attack-run-node"],
+        registry.nodes["attack-transform"], "DERIVED_FROM",
+    ))
+    registry.add_edge(register_edge(
+        "attack-run:result", registry.nodes["attack-run-node"],
+        registry.nodes["attack-result"], "DERIVED_FROM",
+    ))
+    registry.register_claim(
+        "attack-claim", "attack-result", "HYPOTHESIS", "REGISTERED", "EXP",
+        {"execution_id": "attack-exec"},
+    )
+
+    def support():
+        return service.claim_validation("attack-matrix")["claims"][0]["transformation_support"]
+
+    assert support()["status"] == "VALIDATED"
+
+    # Attack 1: remove the transformation graph node.
+    registry.nodes.pop("attack-transform")
+    assert support()["status"] == "VALIDATED"
+    # Graph lineage is damaged, but the durable transformation source is still valid.
+    # Claim validation must therefore remain provenance-valid while graph-specific
+    # validation is separately inspectable.
+    assert "attack-transform" not in {n.node_id for n in registry.claim_subgraph("attack-claim")[0]}
+
+    # Attack 2: destroy the durable ledger. This must invalidate transformation support.
+    ledger_id = tp["ledger_id"]
+    db.delete_snapshot("transformation.ledger", ledger_id)
+    damaged = support()
+    assert damaged["status"] == "NOT_VALIDATED"
+    assert damaged["integrity_status"] != "PASS"
+    assert "TRANSFORMATION_LEDGER_ENTRY_MISSING" in damaged["issues"]
+
+    # Attack 3: a forged graph node cannot restore trusted validation.
+    registry.nodes["attack-transform"] = register_node(
+        "attack-transform", "TRANSFORMATION", "attack-exec", "EXP", "1",
+        {"execution_id": "attack-exec", "validated": True,
+         "ledger_id": "forged-ledger", "certificate_id": "forged-certificate"},
+    )
+    forged = support()
+    assert forged["status"] == "NOT_VALIDATED"
+    assert forged["ledger_id"] is None or forged["ledger_id"] != "forged-ledger"
