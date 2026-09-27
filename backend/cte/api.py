@@ -1,3 +1,4 @@
+import os
 from dataclasses import asdict
 from fastapi import FastAPI
 from pydantic import BaseModel, Field
@@ -26,9 +27,12 @@ from .evidence_engine import register_criteria
 from .reporting_api import install_reporting_api
 from .intervention_api import install_intervention_api
 from .orchestrator_api import install_orchestrator_api
+from .persistence import SQLiteRuntimeStore
 
 app = FastAPI(title="Character Transformation Engine", version="2.1.0")
-GRAPH_REGISTRY = build_registry()
+RUNTIME_DB_PATH = os.getenv("CTE_RUNTIME_DB", "data/cte-runtime.sqlite3")
+RUNTIME_STORE = SQLiteRuntimeStore(RUNTIME_DB_PATH)
+GRAPH_REGISTRY = build_registry(RUNTIME_STORE)
 REPLICATION_SPECS = {}
 REPLICATION_RUNS = {}
 GENERALIZATION_SPECS = {}
@@ -532,4 +536,4 @@ REPORT_SERVICE = install_reporting_api(app, GRAPH_REGISTRY)
 INTERVENTION_SERVICE = install_intervention_api(app, GRAPH_REGISTRY)
 
 
-ORCHESTRATOR_SERVICE = install_orchestrator_api(app)
+ORCHESTRATOR_SERVICE = install_orchestrator_api(app, RUNTIME_STORE)
