@@ -34,6 +34,7 @@ from .orchestrator_api import install_orchestrator_api
 from .integrity_runner import run_v19_integrity_suite
 from .research_api import install_research_api
 from .science_lab_api import install_science_lab_api
+from .observability import SecurityObservabilityMiddleware, configure_logging
 from .persistence import SQLiteRuntimeStore, build_runtime_store
 
 app = FastAPI(title="Character Transformation Engine", version="2.1.0")
