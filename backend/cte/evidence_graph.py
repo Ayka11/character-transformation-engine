@@ -45,5 +45,7 @@ def register_edge(edge_id: str, from_node: GraphNode, to_node: GraphNode, edge_t
         raise ValueError("RESULTS_IN requires ANALYSIS -> RESULT")
     if edge_type=="ANALYZED_FROM" and from_node.node_type!="ANALYSIS":
         raise ValueError("ANALYZED_FROM must originate from ANALYSIS")
+    if edge_type=="SUPPORTS" and not (from_node.node_type=="RESULT" and to_node.node_type=="CLAIM"):
+        raise ValueError("SUPPORTS requires RESULT -> CLAIM")
     payload={"edge_id":edge_id,"from":from_node.node_id,"to":to_node.node_id,"type":edge_type,"rationale":rationale}
     return GraphEdge(edge_id,from_node.node_id,to_node.node_id,edge_type,"ACTIVE",content_hash(payload),rationale)
