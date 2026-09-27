@@ -192,6 +192,17 @@ class ReportService:
         self.store.put_snapshot("report.run",run.report_run_id,payload,"1.6")
 
 
+    def register_spec(self,spec:ReportSpec)->ReportSpec:
+        if spec.report_spec_id in self.specs:
+            raise ValueError("report spec already registered")
+        self.specs[spec.report_spec_id]=spec
+        if self.store is not None:
+            self.store.put_snapshot("report.spec",spec.report_spec_id,{"report_spec_id":spec.report_spec_id,
+                "name":spec.name,"version":spec.version,"section_order":list(spec.section_order),
+                "rendering_rules":spec.rendering_rules,"claim_language_rules":spec.claim_language_rules,
+                "immutable_hash":spec.immutable_hash},spec.version)
+        return spec
+
     def create(self,report_run_id:str,report_spec_id:str,study_id:str,artifact_ids:list[str])->ReportRun:
         if report_run_id in self.runs: raise ValueError("report run already registered")
         spec=self.specs.get(report_spec_id)
