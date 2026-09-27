@@ -1,0 +1,102 @@
+{
+  "version": "1.2.0",
+  "pipeline": [
+    "QUESTION",
+    "HYPOTHESIS",
+    "STUDY",
+    "PROTOCOL",
+    "PARTICIPANT_ENROLLMENT",
+    "EXPERIMENT",
+    "ARM_ASSIGNMENT",
+    "TRIAL_DATA",
+    "QC",
+    "ANALYSIS",
+    "RESULT",
+    "CLAIM",
+    "REPLICATION",
+    "GENERALIZATION",
+    "REPORT"
+  ],
+  "endpoints": [
+    [
+      "POST",
+      "/research/studies",
+      "Register study and research question"
+    ],
+    [
+      "POST",
+      "/research/studies/{study_id}/experiments",
+      "Create executable experiment"
+    ],
+    [
+      "POST",
+      "/research/experiments/{experiment_id}/arms",
+      "Register control/intervention arms"
+    ],
+    [
+      "POST",
+      "/research/studies/{study_id}/participants",
+      "Enroll participant"
+    ],
+    [
+      "POST",
+      "/research/participants/{participant_id}/assign",
+      "Assign participant to arm"
+    ],
+    [
+      "POST",
+      "/research/experiments/{experiment_id}/trials",
+      "Ingest trial-level observation"
+    ],
+    [
+      "POST",
+      "/research/experiments/{experiment_id}/qc",
+      "Execute deterministic QC"
+    ],
+    [
+      "POST",
+      "/research/experiments/{experiment_id}/analysis",
+      "Execute preregistered analysis"
+    ],
+    [
+      "GET",
+      "/research/analysis/{analysis_run_id}/results",
+      "Retrieve statistical results"
+    ],
+    [
+      "POST",
+      "/research/analysis/{analysis_run_id}/claim",
+      "Create/update claim graph link"
+    ],
+    [
+      "POST",
+      "/research/claims/{claim_id}/replicate",
+      "Register replication"
+    ],
+    [
+      "POST",
+      "/research/analysis/{analysis_run_id}/generalize",
+      "Run transport/generalization analysis"
+    ],
+    [
+      "POST",
+      "/research/studies/{study_id}/report",
+      "Generate research report"
+    ],
+    [
+      "GET",
+      "/research/studies/{study_id}/provenance",
+      "Return complete provenance graph"
+    ]
+  ],
+  "invariants": [
+    "Every analysis references an immutable dataset manifest.",
+    "Every analysis has an explicit analysis_version and random seed where stochastic methods are used.",
+    "QC precedes final statistical interpretation.",
+    "Raw trial data remain separate from derived results.",
+    "Replication is a separate study/run, not a renamed re-analysis of the same data.",
+    "Generalization records target population/context and transport error.",
+    "Claims link to evidence through explicit graph edges.",
+    "Reports are generated from registered study, QC, analysis and claim objects."
+  ]
+}

@@ -1,0 +1,77 @@
+{
+  "report_version": "1.2",
+  "sections": [
+    {
+      "id": "S1",
+      "title": "Research Question",
+      "source": "ct_studies"
+    },
+    {
+      "id": "S2",
+      "title": "Hypotheses",
+      "source": "ct_studies.hypothesis_ids"
+    },
+    {
+      "id": "S3",
+      "title": "Study Design",
+      "source": "ct_studies + ct_experiments"
+    },
+    {
+      "id": "S4",
+      "title": "Participants",
+      "source": "ct_participants"
+    },
+    {
+      "id": "S5",
+      "title": "Intervention / Comparator",
+      "source": "ct_experiment_arms"
+    },
+    {
+      "id": "S6",
+      "title": "Measurement Protocol",
+      "source": "ct_experiments.measurement_schedule"
+    },
+    {
+      "id": "S7",
+      "title": "Data Quality",
+      "source": "ct_qc_runs"
+    },
+    {
+      "id": "S8",
+      "title": "Statistical Analysis",
+      "source": "ct_analysis_runs"
+    },
+    {
+      "id": "S9",
+      "title": "Results",
+      "source": "ct_statistical_results"
+    },
+    {
+      "id": "S10",
+      "title": "Replication",
+      "source": "ct_replication_runs"
+    },
+    {
+      "id": "S11",
+      "title": "Generalization",
+      "source": "ct_generalization_runs"
+    },
+    {
+      "id": "S12",
+      "title": "Claim Status",
+      "source": "ct_claim_graph_edges + ct_claims"
+    },
+    {
+      "id": "S13",
+      "title": "Limitations",
+      "source": "study/protocol/QC metadata"
+    },
+    {
+      "id": "S14",
+      "title": "Provenance",
+      "source": "ct_provenance_records + dataset manifests"
+    }
+  ],
+  "report_rule": "Do not convert MDL or HYP into EVD language merely because an analysis produced a numerical result.",
+  "minimum_traceability": "study -> experiment -> arm -> participant -> trial -> QC -> dataset manifest -> analysis -> result -> claim -> replication/generalization"
+}

@@ -1,0 +1,1367 @@
+{
+  "package": "Character Transformation & Social Compatibility Engine",
+  "version": "1.0.0",
+  "status": "backend_api_ready_seed",
+  "scientific_boundary": "Architecture/model seed; implementation is not empirical validation.",
+  "provenance_tags": {
+    "EVD": "evidence-supported",
+    "MDL": "theoretical/model",
+    "HYP": "hypothesis",
+    "RPT": "self-reported",
+    "DRV": "derived metric",
+    "OBS": "observed",
+    "EXT": "external source",
+    "EXP": "experimental"
+  },
+  "domains": [
+    {
+      "id": "P1",
+      "name_en": "Bio / Recovery",
+      "name_ru": "Био / Восстановление",
+      "state_trait": "STATE",
+      "provenance": "EVD"
+    },
+    {
+      "id": "P2",
+      "name_en": "Personality",
+      "name_ru": "Личность",
+      "state_trait": "TRAIT",
+      "provenance": "EVD"
+    },
+    {
+      "id": "P3",
+      "name_en": "Cognitive-Behavioral Regulation",
+      "name_ru": "Когнитивно-поведенческая регуляция",
+      "state_trait": "TRAIT",
+      "provenance": "MIXED"
+    },
+    {
+      "id": "P4",
+      "name_en": "Values",
+      "name_ru": "Ценности",
+      "state_trait": "TRAIT",
+      "provenance": "EVD"
+    },
+    {
+      "id": "P5",
+      "name_en": "Behavioral Execution",
+      "name_ru": "Поведенческое исполнение",
+      "state_trait": "TRAIT",
+      "provenance": "MDL"
+    }
+  ],
+  "traits": [
+    {
+      "id": "P1.1",
+      "domain": "P1",
+      "name_en": "Sleep Quality",
+      "name_ru": "Качество сна",
+      "state_trait": "STATE",
+      "provenance": "RPT"
+    },
+    {
+      "id": "P1.2",
+      "domain": "P1",
+      "name_en": "Recovery Index",
+      "name_ru": "Индекс восстановления",
+      "state_trait": "STATE",
+      "provenance": "RPT"
+    },
+    {
+      "id": "P1.3",
+      "domain": "P1",
+      "name_en": "Physical Activity",
+      "name_ru": "Физическая активность",
+      "state_trait": "STATE",
+      "provenance": "RPT"
+    },
+    {
+      "id": "P1.4",
+      "domain": "P1",
+      "name_en": "Metabolic Stability",
+      "name_ru": "Метаболическая стабильность",
+      "state_trait": "STATE",
+      "provenance": "RPT"
+    },
+    {
+      "id": "P1.5",
+      "domain": "P1",
+      "name_en": "Subjective Stress",
+      "name_ru": "Субъективный стресс",
+      "state_trait": "STATE",
+      "provenance": "RPT"
+    },
+    {
+      "id": "P1.6",
+      "domain": "P1",
+      "name_en": "Subjective Energy",
+      "name_ru": "Субъективная энергия",
+      "state_trait": "STATE",
+      "provenance": "RPT"
+    },
+    {
+      "id": "P2.1",
+      "domain": "P2",
+      "name_en": "Openness",
+      "name_ru": "Открытость",
+      "state_trait": "TRAIT",
+      "provenance": "EVD"
+    },
+    {
+      "id": "P2.2",
+      "domain": "P2",
+      "name_en": "Conscientiousness",
+      "name_ru": "Добросовестность",
+      "state_trait": "TRAIT",
+      "provenance": "EVD"
+    },
+    {
+      "id": "P2.3",
+      "domain": "P2",
+      "name_en": "Extraversion",
+      "name_ru": "Экстраверсия",
+      "state_trait": "TRAIT",
+      "provenance": "EVD"
+    },
+    {
+      "id": "P2.4",
+      "domain": "P2",
+      "name_en": "Agreeableness",
+      "name_ru": "Доброжелательность",
+      "state_trait": "TRAIT",
+      "provenance": "EVD"
+    },
+    {
+      "id": "P2.5",
+      "domain": "P2",
+      "name_en": "Neuroticism",
+      "name_ru": "Нейротизм",
+      "state_trait": "TRAIT",
+      "provenance": "EVD"
+    },
+    {
+      "id": "P3.1",
+      "domain": "P3",
+      "name_en": "Impulse Control",
+      "name_ru": "Контроль импульсов",
+      "state_trait": "TRAIT",
+      "provenance": "MDL"
+    },
+    {
+      "id": "P3.2",
+      "domain": "P3",
+      "name_en": "Pause Capacity",
+      "name_ru": "Способность к паузе",
+      "state_trait": "TRAIT",
+      "provenance": "MDL"
+    },
+    {
+      "id": "P3.3",
+      "domain": "P3",
+      "name_en": "Cognitive Reappraisal",
+      "name_ru": "Когнитивная переоценка",
+      "state_trait": "TRAIT",
+      "provenance": "EVD"
+    },
+    {
+      "id": "P3.4",
+      "domain": "P3",
+      "name_en": "Attention Regulation",
+      "name_ru": "Регуляция внимания",
+      "state_trait": "TRAIT",
+      "provenance": "EVD"
+    },
+    {
+      "id": "P3.5",
+      "domain": "P3",
+      "name_en": "Reflection Depth",
+      "name_ru": "Глубина рефлексии",
+      "state_trait": "TRAIT",
+      "provenance": "RPT"
+    },
+    {
+      "id": "P4.1",
+      "domain": "P4",
+      "name_en": "Honesty",
+      "name_ru": "Честность",
+      "state_trait": "TRAIT",
+      "provenance": "EVD"
+    },
+    {
+      "id": "P4.2",
+      "domain": "P4",
+      "name_en": "Autonomy",
+      "name_ru": "Автономия",
+      "state_trait": "TRAIT",
+      "provenance": "EVD"
+    },
+    {
+      "id": "P4.3",
+      "domain": "P4",
+      "name_en": "Achievement",
+      "name_ru": "Достижение",
+      "state_trait": "TRAIT",
+      "provenance": "EVD"
+    },
+    {
+      "id": "P4.4",
+      "domain": "P4",
+      "name_en": "Security",
+      "name_ru": "Безопасность",
+      "state_trait": "TRAIT",
+      "provenance": "EVD"
+    },
+    {
+      "id": "P4.5",
+      "domain": "P4",
+      "name_en": "Growth",
+      "name_ru": "Развитие",
+      "state_trait": "TRAIT",
+      "provenance": "EVD"
+    },
+    {
+      "id": "P4.6",
+      "domain": "P4",
+      "name_en": "Compassion",
+      "name_ru": "Сострадание",
+      "state_trait": "TRAIT",
+      "provenance": "EVD"
+    },
+    {
+      "id": "P4.7",
+      "domain": "P4",
+      "name_en": "Justice",
+      "name_ru": "Справедливость",
+      "state_trait": "TRAIT",
+      "provenance": "EVD"
+    },
+    {
+      "id": "P4.8",
+      "domain": "P4",
+      "name_en": "Family",
+      "name_ru": "Семья",
+      "state_trait": "TRAIT",
+      "provenance": "EVD"
+    },
+    {
+      "id": "P4.9",
+      "domain": "P4",
+      "name_en": "Freedom",
+      "name_ru": "Свобода",
+      "state_trait": "TRAIT",
+      "provenance": "EVD"
+    },
+    {
+      "id": "P4.10",
+      "domain": "P4",
+      "name_en": "Order",
+      "name_ru": "Порядок",
+      "state_trait": "TRAIT",
+      "provenance": "EVD"
+    },
+    {
+      "id": "P5.1",
+      "domain": "P5",
+      "name_en": "Discipline & Consistency",
+      "name_ru": "Дисциплина и последовательность",
+      "state_trait": "TRAIT",
+      "provenance": "MDL"
+    },
+    {
+      "id": "P5.2",
+      "domain": "P5",
+      "name_en": "Social Courage & Assertiveness",
+      "name_ru": "Социальная смелость и ассертивность",
+      "state_trait": "TRAIT",
+      "provenance": "MDL"
+    },
+    {
+      "id": "P5.3",
+      "domain": "P5",
+      "name_en": "Boundary Setting",
+      "name_ru": "Установление границ",
+      "state_trait": "TRAIT",
+      "provenance": "MDL"
+    },
+    {
+      "id": "P5.4",
+      "domain": "P5",
+      "name_en": "Adaptability",
+      "name_ru": "Адаптивность",
+      "state_trait": "TRAIT",
+      "provenance": "MDL"
+    }
+  ],
+  "subtraits": [
+    {
+      "id": "P3.1.1",
+      "parent": "P3.1",
+      "name_en": "Reactivity Reduction",
+      "name_ru": "Снижение реактивности"
+    },
+    {
+      "id": "P3.2.1",
+      "parent": "P3.2",
+      "name_en": "Stimulus-Response Interval",
+      "name_ru": "Интервал стимул–реакция"
+    },
+    {
+      "id": "P3.2.2",
+      "parent": "P3.2",
+      "name_en": "Pause Under Social Pressure",
+      "name_ru": "Пауза под социальным давлением"
+    },
+    {
+      "id": "P3.3.1",
+      "parent": "P3.3",
+      "name_en": "Alternative Interpretation",
+      "name_ru": "Альтернативная интерпретация"
+    },
+    {
+      "id": "P3.4.1",
+      "parent": "P3.4",
+      "name_en": "Task Focus",
+      "name_ru": "Фокус на задаче"
+    },
+    {
+      "id": "P3.5.1",
+      "parent": "P3.5",
+      "name_en": "Trigger Reflection",
+      "name_ru": "Рефлексия триггеров"
+    },
+    {
+      "id": "P5.1.1",
+      "parent": "P5.1",
+      "name_en": "Execution Consistency",
+      "name_ru": "Последовательность исполнения"
+    },
+    {
+      "id": "P5.2.1",
+      "parent": "P5.2",
+      "name_en": "Disagreement Expression",
+      "name_ru": "Выражение несогласия"
+    },
+    {
+      "id": "P5.3.1",
+      "parent": "P5.3",
+      "name_en": "Clear Refusal",
+      "name_ru": "Четкий отказ"
+    },
+    {
+      "id": "P5.4.1",
+      "parent": "P5.4",
+      "name_en": "Plan Reconfiguration",
+      "name_ru": "Перестройка плана"
+    }
+  ],
+  "blockers": [
+    {
+      "id": "BLK.01",
+      "kind": "STATE",
+      "name_en": "Low Recovery",
+      "name_ru": "Низкое восстановление"
+    },
+    {
+      "id": "BLK.02",
+      "kind": "STATE",
+      "name_en": "High Stress",
+      "name_ru": "Высокий стресс"
+    },
+    {
+      "id": "BLK.03",
+      "kind": "TRAIT",
+      "name_en": "Low Pause Capacity",
+      "name_ru": "Низкая способность к паузе"
+    },
+    {
+      "id": "BLK.04",
+      "kind": "TRAIT",
+      "name_en": "Low Execution Consistency",
+      "name_ru": "Низкая последовательность исполнения"
+    },
+    {
+      "id": "BLK.05",
+      "kind": "TRAIT",
+      "name_en": "Fear of Evaluation",
+      "name_ru": "Страх оценки"
+    },
+    {
+      "id": "BLK.06",
+      "kind": "TRAIT",
+      "name_en": "Low Boundary Clarity",
+      "name_ru": "Низкая ясность границ"
+    },
+    {
+      "id": "BLK.07",
+      "kind": "STATE",
+      "name_en": "Low Energy",
+      "name_ru": "Низкая энергия"
+    }
+  ],
+  "trait_edges": [
+    {
+      "from": "P3.1",
+      "to": "P3.2",
+      "edge_type": "REQUIRES",
+      "provenance": "MDL"
+    },
+    {
+      "from": "P3.1",
+      "to": "P3.1.1",
+      "edge_type": "DECOMPOSES_TO",
+      "provenance": "MDL"
+    },
+    {
+      "from": "P3.2",
+      "to": "P3.2.1",
+      "edge_type": "DECOMPOSES_TO",
+      "provenance": "MDL"
+    },
+    {
+      "from": "P3.2",
+      "to": "P3.2.2",
+      "edge_type": "DECOMPOSES_TO",
+      "provenance": "MDL"
+    },
+    {
+      "from": "P3.3",
+      "to": "P3.3.1",
+      "edge_type": "DECOMPOSES_TO",
+      "provenance": "EVD"
+    },
+    {
+      "from": "P3.4",
+      "to": "P3.4.1",
+      "edge_type": "DECOMPOSES_TO",
+      "provenance": "EVD"
+    },
+    {
+      "from": "P3.5",
+      "to": "P3.5.1",
+      "edge_type": "DECOMPOSES_TO",
+      "provenance": "RPT"
+    },
+    {
+      "from": "P5.1",
+      "to": "P5.1.1",
+      "edge_type": "DECOMPOSES_TO",
+      "provenance": "MDL"
+    },
+    {
+      "from": "P5.2",
+      "to": "P5.2.1",
+      "edge_type": "DECOMPOSES_TO",
+      "provenance": "MDL"
+    },
+    {
+      "from": "P5.3",
+      "to": "P5.3.1",
+      "edge_type": "DECOMPOSES_TO",
+      "provenance": "MDL"
+    },
+    {
+      "from": "P5.4",
+      "to": "P5.4.1",
+      "edge_type": "DECOMPOSES_TO",
+      "provenance": "MDL"
+    },
+    {
+      "from": "P3.2",
+      "to": "BLK.03",
+      "edge_type": "BLOCKED_BY",
+      "provenance": "MDL"
+    },
+    {
+      "from": "P5.1",
+      "to": "BLK.04",
+      "edge_type": "BLOCKED_BY",
+      "provenance": "MDL"
+    },
+    {
+      "from": "P5.2",
+      "to": "BLK.05",
+      "edge_type": "BLOCKED_BY",
+      "provenance": "MDL"
+    },
+    {
+      "from": "P5.3",
+      "to": "BLK.06",
+      "edge_type": "BLOCKED_BY",
+      "provenance": "MDL"
+    },
+    {
+      "from": "P3.1",
+      "to": "BLK.01",
+      "edge_type": "STATE_MODULATOR",
+      "provenance": "MDL"
+    },
+    {
+      "from": "P3.2",
+      "to": "BLK.02",
+      "edge_type": "STATE_MODULATOR",
+      "provenance": "MDL"
+    },
+    {
+      "from": "P5.1",
+      "to": "BLK.07",
+      "edge_type": "STATE_MODULATOR",
+      "provenance": "MDL"
+    }
+  ],
+  "metrics_catalog": [
+    {
+      "id": "M.P1.SLEEPQ",
+      "node": "P1.1",
+      "name": "Sleep quality",
+      "unit": "pct",
+      "min": 0,
+      "max": 100,
+      "source": "self_report_or_wearable",
+      "provenance": "RPT"
+    },
+    {
+      "id": "M.P1.RECOVERY",
+      "node": "P1.2",
+      "name": "Recovery index",
+      "unit": "score",
+      "min": 0,
+      "max": 100,
+      "source": "wearable_or_self_report",
+      "provenance": "RPT"
+    },
+    {
+      "id": "M.P1.STRESS",
+      "node": "P1.5",
+      "name": "Subjective stress",
+      "unit": "1-10",
+      "min": 1,
+      "max": 10,
+      "source": "daily_checkin",
+      "provenance": "RPT"
+    },
+    {
+      "id": "M.P1.ENERGY",
+      "node": "P1.6",
+      "name": "Subjective energy",
+      "unit": "1-10",
+      "min": 1,
+      "max": 10,
+      "source": "daily_checkin",
+      "provenance": "RPT"
+    },
+    {
+      "id": "M.P3.PAUSE",
+      "node": "P3.2",
+      "name": "Stimulus-response interval",
+      "unit": "seconds",
+      "min": 0,
+      "max": null,
+      "source": "behavioral_test",
+      "provenance": "DRV"
+    },
+    {
+      "id": "M.P3.IMPULSE",
+      "node": "P3.1",
+      "name": "Impulse-control success rate",
+      "unit": "pct",
+      "min": 0,
+      "max": 100,
+      "source": "behavioral_test",
+      "provenance": "DRV"
+    },
+    {
+      "id": "M.P3.REAPPRAISAL",
+      "node": "P3.3",
+      "name": "Reappraisal task score",
+      "unit": "score",
+      "min": 0,
+      "max": 100,
+      "source": "behavioral_test",
+      "provenance": "DRV"
+    },
+    {
+      "id": "M.P3.ATTENTION",
+      "node": "P3.4",
+      "name": "Attention regulation score",
+      "unit": "score",
+      "min": 0,
+      "max": 100,
+      "source": "task",
+      "provenance": "DRV"
+    },
+    {
+      "id": "M.P3.REFLECTION",
+      "node": "P3.5",
+      "name": "Reflection completeness",
+      "unit": "pct",
+      "min": 0,
+      "max": 100,
+      "source": "journal",
+      "provenance": "RPT"
+    },
+    {
+      "id": "M.P5.DISCIPLINE",
+      "node": "P5.1",
+      "name": "Routine completion",
+      "unit": "pct",
+      "min": 0,
+      "max": 100,
+      "source": "event_log",
+      "provenance": "DRV"
+    },
+    {
+      "id": "M.P5.COURAGE",
+      "node": "P5.2",
+      "name": "Assertive action rate",
+      "unit": "pct",
+      "min": 0,
+      "max": 100,
+      "source": "event_log",
+      "provenance": "DRV"
+    },
+    {
+      "id": "M.P5.BOUNDARY",
+      "node": "P5.3",
+      "name": "Boundary action rate",
+      "unit": "pct",
+      "min": 0,
+      "max": 100,
+      "source": "event_log",
+      "provenance": "DRV"
+    },
+    {
+      "id": "M.P5.ADAPT",
+      "node": "P5.4",
+      "name": "Plan adaptation latency",
+      "unit": "minutes",
+      "min": 0,
+      "max": null,
+      "source": "event_log",
+      "provenance": "DRV"
+    },
+    {
+      "id": "M.CAP",
+      "node": "ENGINE",
+      "name": "Capacity index C_cap",
+      "unit": "score",
+      "min": null,
+      "max": null,
+      "source": "derived",
+      "provenance": "DRV"
+    }
+  ],
+  "assessment_questions": [
+    {
+      "id": "Q.P3.2.01",
+      "node": "P3.2",
+      "text_ru": "Когда возникает сильный триггер, удается ли вам заметить стимул до действия?",
+      "text_en": "When a strong trigger occurs, can you notice the stimulus before acting?",
+      "scale": "1-5",
+      "provenance": "MDL"
+    },
+    {
+      "id": "Q.P3.1.01",
+      "node": "P3.1",
+      "text_ru": "Как часто вы действуете импульсивно, а затем жалеете о реакции?",
+      "text_en": "How often do you act impulsively and later regret the reaction?",
+      "scale": "1-5",
+      "provenance": "MDL"
+    },
+    {
+      "id": "Q.P3.3.01",
+      "node": "P3.3",
+      "text_ru": "Можете ли вы сформулировать альтернативное объяснение неприятной ситуации?",
+      "text_en": "Can you formulate an alternative interpretation of an unpleasant situation?",
+      "scale": "1-5",
+      "provenance": "EVD"
+    },
+    {
+      "id": "Q.P5.1.01",
+      "node": "P5.1",
+      "text_ru": "Какой процент запланированных коротких действий вы обычно доводите до конца?",
+      "text_en": "What percentage of planned short actions do you usually complete?",
+      "scale": "0-100",
+      "provenance": "RPT"
+    },
+    {
+      "id": "Q.P5.3.01",
+      "node": "P5.3",
+      "text_ru": "Насколько легко вам спокойно отказать в просьбе, которую вы не хотите выполнять?",
+      "text_en": "How easy is it for you to calmly refuse a request you do not want to fulfill?",
+      "scale": "1-5",
+      "provenance": "MDL"
+    }
+  ],
+  "behavioral_tests": [
+    {
+      "id": "BT.P3.2.PAUSE",
+      "node": "P3.2",
+      "name": "10-second pause test",
+      "protocol": "Standardized trigger vignette; record deliberate pause before response.",
+      "primary_metric": "M.P3.PAUSE",
+      "provenance": "MDL"
+    },
+    {
+      "id": "BT.P3.1.IMPULSE",
+      "node": "P3.1",
+      "name": "Impulse inhibition trial",
+      "protocol": "Repeated response-inhibition trials with predefined scoring and QC.",
+      "primary_metric": "M.P3.IMPULSE",
+      "provenance": "MDL"
+    },
+    {
+      "id": "BT.P3.3.REAPPRAISAL",
+      "node": "P3.3",
+      "name": "Reappraisal task",
+      "protocol": "Ambiguous negative scenario; collect initial and alternative interpretation.",
+      "primary_metric": "M.P3.REAPPRAISAL",
+      "provenance": "EVD"
+    },
+    {
+      "id": "BT.P5.1.EXEC",
+      "node": "P5.1",
+      "name": "Micro-routine completion",
+      "protocol": "Seven-day short routine; count opportunities and completed executions.",
+      "primary_metric": "M.P5.DISCIPLINE",
+      "provenance": "MDL"
+    },
+    {
+      "id": "BT.P5.3.BOUNDARY",
+      "node": "P5.3",
+      "name": "Boundary script trial",
+      "protocol": "Standardized low-risk refusal scenario; score clarity and follow-through.",
+      "primary_metric": "M.P5.BOUNDARY",
+      "provenance": "MDL"
+    }
+  ],
+  "load_levels": [
+    {
+      "id": "A",
+      "name": "Recovery",
+      "social_pressure": "none",
+      "cognitive_load": "minimal",
+      "action_window": "5-30 sec",
+      "provenance": "MDL"
+    },
+    {
+      "id": "B",
+      "name": "Stabilization",
+      "social_pressure": "none",
+      "cognitive_load": "low",
+      "action_window": "1-3 min",
+      "provenance": "MDL"
+    },
+    {
+      "id": "C",
+      "name": "Training",
+      "social_pressure": "low",
+      "cognitive_load": "medium",
+      "action_window": "minutes",
+      "provenance": "MDL"
+    },
+    {
+      "id": "D",
+      "name": "Challenge",
+      "social_pressure": "medium-high",
+      "cognitive_load": "high",
+      "action_window": "real interaction",
+      "provenance": "MDL"
+    },
+    {
+      "id": "E",
+      "name": "Integration",
+      "social_pressure": "real",
+      "cognitive_load": "full",
+      "action_window": "real context",
+      "provenance": "MDL"
+    }
+  ],
+  "adaptation_rules": [
+    {
+      "id": "AR.01",
+      "condition": "stress >= 8 OR C_cap < 3",
+      "action": "set_level",
+      "value": "A",
+      "reason": "safety_degrade",
+      "provenance": "MDL"
+    },
+    {
+      "id": "AR.02",
+      "condition": "recovery < 4 for >= 3 consecutive days",
+      "action": "set_level",
+      "value": "A",
+      "reason": "pause_or_recovery",
+      "provenance": "MDL"
+    },
+    {
+      "id": "AR.03",
+      "condition": "valid_days >= 7 AND avg_compliance_7d >= 0.85 AND capacity_stable_7d == true",
+      "action": "promote_one_level",
+      "value": "",
+      "reason": "",
+      "provenance": "DRV"
+    },
+    {
+      "id": "AR.04",
+      "condition": "compliance_7d < 0.50 AND stress >= 7",
+      "action": "demote_one_level",
+      "value": "",
+      "reason": "",
+      "provenance": "MDL"
+    },
+    {
+      "id": "AR.05",
+      "condition": "compliance_7d < 0.50 AND stress < 7",
+      "action": "reduce_task_scope",
+      "value": "50pct",
+      "reason": "",
+      "provenance": "MDL"
+    },
+    {
+      "id": "AR.06",
+      "condition": "root_cause_score_missing == true",
+      "action": "mark_unknown_and_collect_data",
+      "value": "",
+      "reason": "",
+      "provenance": "DRV"
+    }
+  ],
+  "sprint_templates": [
+    {
+      "sprint_id": "SPR-01",
+      "target_node_id": "P3.2",
+      "title": "Pause Capacity",
+      "duration_days": 21,
+      "supporting_habit": "Sleep/recovery support",
+      "daily_action": "10-second pause",
+      "level_progression": [
+        "B",
+        "B",
+        "C",
+        "C",
+        "D",
+        "D",
+        "E"
+      ],
+      "adaptation_rule_refs": [
+        "AR.01",
+        "AR.02",
+        "AR.03",
+        "AR.04",
+        "AR.05"
+      ],
+      "evidence_status": "MDL"
+    },
+    {
+      "sprint_id": "SPR-02",
+      "target_node_id": "P3.1",
+      "title": "Impulse Control",
+      "duration_days": 21,
+      "supporting_habit": "Recovery routine",
+      "daily_action": "Trigger → pause → response",
+      "level_progression": [
+        "B",
+        "B",
+        "C",
+        "C",
+        "D",
+        "D",
+        "E"
+      ],
+      "adaptation_rule_refs": [
+        "AR.01",
+        "AR.02",
+        "AR.03",
+        "AR.04",
+        "AR.05"
+      ],
+      "evidence_status": "MDL"
+    },
+    {
+      "sprint_id": "SPR-03",
+      "target_node_id": "P3.3",
+      "title": "Cognitive Reappraisal",
+      "duration_days": 21,
+      "supporting_habit": "Reflection routine",
+      "daily_action": "Alternative interpretation",
+      "level_progression": [
+        "B",
+        "B",
+        "C",
+        "C",
+        "D",
+        "D",
+        "E"
+      ],
+      "adaptation_rule_refs": [
+        "AR.01",
+        "AR.02",
+        "AR.03",
+        "AR.04",
+        "AR.05"
+      ],
+      "evidence_status": "MDL"
+    },
+    {
+      "sprint_id": "SPR-04",
+      "target_node_id": "P3.4",
+      "title": "Attention Regulation",
+      "duration_days": 21,
+      "supporting_habit": "Sleep schedule",
+      "daily_action": "Single-task focus block",
+      "level_progression": [
+        "B",
+        "B",
+        "C",
+        "C",
+        "D",
+        "D",
+        "E"
+      ],
+      "adaptation_rule_refs": [
+        "AR.01",
+        "AR.02",
+        "AR.03",
+        "AR.04",
+        "AR.05"
+      ],
+      "evidence_status": "MDL"
+    },
+    {
+      "sprint_id": "SPR-05",
+      "target_node_id": "P3.5",
+      "title": "Reflection Depth",
+      "duration_days": 21,
+      "supporting_habit": "Evening wind-down",
+      "daily_action": "One trigger → one analysis",
+      "level_progression": [
+        "B",
+        "B",
+        "C",
+        "C",
+        "D",
+        "D",
+        "E"
+      ],
+      "adaptation_rule_refs": [
+        "AR.01",
+        "AR.02",
+        "AR.03",
+        "AR.04",
+        "AR.05"
+      ],
+      "evidence_status": "MDL"
+    },
+    {
+      "sprint_id": "SPR-06",
+      "target_node_id": "P5.1",
+      "title": "Discipline & Consistency",
+      "duration_days": 21,
+      "supporting_habit": "Energy-aware planning",
+      "daily_action": "2-minute completion rule",
+      "level_progression": [
+        "B",
+        "B",
+        "C",
+        "C",
+        "D",
+        "D",
+        "E"
+      ],
+      "adaptation_rule_refs": [
+        "AR.01",
+        "AR.02",
+        "AR.03",
+        "AR.04",
+        "AR.05"
+      ],
+      "evidence_status": "MDL"
+    },
+    {
+      "sprint_id": "SPR-07",
+      "target_node_id": "P5.2",
+      "title": "Social Courage",
+      "duration_days": 21,
+      "supporting_habit": "Recovery baseline",
+      "daily_action": "Low-risk disagreement",
+      "level_progression": [
+        "B",
+        "B",
+        "C",
+        "C",
+        "D",
+        "D",
+        "E"
+      ],
+      "adaptation_rule_refs": [
+        "AR.01",
+        "AR.02",
+        "AR.03",
+        "AR.04",
+        "AR.05"
+      ],
+      "evidence_status": "MDL"
+    },
+    {
+      "sprint_id": "SPR-08",
+      "target_node_id": "P5.3",
+      "title": "Boundary Setting",
+      "duration_days": 21,
+      "supporting_habit": "Stress stabilization",
+      "daily_action": "One clear refusal",
+      "level_progression": [
+        "B",
+        "B",
+        "C",
+        "C",
+        "D",
+        "D",
+        "E"
+      ],
+      "adaptation_rule_refs": [
+        "AR.01",
+        "AR.02",
+        "AR.03",
+        "AR.04",
+        "AR.05"
+      ],
+      "evidence_status": "MDL"
+    },
+    {
+      "sprint_id": "SPR-09",
+      "target_node_id": "P5.4",
+      "title": "Adaptability",
+      "duration_days": 21,
+      "supporting_habit": "Planning buffer",
+      "daily_action": "Replan after controlled disruption",
+      "level_progression": [
+        "B",
+        "B",
+        "C",
+        "C",
+        "D",
+        "D",
+        "E"
+      ],
+      "adaptation_rule_refs": [
+        "AR.01",
+        "AR.02",
+        "AR.03",
+        "AR.04",
+        "AR.05"
+      ],
+      "evidence_status": "MDL"
+    },
+    {
+      "sprint_id": "SPR-10",
+      "target_node_id": "P3.1",
+      "title": "Reactivity Reduction",
+      "duration_days": 21,
+      "supporting_habit": "Stress logging",
+      "daily_action": "Trigger classification",
+      "level_progression": [
+        "B",
+        "B",
+        "C",
+        "C",
+        "D",
+        "D",
+        "E"
+      ],
+      "adaptation_rule_refs": [
+        "AR.01",
+        "AR.02",
+        "AR.03",
+        "AR.04",
+        "AR.05"
+      ],
+      "evidence_status": "MDL"
+    },
+    {
+      "sprint_id": "SPR-11",
+      "target_node_id": "P5.1",
+      "title": "Execution Consistency",
+      "duration_days": 21,
+      "supporting_habit": "Routine anchoring",
+      "daily_action": "Same cue → same action",
+      "level_progression": [
+        "B",
+        "B",
+        "C",
+        "C",
+        "D",
+        "D",
+        "E"
+      ],
+      "adaptation_rule_refs": [
+        "AR.01",
+        "AR.02",
+        "AR.03",
+        "AR.04",
+        "AR.05"
+      ],
+      "evidence_status": "MDL"
+    },
+    {
+      "sprint_id": "SPR-12",
+      "target_node_id": "P5.2",
+      "title": "Assertive Communication",
+      "duration_days": 21,
+      "supporting_habit": "Recovery check",
+      "daily_action": "Speak disagreement calmly",
+      "level_progression": [
+        "B",
+        "B",
+        "C",
+        "C",
+        "D",
+        "D",
+        "E"
+      ],
+      "adaptation_rule_refs": [
+        "AR.01",
+        "AR.02",
+        "AR.03",
+        "AR.04",
+        "AR.05"
+      ],
+      "evidence_status": "MDL"
+    },
+    {
+      "sprint_id": "SPR-13",
+      "target_node_id": "P5.3",
+      "title": "Boundary Maintenance",
+      "duration_days": 21,
+      "supporting_habit": "Energy budget",
+      "daily_action": "State boundary and maintain it",
+      "level_progression": [
+        "B",
+        "B",
+        "C",
+        "C",
+        "D",
+        "D",
+        "E"
+      ],
+      "adaptation_rule_refs": [
+        "AR.01",
+        "AR.02",
+        "AR.03",
+        "AR.04",
+        "AR.05"
+      ],
+      "evidence_status": "MDL"
+    },
+    {
+      "sprint_id": "SPR-14",
+      "target_node_id": "P3.2",
+      "title": "Pause Under Social Pressure",
+      "duration_days": 21,
+      "supporting_habit": "Recovery support",
+      "daily_action": "Pause before consequential response",
+      "level_progression": [
+        "B",
+        "B",
+        "C",
+        "C",
+        "D",
+        "D",
+        "E"
+      ],
+      "adaptation_rule_refs": [
+        "AR.01",
+        "AR.02",
+        "AR.03",
+        "AR.04",
+        "AR.05"
+      ],
+      "evidence_status": "MDL"
+    },
+    {
+      "sprint_id": "SPR-15",
+      "target_node_id": "P5.4",
+      "title": "Adaptive Planning",
+      "duration_days": 21,
+      "supporting_habit": "Daily capacity check",
+      "daily_action": "Choose/revise plan from capacity",
+      "level_progression": [
+        "B",
+        "B",
+        "C",
+        "C",
+        "D",
+        "D",
+        "E"
+      ],
+      "adaptation_rule_refs": [
+        "AR.01",
+        "AR.02",
+        "AR.03",
+        "AR.04",
+        "AR.05"
+      ],
+      "evidence_status": "MDL"
+    }
+  ],
+  "roles": [
+    {
+      "id": "ROLE.LEADER",
+      "name": "Leader",
+      "dimensions": {
+        "initiative": "high",
+        "decision_speed": "high",
+        "structure": "medium"
+      }
+    },
+    {
+      "id": "ROLE.STRATEGIST",
+      "name": "Strategist",
+      "dimensions": {
+        "initiative": "medium",
+        "decision_speed": "medium",
+        "analysis": "high"
+      }
+    },
+    {
+      "id": "ROLE.MEDIATOR",
+      "name": "Mediator",
+      "dimensions": {
+        "conflict_management": "high",
+        "assertiveness": "medium",
+        "empathy": "high"
+      }
+    },
+    {
+      "id": "ROLE.ORGANIZER",
+      "name": "Organizer",
+      "dimensions": {
+        "structure": "high",
+        "follow_through": "high",
+        "adaptability": "medium"
+      }
+    }
+  ],
+  "compatibility_rules": [
+    {
+      "id": "CV1",
+      "vector": "V1_BIO_TEMPO",
+      "inputs": [
+        "P1.2",
+        "P1.5",
+        "P1.6"
+      ],
+      "outputs": [
+        "tempo_gap",
+        "energy_gap",
+        "reactivity_gap"
+      ],
+      "status": "MDL"
+    },
+    {
+      "id": "CV2",
+      "vector": "V2_VALUES_ALIGNMENT",
+      "inputs": [
+        "P4.1",
+        "P4.2",
+        "P4.3",
+        "P4.4",
+        "P4.5",
+        "P4.6",
+        "P4.7",
+        "P4.8",
+        "P4.9",
+        "P4.10"
+      ],
+      "outputs": [
+        "rank_correlation",
+        "shared_priorities",
+        "priority_gaps"
+      ],
+      "status": "MDL"
+    },
+    {
+      "id": "CV3",
+      "vector": "V3_BEHAVIORAL_SYNERGY",
+      "inputs": [
+        "P5.1",
+        "P5.2",
+        "P5.3",
+        "P5.4"
+      ],
+      "outputs": [
+        "role_pattern",
+        "synergy",
+        "friction"
+      ],
+      "status": "MDL"
+    },
+    {
+      "id": "CV4",
+      "vector": "DATA_COMPLETENESS",
+      "inputs": [
+        "all_available_measurements"
+      ],
+      "outputs": [
+        "completeness",
+        "recency",
+        "consistency"
+      ],
+      "status": "DRV"
+    }
+  ],
+  "claims": [
+    {
+      "id": "CLM-001",
+      "text": "Adaptive task load can be operationalized from daily energy, stress and recovery inputs.",
+      "status": "REGISTERED",
+      "provenance": "MDL"
+    },
+    {
+      "id": "CLM-002",
+      "text": "A 21-day focused sprint can change the measured target behavior under a defined intervention protocol.",
+      "status": "REGISTERED",
+      "provenance": "HYP"
+    },
+    {
+      "id": "CLM-003",
+      "text": "Compatibility vectors can identify recurring friction and synergy patterns beyond a single scalar score.",
+      "status": "REGISTERED",
+      "provenance": "MDL"
+    },
+    {
+      "id": "CLM-004",
+      "text": "Trait changes should be evaluated longitudinally rather than inferred from short-term state fluctuations.",
+      "status": "REGISTERED",
+      "provenance": "MDL"
+    }
+  ],
+  "validation_protocols": [
+    {
+      "id": "VAL-01",
+      "name": "Construct Validity",
+      "status": "PLANNED"
+    },
+    {
+      "id": "VAL-02",
+      "name": "Intervention Efficacy",
+      "status": "PLANNED"
+    },
+    {
+      "id": "VAL-03",
+      "name": "Compatibility Predictive Validity",
+      "status": "PLANNED"
+    },
+    {
+      "id": "VAL-04",
+      "name": "Reproducibility",
+      "status": "PLANNED"
+    }
+  ],
+  "engine_contracts": {
+    "capacity_formula": "C_cap = 0.5*E + 0.3*(R/10) - 0.5*S",
+    "safety": "if S>=8 OR C_cap<3 => Level A",
+    "promotion": "valid_days>=7 AND avg_compliance_7d>=0.85 AND capacity_stable_7d=true",
+    "missing_data": "UNKNOWN; never default missing score to 10",
+    "compatibility_output": "V1/V2/V3 + completeness/recency/consistency; no single compatibility percentage"
+  }
+}

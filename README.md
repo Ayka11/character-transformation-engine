@@ -1,28 +1,39 @@
-# Character Transformation Engine
+# Character Transformation & Social Compatibility Engine
 
-Scientific/runtime architecture for character development, behavioral adaptation, compatibility analysis, and evidence-linked research.
+A provenance-aware architecture for measurement, adaptive behavioral intervention, compatibility analysis, and reproducible research execution.
 
-## Current baseline
+## Architecture
 
-- Master Matrix V1.0
-- Runtime Layer V1.1
-- Research Execution Layer V1.2
-- Next: Validation & Analytics Engine V1.3
+- **Master Matrix V1.0** — canonical ontology, domains P1–P5, traits/subtraits, metrics, questions, behavioral tests, load levels, sprint templates, compatibility vectors, claims and validation protocols.
+- **Runtime V1.1** — user profiles, immutable trait snapshots, daily state, capacity engine, root-cause navigation, sprint runtime, behavioral events, adaptation decisions, compatibility runtime, provenance and claim graph.
+- **Research Execution V1.2** — study registration, experiments, arms, participants, trial-level data, QC, dataset manifests, statistical analyses, results, replication, generalization and automated report specification.
 
-## Design principles
+## Scientific status
 
-- STATE and TRAIT are separated.
-- Missing measurements remain UNKNOWN.
-- Derived decisions retain algorithm version and input provenance.
-- Compatibility is represented as V1 Bio/Tempo, V2 Values Alignment, and V3 Behavioral Synergy rather than one authoritative scalar.
-- Claims require evidence and replication before evidence-supported status.
+This repository is an implementation architecture and model specification. `MDL` and `HYP` elements are not treated as empirically established merely because the software produces numerical outputs.
 
-## Repository structure
+## Core invariants
+
+1. TRAIT and daily STATE remain separate.
+2. Missing measurements are `UNKNOWN`, never a perfect/default score.
+3. Every derived decision records its rule/algorithm version and input/output hashes.
+4. Safety degradation has priority over promotion.
+5. Compatibility is represented as V1/V2/V3 vectors plus data-quality metadata, not as one authoritative percentage.
+6. QC precedes final statistical interpretation.
+7. Replication is a separate study/run, not a renamed re-analysis of the same dataset.
+8. Generalization records target population/context and transport error.
+9. Claims require explicit evidence and replication provenance before evidence-supported status.
+
+## Pipeline
 
 ```text
-schema/    Master Matrix definitions and seed SQL
-runtime/   Runtime database/API contracts
-research/  Research execution, reporting, and provenance
+Question → Hypothesis → Study → Protocol → Experiment
+→ Participant → Trial Data → QC → Dataset Manifest
+→ Analysis → Result → Claim → Replication → Generalization → Report
 ```
 
-This repository is an implementation baseline. Statistical and causal claims remain subject to empirical validation.
+## Versioning
+
+- V1.0 — canonical Master Matrix seed
+- V1.1 — executable Runtime layer
+- V1.2 — Research Execution layer

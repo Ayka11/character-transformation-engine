@@ -1,0 +1,80 @@
+{
+  "version": "1.1.0",
+  "runtime_principle": "Every decision must be reproducible from inputs + rule version + provenance.",
+  "endpoints": [
+    {
+      "method": "POST",
+      "path": "/profiles/{user_id}/baseline",
+      "purpose": "Create immutable trait/profile snapshot"
+    },
+    {
+      "method": "POST",
+      "path": "/users/{user_id}/daily-state",
+      "purpose": "Record P1 dynamic state"
+    },
+    {
+      "method": "GET",
+      "path": "/users/{user_id}/capacity/today",
+      "purpose": "Calculate C_cap and recommended load level"
+    },
+    {
+      "method": "POST",
+      "path": "/users/{user_id}/root-cause",
+      "purpose": "Resolve target node bottleneck"
+    },
+    {
+      "method": "POST",
+      "path": "/users/{user_id}/sprints/generate",
+      "purpose": "Generate 21-day sprint from target + bottleneck + capacity"
+    },
+    {
+      "method": "POST",
+      "path": "/sprints/{user_sprint_id}/events",
+      "purpose": "Record behavioral event"
+    },
+    {
+      "method": "POST",
+      "path": "/sprints/{user_sprint_id}/daily-evaluate",
+      "purpose": "Evaluate daily compliance and adaptation"
+    },
+    {
+      "method": "GET",
+      "path": "/sprints/{user_sprint_id}/progress",
+      "purpose": "Return trial-level progress"
+    },
+    {
+      "method": "POST",
+      "path": "/compatibility",
+      "purpose": "Calculate V1/V2/V3 profile"
+    },
+    {
+      "method": "GET",
+      "path": "/claims/{claim_id}/provenance",
+      "purpose": "Return evidence and derivation chain"
+    },
+    {
+      "method": "POST",
+      "path": "/research/runs",
+      "purpose": "Register reproducible study run"
+    },
+    {
+      "method": "POST",
+      "path": "/research/runs/{run_id}/qc",
+      "purpose": "Run data quality checks"
+    },
+    {
+      "method": "POST",
+      "path": "/research/runs/{run_id}/claim",
+      "purpose": "Attach result to claim graph"
+    }
+  ],
+  "runtime_invariants": [
+    "TRAIT values are never overwritten by daily STATE values.",
+    "Missing measurements are UNKNOWN, not high/default scores.",
+    "Every derived decision stores algorithm_version and input_hash.",
+    "Every adaptation decision stores rule_ids and an explanation.",
+    "Safety degradation takes precedence over promotion.",
+    "Compatibility is represented as V1/V2/V3 vectors, not one authoritative percentage.",
+    "Claims cannot become evidence-supported without recorded evidence and replication state."
+  ]
+}
