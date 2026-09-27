@@ -617,7 +617,7 @@ INTERVENTION_SERVICE = install_intervention_api(app, GRAPH_REGISTRY, RUNTIME_STO
 
 ORCHESTRATOR_SERVICE = install_orchestrator_api(app, RUNTIME_STORE)
 
-RESEARCH_SERVICE = install_research_api(app, GRAPH_REGISTRY, RUNTIME_STORE)
+RESEARCH_SERVICE = install_research_api(app, GRAPH_REGISTRY, RUNTIME_STORE, ORCHESTRATOR_SERVICE)
 
 
 @app.post("/integrity/v1.9/run")
