@@ -22,6 +22,7 @@ class StageInput(BaseModel):
     metadata:dict=Field(default_factory=dict)
 
 class EventInput(BaseModel):
+    execution_id:str
     event_type:str
     input_hash:str
     output_hash:str|None=None
@@ -80,9 +81,10 @@ def install_orchestrator_api(app):
 
     @app.post("/orchestrator/events")
     def append_event(p:EventInput):
-        if p.provenance_record_id.startswith(""):
-            pass
-        raise HTTPException(400,"execution_id is required through the execution path for event append")
+        try:
+            return asdict(service.append_event(p.execution_id,p.event_type,p.input_hash,p.output_hash,p.provenance_record_id,p.payload))
+        except ValueError as e:
+            raise HTTPException(400,str(e))
 
     @app.get("/orchestrator/executions/{execution_id}")
     def get_execution(execution_id:str):
