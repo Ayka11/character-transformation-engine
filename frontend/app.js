@@ -95,7 +95,7 @@ async function loadOverview(){
           return "<tr><td>"+row.scenario_id+"</td><td><code>"+escapeHtml(JSON.stringify(def.conditions || {}))+
                  "</code></td><td>"+row.status+"</td><td>"+(row.estimate_by_outcome?.value ?? "—")+"</td></tr>";
         }).join("")
-      : "<tr><td colspan="4">No scenario runs yet.</td></tr>";
+        : "<tr><td colspan=\"4\">No scenario runs yet.</td></tr>";
   }catch(e){
     $("output").textContent="ERROR: "+e.message;
   }
@@ -111,7 +111,7 @@ async function loadClaims(){
 }
 
 function escapeHtml(value){
-  return String(value).replace(/[&<>"]/g,char=>({"&":"&amp;","<":"&lt;",">":"&gt;",""":"&quot;"}[char]));
+  return String(value).replace(/[&<>"]/g,char=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;"}[char]));
 }
 
 async function boot(){
@@ -125,7 +125,6 @@ async function boot(){
     $("apiStatus").dataset.online = "true";
   }
   $("runPayload").value = JSON.stringify(samplePayload($("executionId").value),null,2);
-  await loadOverview();
 }
 
 $("createMatrix").onclick = async () => {
