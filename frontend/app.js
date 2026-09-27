@@ -134,6 +134,7 @@ $("createMatrix").onclick = async () => {
       primary_outcome:$("primaryOutcome").value,design:{type:"scenario_matrix"}
     })});
     out(data);
+    await loadOverview();
   }catch(e){out("ERROR: "+e.message)}
 };
 
