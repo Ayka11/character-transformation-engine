@@ -931,3 +931,225 @@ def test_postgres_science_lab_provenance_rebind_matches_sqlite_after_restore():
                 "DELETE FROM runtime_snapshots WHERE key LIKE %s OR payload_json->>'execution_id'=%s",
                 (f"%{suffix}%", execution_id),
             )
+
+
+@pytest.mark.skipif(
+    not os.getenv("CTE_DATABASE_URL"),
+    reason="CTE_DATABASE_URL is required for live PostgreSQL integration",
+)
+def test_postgres_full_durability_gate_crash_restore_and_adversarial_lineage():
+    """Production gate: crash recovery + backup/restore + graph attack must compose."""
+    from types import SimpleNamespace
+    from cte.contracts.transformation import TransformationContract, TransformationResult
+    from cte.state_snapshot_store import StateSnapshotStore
+    from cte.transformation_ledger import TransformationLedger, TransformationLedgerEntry
+    from cte.transformation_provenance import TransformationProvenanceBinder
+    from cte.transformation_runtime import TransformationExecutor
+    from cte.transformation_recovery import (
+        JournalAttempt, TransformationJournal, TransformationRecoveryService,
+    )
+    from cte.graph_registry import GraphRegistry
+    from cte.evidence_graph import register_node, register_edge
+    from cte.science_lab import ExperimentMatrix, ScenarioDefinition, ScenarioRun, ScienceLabService
+    from cte.provenance import Provenance, ProvenanceTag, content_hash
+    import copy
+
+    dsn = os.environ["CTE_DATABASE_URL"]
+    store = PostgreSQLRuntimeStore(dsn)
+    suffix = os.urandom(6).hex()
+    execution_id = f"full-gate-{suffix}"
+    character_id = f"full-gate-character-{suffix}"
+    matrix_id = f"full-gate-matrix-{suffix}"
+    scenario_id = f"full-gate-scenario-{suffix}"
+    run_id = f"full-gate-run-{suffix}"
+    result_id = f"full-gate-result-{suffix}"
+    claim_id = f"full-gate-claim-{suffix}"
+
+    execution = TransformationExecutor(
+        StateSnapshotStore(store), TransformationLedger(store)
+    ).execute(
+        execution_id, character_id, 1, {"tempo": 5},
+        TransformationContract("full-gate-contract", "1", expected_changes={"tempo": 6}),
+        lambda state: {"tempo": 6},
+    )
+    assert execution.result.status == "VALIDATED"
+    binder = TransformationProvenanceBinder(store)
+    trusted = binder.bind_execution(execution_id)
+    assert trusted["validated"] is True
+
+    registry = GraphRegistry.empty(store)
+    registry.add_node(register_node(
+        result_id, "RESULT", result_id, "EXP", "1",
+        {"qc_status": "PASS", "validated_descriptive_result": True},
+    ))
+    registry.add_node(register_node(
+        f"analysis-{suffix}", "ANALYSIS", f"analysis-{suffix}", "EXP", "1",
+        {"execution_id": execution_id},
+    ))
+    registry.add_node(register_node(
+        f"transform-{suffix}", "TRANSFORMATION", execution_id, "EXP", "1",
+        {"execution_id": execution_id, "ledger_id": trusted["ledger_id"],
+         "certificate_id": trusted["certificate_id"]},
+    ))
+    registry.add_edge(register_edge(
+        f"analysis-result-{suffix}", registry.nodes[f"analysis-{suffix}"],
+        registry.nodes[result_id], "RESULTS_IN",
+    ))
+    registry.add_edge(register_edge(
+        f"run-result-{suffix}", registry.nodes[f"analysis-{suffix}"],
+        registry.nodes[result_id], "DERIVED_FROM",
+    ))
+    registry.add_edge(register_edge(
+        f"run-transform-{suffix}", registry.nodes[f"analysis-{suffix}"],
+        registry.nodes[f"transform-{suffix}"], "DERIVED_FROM",
+    ))
+    registry.register_claim(
+        claim_id, result_id, "HYPOTHESIS", "REGISTERED", "EXP",
+        {"execution_id": execution_id},
+    )
+
+    matrix = ExperimentMatrix(
+        matrix_id, f"study-{suffix}", "Full durability gate", "outcome", {},
+        (scenario_id,), "ACTIVE", "matrix-hash",
+    )
+    scenario = ScenarioDefinition(
+        scenario_id, matrix_id, "Full durability scenario", "Gate", {},
+        ("outcome",), True, "scenario-hash",
+    )
+    service = object.__new__(ScienceLabService)
+    service.registry = registry
+    service.store = store
+    service.research = None
+    service.coordinator = None
+    service.transformation_provenance = binder
+    service.matrices = {matrix_id: matrix}
+    service.scenarios = {scenario_id: scenario}
+    service.runs = {
+        run_id: ScenarioRun(
+            run_id, matrix_id, scenario_id, execution_id, "COMPLETED",
+            (result_id,), {"outcome": 6.0}, "PASS", "output",
+            Provenance(ProvenanceTag.EXP, "full-gate", "1", "input", "test"),
+            trusted,
+        )
+    }
+    service.replication_assessments = {}
+    service.generalization_assessments = {}
+    service._put("science_lab.matrix", matrix_id, {
+        **matrix.__dict__, "scenario_ids": list(matrix.scenario_ids),
+    })
+    service._put("science_lab.scenario", scenario_id, {
+        **scenario.__dict__, "expected_outcomes": list(scenario.expected_outcomes),
+    })
+    service._put("science_lab.run", run_id, {
+        **service.runs[run_id].__dict__, "transformation_provenance": trusted,
+        "provenance_tag": "EXP", "source": "full-gate", "version": "1",
+        "provenance_input_hash": "input", "provenance_note": "test",
+    })
+    before = service.report_bundle(matrix_id)
+    assert before["claim_validation"]["claims"][0]["transformation_support"]["status"] == "VALIDATED"
+
+    # Simulate the crash window independently: ledger is durable, terminal journal is absent.
+    recovery_execution = f"{execution_id}-recovery"
+    recovery_attempt = f"{execution_id}-attempt"
+    req_hash = content_hash({"execution_id": recovery_execution, "state": {"tempo": 5}})
+    snapshots = StateSnapshotStore(store)
+    journal = TransformationJournal(store)
+    recovery_ledger = TransformationLedger(store)
+    from cte.contracts.state import StateSnapshot
+    rb = StateSnapshot.capture(f"{recovery_execution}:before", character_id, 10, {"tempo": 5},
+                               source_execution_id=recovery_execution)
+    ra = StateSnapshot.capture(f"{recovery_execution}:after", character_id, 11, {"tempo": 6},
+                               parent_snapshot_id=rb.snapshot_id, source_execution_id=recovery_execution)
+    snapshots.save_pair_atomic(rb, ra)
+    journal.record(JournalAttempt(
+        recovery_attempt, recovery_execution, character_id, 10, req_hash,
+        "full-gate-contract", "1", "AFTER_CAPTURED", rb.snapshot_id, ra.snapshot_id,
+    ), "AFTER_CAPTURED", after_hash=ra.state_hash)
+    recovery_result = TransformationResult(
+        "VALIDATED", None, rb.snapshot_id, ra.snapshot_id, rb.state_hash, ra.state_hash,
+        ("tempo",), False, {},
+    )
+    recovery_contract = TransformationContract("full-gate-contract", "1", expected_changes={"tempo": 6})
+    recovery_ledger.append(TransformationLedgerEntry.from_execution(
+        SimpleNamespace(execution_id=recovery_execution, result=recovery_result, certificate=None),
+        character_id, recovery_contract, request_hash=req_hash,
+    ))
+    recovered = TransformationRecoveryService(
+        snapshots, recovery_ledger, journal
+    ).recover(recovery_attempt, recovery_contract)
+    assert recovered.status == "RECOVERED"
+
+    # Backup and restore the complete durable state.
+    backup = build_backup(store)
+    validate_backup(backup)
+    cleanup = PostgreSQLRuntimeStore(dsn)
+    with cleanup.transaction() as conn:
+        with conn.cursor() as cur:
+            for namespace in (
+                "science_lab.matrix", "science_lab.scenario", "science_lab.run",
+                "graph.node", "graph.edge", "graph.contradiction", "graph.inference",
+                "transformation.ledger", "transformation.certificate",
+                "state.snapshot", "transformation.lock",
+            ):
+                cur.execute(
+                    "DELETE FROM runtime_snapshots WHERE namespace=%s AND (key LIKE %s OR payload_json->>'execution_id' IN (%s,%s))",
+                    (namespace, f"%{suffix}%", execution_id, recovery_execution),
+                )
+            cur.execute(
+                "DELETE FROM runtime_events WHERE payload_json->>'execution_id' IN (%s,%s)",
+                (execution_id, recovery_execution),
+            )
+
+    restore_backup(store, copy.deepcopy(backup))
+    restored = object.__new__(ScienceLabService)
+    restored.registry = GraphRegistry.empty(store)
+    restored.store = store
+    restored.research = None
+    restored.coordinator = None
+    restored.transformation_provenance = TransformationProvenanceBinder(store)
+    restored.matrices = {}
+    restored.scenarios = {}
+    restored.runs = {}
+    restored.replication_assessments = {}
+    restored.generalization_assessments = {}
+    restored._hydrate()
+
+    after = restored.report_bundle(matrix_id)
+    assert after["provenance"]["input_hash"] == before["provenance"]["input_hash"]
+    assert after["claim_validation"] == before["claim_validation"]
+    assert TransformationProvenanceBinder(store).bind_execution(execution_id)["validated"] is True
+
+    # Final adversarial mutation: remove the trusted transformation graph node.
+    with cleanup.transaction() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                "DELETE FROM runtime_snapshots WHERE namespace='graph.node' AND key=%s",
+                (f"transform-{suffix}",),
+            )
+
+    attacked = object.__new__(ScienceLabService)
+    attacked.registry = GraphRegistry.empty(store)
+    attacked.store = store
+    attacked.research = None
+    attacked.coordinator = None
+    attacked.transformation_provenance = TransformationProvenanceBinder(store)
+    attacked.matrices = {}
+    attacked.scenarios = {}
+    attacked.runs = {}
+    attacked.replication_assessments = {}
+    attacked.generalization_assessments = {}
+    attacked._hydrate()
+    claim = attacked.claim_validation(matrix_id)["claims"][0]
+    assert claim["transformation_support"]["status"] == "NOT_VALIDATED"
+    assert claim["transformation_support"]["graph_lineage_valid"] is False
+
+    with cleanup.transaction() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                "DELETE FROM runtime_events WHERE event_id LIKE %s OR payload_json->>'execution_id' IN (%s,%s)",
+                (f"%{suffix}%", execution_id, recovery_execution),
+            )
+            cur.execute(
+                "DELETE FROM runtime_snapshots WHERE key LIKE %s OR payload_json->>'execution_id' IN (%s,%s)",
+                (f"%{suffix}%", execution_id, recovery_execution),
+            )
