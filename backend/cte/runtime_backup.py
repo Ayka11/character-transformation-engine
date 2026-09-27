@@ -46,6 +46,11 @@ def build_backup(store) -> dict:
     return payload
 
 
+
+def backup_to_path(store, path: str | Path) -> dict:
+    """Alias with an operationally explicit name for scheduled backup jobs."""
+    return save_backup(store, path)
+
 def save_backup(store, path: str | Path) -> dict:
     backup = build_backup(store)
     target = Path(path)
