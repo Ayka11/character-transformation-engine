@@ -5,7 +5,7 @@ A stdlib SQLite runtime adapter is now available through CTE_RUNTIME_DB (default
 Durable coverage currently includes:
 - Evidence Graph nodes and edges;
 - graph audit events, contradiction sets and inference blocks;
-- Orchestrator executions and events;
+- Orchestrator executions, events, module registry, schema registry and rule registry;
 - Scientific Reporting specs and report snapshots;
 - Decision/Intervention rules and assignments;
 - graph-backed replication and generalization research state.
