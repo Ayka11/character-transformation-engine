@@ -282,6 +282,7 @@ class ScienceLabService:
             "result_ids": result_ids, "estimates": estimates,
         }
         prov = _prov("science_lab.scenario_run", provenance_payload)
+        transformation_provenance = self.transformation_provenance.bind_execution(payload["execution_id"]) if self.transformation_provenance is not None else {"execution_id": payload["execution_id"], "status": "UNAVAILABLE", "validated": False}
         item = ScenarioRun(
             run_id=f"{matrix_id}:{scenario_id}:{payload['execution_id']}",
             matrix_id=matrix_id,
@@ -293,6 +294,7 @@ class ScienceLabService:
             safety_status=safety_status,
             output_hash=content_hash(provenance_payload),
             provenance=prov,
+            transformation_provenance=transformation_provenance,
         )
         self.runs[item.run_id] = item
         self._put("science_lab.run", item.run_id, {
