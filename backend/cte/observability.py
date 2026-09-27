@@ -56,6 +56,12 @@ class SecurityObservabilityMiddleware(BaseHTTPMiddleware):
     def __init__(self, app, store=None):
         super().__init__(app)
         self.store = store
+        raw_limit = os.getenv("CTE_RATE_LIMIT_PER_MINUTE", "0")
+        try:
+            self.rate_limit = int(raw_limit)
+        except ValueError as exc:
+            raise ValueError("CTE_RATE_LIMIT_PER_MINUTE must be an integer") from exc
+        self.limiter = SlidingWindowRateLimiter(self.rate_limit) if self.rate_limit > 0 else None
 
     @staticmethod
     def _request_id(request: Request) -> str:
@@ -100,6 +106,16 @@ class SecurityObservabilityMiddleware(BaseHTTPMiddleware):
                 response.headers["WWW-Authenticate"] = "ApiKey"
                 self._audit(request, request_id, 401, started, "auth_failed")
                 return response
+
+            if self.limiter is not None:
+                client_host = request.client.host if request.client else "unknown"
+                allowed, retry_after = self.limiter.allow(client_host)
+                if not allowed:
+                    response = JSONResponse({"detail": "rate limit exceeded"}, status_code=429)
+                    response.headers["X-Request-ID"] = request_id
+                    response.headers["Retry-After"] = str(retry_after)
+                    self._audit(request, request_id, 429, started, "rate_limited", auth_mode)
+                    return response
 
         try:
             response = await call_next(request)
