@@ -120,6 +120,10 @@ def install_science_lab_api(
     def validate_claims(matrix_id: str):
         return service.claim_validation(matrix_id)
 
+    @app.get("/science-lab/matrices/{matrix_id}/statistics")
+    def matrix_statistics(matrix_id: str):
+        return service.descriptive_statistics(matrix_id)
+
     @app.get("/science-lab/matrices/{matrix_id}/report")
     def build_report_bundle(matrix_id: str):
         return service.report_bundle(matrix_id)
