@@ -118,14 +118,35 @@ class PostgreSQLRuntimeStore:
                     )
                     return Snapshot(namespace, key, version, payload, payload_hash)
 
-                cur.execute(
-                    """
-                    INSERT INTO runtime_snapshots
-                    (namespace,key,version,payload_json,payload_hash)
-                    VALUES (%s,%s,%s,%s,%s)
-                    """,
-                    (namespace, key, version, Jsonb(payload), payload_hash),
-                )
+                if namespace not in MUTABLE_SNAPSHOT_NAMESPACES:
+                    cur.execute(
+                        """
+                        INSERT INTO runtime_snapshots
+                        (namespace,key,version,payload_json,payload_hash)
+                        VALUES (%s,%s,%s,%s,%s)
+                        ON CONFLICT (namespace,key) DO NOTHING
+                        """,
+                        (namespace, key, version, Jsonb(payload), payload_hash),
+                    )
+                    if cur.rowcount == 0:
+                        cur.execute(
+                            "SELECT version,payload_hash,payload_json FROM runtime_snapshots WHERE namespace=%s AND key=%s",
+                            (namespace, key),
+                        )
+                        existing = cur.fetchone()
+                        if existing is not None and existing[1] == payload_hash:
+                            existing_payload = existing[2] if isinstance(existing[2], dict) else json.loads(existing[2])
+                            return Snapshot(namespace, key, existing[0], existing_payload, existing[1])
+                        raise ValueError("immutable snapshot conflict")
+                else:
+                    cur.execute(
+                        """
+                        INSERT INTO runtime_snapshots
+                        (namespace,key,version,payload_json,payload_hash)
+                        VALUES (%s,%s,%s,%s,%s)
+                        """,
+                        (namespace, key, version, Jsonb(payload), payload_hash),
+                    )
         return Snapshot(namespace, key, version, payload, payload_hash)
 
     def get_snapshot(self, namespace: str, key: str) -> Snapshot | None:
@@ -213,12 +234,24 @@ class PostgreSQLRuntimeStore:
                     INSERT INTO runtime_events
                     (event_id,namespace,event_type,payload_json,input_hash,output_hash,provenance_record_id)
                     VALUES (%s,%s,%s,%s,%s,%s,%s)
+                    ON CONFLICT (event_id) DO NOTHING
                     """,
                     (
                         event_id, namespace, event_type, Jsonb(payload),
                         input_hash, output_hash, provenance_record_id,
                     ),
                 )
+                if cur.rowcount == 0:
+                    cur.execute(
+                        "SELECT input_hash,output_hash,payload_json FROM runtime_events WHERE event_id=%s",
+                        (event_id,),
+                    )
+                    existing = cur.fetchone()
+                    if existing is not None:
+                        existing_payload = existing[2] if isinstance(existing[2], dict) else json.loads(existing[2])
+                        if existing[0] == input_hash and existing[1] == output_hash and existing_payload == payload:
+                            return
+                    raise ValueError("immutable event conflict")
 
     def get_event(self, event_id: str) -> dict | None:
         with self._connect() as conn:
