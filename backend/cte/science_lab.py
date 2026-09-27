@@ -448,17 +448,60 @@ class ScienceLabService:
         })
         return item
 
+    def descriptive_statistics(self, matrix_id: str) -> dict:
+        matrix = self.matrices.get(matrix_id)
+        if matrix is None:
+            raise ValueError("experiment matrix is not registered")
+        runs = [r for r in self.runs.values() if r.matrix_id == matrix_id]
+        completed = [r for r in runs if r.status == "COMPLETED"]
+        blocked = [r for r in runs if r.status == "BLOCKED"]
+        estimates = []
+        for run in completed:
+            value = run.estimate_by_outcome.get(matrix.primary_outcome)
+            if isinstance(value, (int, float)):
+                estimates.append(float(value))
+        replication_statuses = [r.status for r in self.replication_assessments.values() if r.matrix_id == matrix_id]
+        generalization_statuses = [r.status for r in self.generalization_assessments.values() if r.matrix_id == matrix_id]
+        return {
+            "matrix_id": matrix_id,
+            "scenario_count": len(matrix.scenario_ids),
+            "run_count": len(runs),
+            "completed_runs": len(completed),
+            "blocked_runs": len(blocked),
+            "primary_outcome": matrix.primary_outcome,
+            "descriptive_estimate_mean": (
+                sum(estimates) / len(estimates) if estimates else None
+            ),
+            "descriptive_estimate_count": len(estimates),
+            "replication": {
+                "count": len(replication_statuses),
+                "by_status": {status: replication_statuses.count(status) for status in sorted(set(replication_statuses))},
+            },
+            "generalization": {
+                "count": len(generalization_statuses),
+                "by_status": {status: generalization_statuses.count(status) for status in sorted(set(generalization_statuses))},
+            },
+            "scientific_status": "DESCRIPTIVE_ONLY_MODEL_DERIVED_RUNTIME",
+            "provenance": {
+                "tag": "EXP",
+                "input_hash": content_hash({
+                    "runs": [asdict(r) for r in runs],
+                    "replication": replication_statuses,
+                    "generalization": generalization_statuses,
+                }),
+            },
+        }
+
     def claim_validation(self, matrix_id: str) -> dict:
         matrix = self.matrices.get(matrix_id)
         if matrix is None:
             raise ValueError("experiment matrix is not registered")
+        execution_ids = {run.execution_id for run in self.runs.values() if run.matrix_id == matrix_id}
         claims = []
         for node in self.registry.nodes.values():
             if node.node_type != "CLAIM":
                 continue
-            if node.metadata.get("execution_id") and node.metadata.get("execution_id").startswith(tuple(
-                run.execution_id for run in self.runs.values() if run.matrix_id == matrix_id
-            )):
+            if node.metadata.get("execution_id") in execution_ids:
                 claims.append({
                     "claim_id": node.node_id,
                     "state": node.metadata.get("state"),
@@ -485,6 +528,7 @@ class ScienceLabService:
             "replication_assessments": replications,
             "generalization_assessments": generalizations,
             "claim_validation": claims,
+            "descriptive_statistics": self.descriptive_statistics(matrix_id),
         }
         return {
             **payload,
