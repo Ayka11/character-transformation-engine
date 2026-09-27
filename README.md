@@ -1,12 +1,12 @@
 # Character Transformation & Social Compatibility Engine
 
-A provenance-aware architecture for measurement, adaptive behavioral intervention, compatibility analysis, and reproducible research execution.
+A provenance-aware architecture for measurement, adaptive behavioral intervention, compatibility analysis, reproducible research execution, and a browser-accessible Science Lab.
 
 ## Architecture
 
 - **Master Matrix V1.0** — canonical ontology, domains P1–P5, traits/subtraits, metrics, questions, behavioral tests, load levels, sprint templates, compatibility vectors, claims and validation protocols.
 - **Runtime V1.1** — user profiles, immutable trait snapshots, daily state, capacity engine, root-cause navigation, sprint runtime, behavioral events, adaptation decisions, compatibility runtime, provenance and claim graph.
-- **Research Execution V1.2** — study registration, experiments, arms, participants, trial-level data, QC, dataset manifests, statistical analyses, results, replication, generalization and automated report specification.
+- **Research Execution V1.2** — study/protocol/experiment/arm/participant/trial execution, QC, immutable dataset manifests and descriptive analysis.
 
 ## Scientific status
 
@@ -37,3 +37,10 @@ Question → Hypothesis → Study → Protocol → Experiment
 - V1.0 — canonical Master Matrix seed
 - V1.1 — executable Runtime layer
 - V1.2 — Research Execution layer
+
+
+## V2.2–V2.3
+
+- **V2.2 Research E2E** composes profile, assessment, state, capacity, safety, research execution, QC, analysis, claim and audit under one execution ID.
+- **Science Lab V2.3** adds Experiment Matrix, scenario definitions/runs, descriptive statistics, replication/generalization assessment, claim validation, provenance report bundle and a static browser UI at `/science-lab/ui`.
+- Current CI baseline: GitHub Actions run #106, 140 backend tests passing.
