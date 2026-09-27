@@ -6,6 +6,7 @@ It does not replace the repository's PostgreSQL persistence contracts.
 from __future__ import annotations
 import json
 import sqlite3
+import tempfile
 from dataclasses import dataclass
 from pathlib import Path
 from .provenance import content_hash
