@@ -620,3 +620,83 @@ def test_postgres_retention_cannot_destroy_transformation_provenance():
                 "DELETE FROM runtime_snapshots WHERE namespace='transformation.lock' AND key=%s",
                 (f"{character_id}:1",),
             )
+
+@pytest.mark.skipif(
+    not os.getenv("CTE_DATABASE_URL"),
+    reason="CTE_DATABASE_URL is required for live PostgreSQL integration",
+)
+def test_postgres_matches_sqlite_transformation_provenance_contract():
+    from cte.persistence import SQLiteRuntimeStore
+    from cte.state_snapshot_store import StateSnapshotStore
+    from cte.transformation_ledger import TransformationLedger
+    from cte.transformation_provenance import TransformationProvenanceBinder
+    from cte.transformation_runtime import TransformationExecutor
+    from cte.contracts.transformation import TransformationContract
+
+    pg = PostgreSQLRuntimeStore(os.environ["CTE_DATABASE_URL"])
+    sqlite = SQLiteRuntimeStore(":memory:")
+    suffix = os.urandom(6).hex()
+    execution_id = f"parity-{suffix}"
+    character_id = f"parity-character-{suffix}"
+    contract = TransformationContract("parity-contract", "1", expected_changes={"tempo": 6})
+
+    results = []
+    for store in (sqlite, pg):
+        execution = TransformationExecutor(
+            StateSnapshotStore(store), TransformationLedger(store)
+        ).execute(
+            execution_id, character_id, 1, {"tempo": 5}, contract,
+            lambda state: {"tempo": 6},
+        )
+        binding = TransformationProvenanceBinder(store).bind_execution(execution_id)
+        assert execution.result.status == "VALIDATED"
+        assert binding["validated"] is True
+        assert binding["integrity_status"] == "PASS"
+        results.append((execution, binding))
+
+    sqlite_execution, sqlite_binding = results[0]
+    pg_execution, pg_binding = results[1]
+    assert pg_execution.result.status == sqlite_execution.result.status
+    assert pg_execution.result.failure_code == sqlite_execution.result.failure_code
+    assert pg_execution.result.before_hash == sqlite_execution.result.before_hash
+    assert pg_execution.result.after_hash == sqlite_execution.result.after_hash
+    assert pg_execution.result.changed_fields == sqlite_execution.result.changed_fields
+    assert pg_binding["ledger_id"] == sqlite_binding["ledger_id"]
+    assert pg_binding["certificate_id"] == sqlite_binding["certificate_id"]
+    assert pg_binding["before_hash"] == sqlite_binding["before_hash"]
+    assert pg_binding["after_hash"] == sqlite_binding["after_hash"]
+    assert pg_binding["request_hash"] == sqlite_binding["request_hash"]
+
+    for store in (sqlite, pg):
+        ledger_id = TransformationProvenanceBinder(store).bind_execution(execution_id)["ledger_id"]
+        ledger = TransformationLedger(store).get(ledger_id)
+        assert ledger is not None
+        assert ledger.ledger_id == ledger.payload_hash
+
+    cleanup = PostgreSQLRuntimeStore(os.environ["CTE_DATABASE_URL"])
+    with cleanup.transaction() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                "DELETE FROM runtime_snapshots WHERE namespace='transformation.lock' AND key=%s",
+                (f"{character_id}:1",),
+            )
+            cur.execute(
+                "DELETE FROM runtime_snapshots WHERE namespace='transformation.ledger' "
+                "AND payload_json->>'execution_id'=%s",
+                (execution_id,),
+            )
+            cur.execute(
+                "DELETE FROM runtime_snapshots WHERE namespace='transformation.certificate' "
+                "AND payload_json->>'execution_id'=%s",
+                (execution_id,),
+            )
+            cur.execute(
+                "DELETE FROM runtime_snapshots WHERE namespace='state.snapshot' "
+                "AND payload_json->>'source_execution_id'=%s",
+                (execution_id,),
+            )
+            cur.execute(
+                "DELETE FROM runtime_events WHERE namespace='transformation.journal' "
+                "AND payload_json->>'execution_id'=%s",
+                (execution_id,),
+            )
