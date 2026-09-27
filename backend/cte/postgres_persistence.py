@@ -220,6 +220,16 @@ class PostgreSQLRuntimeStore:
                     ),
                 )
 
+    def get_event(self, event_id: str) -> dict | None:
+        with self._connect() as conn:
+            with conn.cursor() as cur:
+                cur.execute("SELECT event_type,namespace,payload_json,input_hash,output_hash,provenance_record_id,created_at FROM runtime_events WHERE event_id=%s", (event_id,))
+                row=cur.fetchone()
+        if row is None:
+            return None
+        payload=row[2] if isinstance(row[2],dict) else json.loads(row[2])
+        return {"event_id":event_id,"event_type":row[0],"namespace":row[1],"payload":payload,"input_hash":row[3],"output_hash":row[4],"provenance_record_id":row[5],"created_at":row[6].isoformat() if hasattr(row[6],"isoformat") else str(row[6])}
+
     def list_events(self, namespace: str) -> list[dict]:
         with self._connect() as conn:
             with conn.cursor() as cur:
