@@ -320,7 +320,7 @@ GRAPH = TraitGraph({
 
 @app.get("/health")
 def health():
-    return {"status":"ok","version":"2.1.0","scientific_status":"implementation_baseline","runtime_persistence":{"backend":"sqlite","path":RUNTIME_DB_PATH},"ci_workflow":"backend-tests"}
+    return {"status":"ok","version":"2.1.0","scientific_status":"implementation_baseline","runtime_persistence":{"backend":"postgresql" if RUNTIME_STORE.__class__.__name__=="PostgreSQLRuntimeStore" else "sqlite","path":getattr(RUNTIME_STORE,"dsn",RUNTIME_DB_PATH)},"ci_workflow":"backend-tests"}
 
 @app.get("/matrix")
 def matrix_catalog():
