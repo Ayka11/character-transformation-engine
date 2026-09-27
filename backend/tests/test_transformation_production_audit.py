@@ -48,3 +48,38 @@ def test_runtime_store_immutable_event_rejects_payload_conflict():
         assert "immutable event conflict" in str(exc)
     else:
         raise AssertionError("expected immutable event conflict")
+
+def test_integrity_detects_forged_certificate_id():
+    db=SQLiteRuntimeStore(":memory:")
+    snapshots=StateSnapshotStore(db)
+    ledger=TransformationLedger(db)
+    TransformationExecutor(snapshots,ledger).execute(
+        "cert-audit","c1",1,{"tempo":5},
+        TransformationContract("t","1",expected_changes={"tempo":6}),
+        lambda s:{"tempo":6},
+    )
+    entry=ledger.list()[0]
+    with db._connect() as conn:
+        conn.execute(
+            "UPDATE runtime_snapshots SET payload_json=? WHERE namespace='transformation.ledger' AND key=?",
+            (str({
+                "ledger_id":entry.ledger_id,
+                "execution_id":entry.execution_id,
+                "character_id":entry.character_id,
+                "contract_id":entry.contract_id,
+                "contract_version":entry.contract_version,
+                "status":entry.status,
+                "failure_code":entry.failure_code,
+                "before_snapshot_id":entry.before_snapshot_id,
+                "after_snapshot_id":entry.after_snapshot_id,
+                "before_hash":entry.before_hash,
+                "after_hash":entry.after_hash,
+                "certificate_id":"FORGED-CERTIFICATE",
+                "payload_hash":entry.payload_hash,
+                "request_hash":entry.request_hash,
+            }).replace("'", '"'), entry.ledger_id),
+        )
+        conn.commit()
+    finding=TransformationIntegrityVerifier(snapshots,ledger).verify(entry.ledger_id)
+    assert finding.status=="FAIL"
+    assert "CERTIFICATE_HASH_MISMATCH" in finding.issues
