@@ -4,7 +4,6 @@ from dataclasses import dataclass
 from typing import Callable, Any
 from .contracts.state import StateSnapshot, StateDiffEngine
 from .contracts.transformation import TransformationContract, TransformationResult, TransformationCertificate, validate_transition
-from .state_snapshot_store import SQLiteRuntimeStore
 from .state_snapshot_store import StateSnapshotStore
 from .transformation_ledger import TransformationLedger, TransformationLedgerEntry
 from .transformation_recovery import TransformationJournal, JournalAttempt
