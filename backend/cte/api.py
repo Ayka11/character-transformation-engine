@@ -11,6 +11,7 @@ from .trait_graph import TraitGraph
 from .intervention import plan_bio_reset, plan_21_day_sprint
 from .sprint import start_sprint, record_day
 from .outcome import evaluate_outcome
+from .runtime_events import make_event, lineage_descriptor
 
 app = FastAPI(title="Character Transformation Engine", version="2.1.0")
 
@@ -54,6 +55,7 @@ class SprintStartInput(BaseModel):
     daily_action: str
 
 class OutcomeInput(BaseModel):
+    execution_id: str = "runtime-outcome"
     baseline: float | None = Field(None, ge=0, le=10)
     current: float | None = Field(None, ge=0, le=10)
     tolerance: float = Field(0.25, ge=0)
@@ -128,7 +130,10 @@ def runtime_sprint_day(p: SprintDayInput):
 
 @app.post("/runtime/outcome")
 def runtime_outcome(p: OutcomeInput):
-    return asdict(evaluate_outcome(p.baseline, p.current, tolerance=p.tolerance, safety_block=p.safety_block))
+    result=evaluate_outcome(p.baseline, p.current, tolerance=p.tolerance, safety_block=p.safety_block)
+    outcome=asdict(result)
+    event=make_event(f"{p.execution_id}:outcome", "OUTCOME_EVALUATED", p.execution_id, outcome)
+    return {"outcome": outcome, "lineage": lineage_descriptor(event)}
 
 @app.post("/runtime/capacity")
 def runtime_capacity(p: StateInput):
