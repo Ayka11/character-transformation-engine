@@ -26,3 +26,10 @@ def test_non_independent_run_is_blocked():
         assert True
     else:
         assert False
+
+
+def test_replication_can_be_replicated_without_unregistered_ci_requirement():
+    out=evaluate_outcome(_run(),source_estimate=1,target_estimate=1.1,source_effect_size=.5,
+                         target_effect_size=.55,protocol_fidelity=True,
+                         measurement_fidelity=True,outcome_definition=True,data_quality=True)
+    assert out.overall_outcome=="REPLICATED"
