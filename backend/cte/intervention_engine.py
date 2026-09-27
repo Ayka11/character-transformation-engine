@@ -130,6 +130,7 @@ class InterventionService:
         if rule.provenance_class not in {"EVD","MDL","HYP","RPT","DRV"}:
             raise ValueError("unsupported intervention rule provenance")
         self.rules[rule.rule_id]=rule
+        self._persist_rule(rule)
         return rule
 
     def register_rule_from_fields(self,rule_id,rule_name,provenance_class,rule_version,
@@ -173,6 +174,7 @@ class InterventionService:
             tuple(source_claim_ids or ()),reason,gate)
         self.assignments[assignment_id]=assignment
         assignment.audit.append(self._audit("ASSIGNMENT_CREATED",assignment_id,reason))
+        self._persist_assignment(assignment)
         return assignment
 
     def create_session(self,assignment_id,session_id,planned_load):
@@ -183,6 +185,7 @@ class InterventionService:
         session=Session(session_id,assignment_id,dict(planned_load))
         assignment.sessions[session_id]=session
         assignment.audit.append(self._audit("SESSION_CREATED",assignment_id,{"session_id":session_id}))
+        self._persist_assignment(assignment)
         return session
 
     def record_measurement(self,session_id,metric_id, value_numeric=None, value_text=None, missing_reason=None):
@@ -193,6 +196,7 @@ class InterventionService:
                      "missing_reason":missing_reason,"provenance_class":"OBS"}
         session.measurements[metric_id]=measurement
         assignment.audit.append(self._audit("MEASUREMENT_RECORDED",assignment.assignment_id,measurement))
+        self._persist_assignment(assignment)
         return measurement
 
     def record_response(self,session_id,response_dimension,baseline_value,post_value,safety_status="PASS"):
@@ -211,6 +215,7 @@ class InterventionService:
                   "response_status":status,"safety_status":safety_status}
         session.response=response
         assignment.audit.append(self._audit("RESPONSE_RECORDED",assignment.assignment_id,response))
+        self._persist_assignment(assignment)
         return response
 
     def adapt(self,assignment_id,adaptation_id,prior_level,response_status,safety_status,input_snapshot):
@@ -250,6 +255,7 @@ class InterventionService:
         link={"session_id":session_id,"relation":relation,"research_result_node_id":result_node_id,"claim_id":claim_id,
               "runtime_observation_is_evidence":False}
         assignment.links.append(link)
+        self._persist_assignment(assignment)
         return link
 
     def _find_session(self,session_id):
@@ -261,3 +267,7 @@ class InterventionService:
     def _audit(event_type,assignment_id,event):
         return {"event_type":event_type,"assignment_id":assignment_id,"event":event,
                 "input_hash":content_hash(event),"actor_type":"SYSTEM"}
+
+
+def asdict_adaptation(item):
+    return {"adaptation_id":item.adaptation_id,"assignment_id":item.assignment_id,"prior_level":item.prior_level,"next_level":item.next_level,"decision":item.decision,"rule_id":item.rule_id,"input_snapshot_hash":item.input_snapshot_hash,"explanation":item.explanation,"safety_status":item.safety_status}
