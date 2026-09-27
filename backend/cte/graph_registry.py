@@ -12,11 +12,35 @@ class GraphAuditEvent:
     payload_hash: str
     actor_type: str
 
+@dataclass(frozen=True)
+class ContradictionSet:
+    contradiction_set_id: str
+    claim_id: str
+    node_ids: tuple[str,...]
+    contradiction_type: str
+    resolution_status: str
+    resolution_note: str | None
+    provenance_class: str
+    version: str
+    immutable_hash: str
+
+@dataclass(frozen=True)
+class InferenceBlock:
+    inference_block_id: str
+    from_node_type: str
+    to_claim_level: str
+    blocked_inference: str
+    reason_code: str
+    rule_id: str
+    immutable_hash: str
+
 @dataclass
 class GraphRegistry:
     nodes: dict[str, GraphNode]
     edges: dict[str, GraphEdge]
     audit_events: list[GraphAuditEvent] = field(default_factory=list)
+    contradiction_sets: dict[str, ContradictionSet] = field(default_factory=dict)
+    inference_blocks: dict[str, InferenceBlock] = field(default_factory=dict)
 
     @classmethod
     def empty(cls) -> "GraphRegistry":
@@ -46,6 +70,51 @@ class GraphRegistry:
         self.audit_events.append(GraphAuditEvent("EDGE_REGISTERED",None,edge.edge_id,claim_id,edge.input_hash,"runtime"))
         return edge
 
+
+    def register_contradiction_set(self, contradiction_set_id: str, claim_id: str,
+                                    node_ids: list[str], contradiction_type: str,
+                                    resolution_status: str = "UNRESOLVED",
+                                    resolution_note: str | None = None) -> ContradictionSet:
+        if contradiction_set_id in self.contradiction_sets:
+            raise ValueError("contradiction set already registered")
+        claim=self.nodes.get(claim_id)
+        if claim is None or claim.node_type!="CLAIM":
+            raise ValueError("claim is not registered")
+        if not node_ids:
+            raise ValueError("contradiction set requires at least one node")
+        for node_id in node_ids:
+            if node_id not in self.nodes:
+                raise ValueError("contradiction references unknown node")
+        if resolution_status not in {"OPEN","EXPLAINED","UNRESOLVED","RESOLVED_BY_NEW_EVIDENCE"}:
+            raise ValueError("unsupported contradiction resolution status")
+        payload={"contradiction_set_id":contradiction_set_id,"claim_id":claim_id,
+                 "node_ids":node_ids,"contradiction_type":contradiction_type,
+                 "resolution_status":resolution_status,"resolution_note":resolution_note}
+        item=ContradictionSet(contradiction_set_id,claim_id,tuple(node_ids),contradiction_type,
+            resolution_status,resolution_note,"DRV","1.4",content_hash(payload))
+        self.contradiction_sets[contradiction_set_id]=item
+        for node_id in node_ids:
+            self.add_edge(register_edge(f"{contradiction_set_id}:contradicts:{node_id}:{claim_id}",
+                self.nodes[node_id],claim,"CONTRADICTS",rationale=contradiction_type))
+        return item
+
+    def register_inference_block(self, inference_block_id: str, from_node_type: str,
+                                 to_claim_level: str, blocked_inference: str,
+                                 reason_code: str, rule_id: str) -> InferenceBlock:
+        if inference_block_id in self.inference_blocks:
+            raise ValueError("inference block already registered")
+        payload={"inference_block_id":inference_block_id,"from_node_type":from_node_type,
+                 "to_claim_level":to_claim_level,"blocked_inference":blocked_inference,
+                 "reason_code":reason_code,"rule_id":rule_id}
+        item=InferenceBlock(inference_block_id,from_node_type,to_claim_level,blocked_inference,
+            reason_code,rule_id,content_hash(payload))
+        self.inference_blocks[inference_block_id]=item
+        return item
+
+    def contradiction_requirements(self, claim_id: str) -> set[str]:
+        return {"unresolved_material_contradiction"} if any(
+            s.claim_id==claim_id and s.resolution_status in {"OPEN","UNRESOLVED"}
+            for s in self.contradiction_sets.values()) else set()
 
     def claim_subgraph(self, claim_id: str) -> tuple[list[GraphNode], list[GraphEdge]]:
         claim=self.nodes.get(claim_id)
