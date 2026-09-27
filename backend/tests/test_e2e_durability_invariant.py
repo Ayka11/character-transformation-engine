@@ -138,6 +138,10 @@ def test_transformation_science_lab_claim_report_survive_backup_restore():
         "e2e-run:transformation", registry.nodes["e2e-run-node"],
         registry.nodes["e2e-transformation"], "DERIVED_FROM", rationale="run",
     ))
+    registry.add_edge(register_edge(
+        "e2e-run:result", registry.nodes["e2e-run-node"],
+        registry.nodes["e2e-result"], "DERIVED_FROM", rationale="run",
+    ))
     registry.register_claim(
         "e2e-claim", "e2e-result", "HYPOTHESIS", "REGISTERED",
         "EXP", {"execution_id": "e2e-durable-1"},
