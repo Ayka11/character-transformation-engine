@@ -202,7 +202,8 @@ class InterventionService:
         if not assignment.execution_id:
             raise ValueError("session execution requires an execution_id")
         from .transformation_runtime import TransformationExecutor
-        runtime=TransformationExecutor()
+        from .state_snapshot_store import StateSnapshotStore
+        runtime=TransformationExecutor(snapshot_store=StateSnapshotStore(self.store) if self.store is not None else None)
         result=runtime.execute(assignment.execution_id, character_id, sequence, state, contract, intervention)
         session.executed_load={"before_snapshot_id":result.before_snapshot_id,
                                "after_snapshot_id":result.after_snapshot_id,
