@@ -591,6 +591,29 @@ class ScienceLabService:
         replications = [asdict(r) for r in self.replication_assessments.values() if r.matrix_id == matrix_id]
         generalizations = [asdict(r) for r in self.generalization_assessments.values() if r.matrix_id == matrix_id]
         claims = self.claim_validation(matrix_id)
+        transformation_provenance = []
+        for run in runs:
+            tp = dict(run.get("transformation_provenance") or {})
+            transformation_provenance.append({
+                "run_id": run["run_id"],
+                "execution_id": run["execution_id"],
+                "validated": bool(tp.get("validated")),
+                "integrity_status": tp.get("integrity_status"),
+                "status": tp.get("status"),
+                "ledger_id": tp.get("ledger_id"),
+                "certificate_id": tp.get("certificate_id"),
+                "before_snapshot_id": tp.get("before_snapshot_id"),
+                "after_snapshot_id": tp.get("after_snapshot_id"),
+                "issues": list(tp.get("issues") or []),
+            })
+        validated_transformation_runs = sum(
+            1 for x in transformation_provenance
+            if x["validated"] and x["integrity_status"] == "PASS"
+        )
+        invalid_transformation_runs = [
+            x for x in transformation_provenance
+            if not (x["validated"] and x["integrity_status"] == "PASS")
+        ]
         payload = {
             "matrix": asdict(matrix),
             "scenarios": [asdict(self.scenarios[x]) for x in matrix.scenario_ids],
@@ -599,6 +622,13 @@ class ScienceLabService:
             "generalization_assessments": generalizations,
             "claim_validation": claims,
             "descriptive_statistics": self.descriptive_statistics(matrix_id),
+            "transformation_provenance": {
+                "run_count": len(transformation_provenance),
+                "validated_run_count": validated_transformation_runs,
+                "invalid_or_unvalidated_run_count": len(invalid_transformation_runs),
+                "all_runs_validated": bool(transformation_provenance) and not invalid_transformation_runs,
+                "runs": transformation_provenance,
+            },
         }
         return {
             **payload,
