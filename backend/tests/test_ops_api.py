@@ -46,11 +46,3 @@ def test_ops_restore_dry_run_does_not_mutate_store(monkeypatch):
     assert response.json()["dry_run"] is True
 
 
-def test_rate_limit_is_enforced_when_configured(monkeypatch):
-    monkeypatch.setenv("CTE_RATE_LIMIT_PER_MINUTE","1")
-    monkeypatch.delenv("CTE_API_KEY",raising=False)
-    monkeypatch.delenv("CTE_READ_API_KEY",raising=False)
-    monkeypatch.delenv("CTE_WRITE_API_KEY",raising=False)
-    # The application middleware reads this setting at construction time,
-    # so this contract is exercised by the reusable limiter in test_rate_limiter.py.
-    assert True
