@@ -86,6 +86,14 @@ class ClaimInput(BaseModel):
     metadata: dict = Field(default_factory=dict)
     previous_claim_id: str | None = None
 
+class InferenceBlockInput(BaseModel):
+    inference_block_id: str
+    from_node_type: str
+    to_claim_level: str
+    blocked_inference: str
+    reason_code: str
+    rule_id: str
+
 class ContradictionInput(BaseModel):
     contradiction_set_id: str
     claim_id: str
@@ -384,6 +392,13 @@ def validation_generalization(p: GeneralizationInput):
     GRAPH_REGISTRY.add_node(node)
     GRAPH_REGISTRY.add_edge(register_edge(f"{p.generalization_id}:generalizes:{p.source_result_id}",node,GRAPH_REGISTRY.nodes[p.source_result_id],"GENERALIZES",rationale="registered generalization record"))
     return {"record":asdict(record),"graph_node":asdict(node)}
+
+@app.post("/graph/inference-blocks")
+def graph_inference_block(p: InferenceBlockInput):
+    return asdict(GRAPH_REGISTRY.register_inference_block(
+        p.inference_block_id,p.from_node_type,p.to_claim_level,
+        p.blocked_inference,p.reason_code,p.rule_id
+    ))
 
 @app.post("/graph/contradictions")
 def graph_contradiction(p: ContradictionInput):
