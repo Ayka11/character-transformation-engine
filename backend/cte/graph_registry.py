@@ -196,8 +196,9 @@ class GraphRegistry:
             # Most research/result edges point into the object they qualify.
             if edge.to_node_id == current and edge.from_node_id != current:
                 neighbors.append(edge.from_node_id)
-            # ANALYZED_FROM and USES_PROTOCOL point outward from ANALYSIS.
-            if edge.from_node_id == current and edge.edge_type in {"ANALYZED_FROM","USES_PROTOCOL"} and edge.to_node_id != current:
+            # ANALYZED_FROM, USES_PROTOCOL and DERIVED_FROM point outward from
+            # the current node in the lineage graph.
+            if edge.from_node_id == current and edge.edge_type in {"ANALYZED_FROM","USES_PROTOCOL","DERIVED_FROM"} and edge.to_node_id != current:
                 neighbors.append(edge.to_node_id)
         return neighbors
 
