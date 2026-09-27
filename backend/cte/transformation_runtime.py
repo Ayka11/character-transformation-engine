@@ -42,8 +42,11 @@ class TransformationExecutor:
         try:
             after_state=intervention(dict(state))
         except Exception as exc:
+            # The intervention raised before producing a durable after-state.
+            # This is a hard FAILED outcome; rollback is not attempted because
+            # the runtime has no evidence that a transition was committed.
             result=TransformationResult.failed(
-                "INTERVENTION_FAILED", {"error":str(exc)},
+                "INTERVENTION_FAILED", {"error":str(exc), "rollback_status":"NOT_REQUIRED"},
                 before_snapshot_id=before.snapshot_id)
             execution=TransformationExecution(execution_id,before.snapshot_id,None,result)
             self.ledger.append(TransformationLedgerEntry.from_execution(
@@ -60,6 +63,50 @@ class TransformationExecutor:
             allowed=set(contract.allowed_changes),forbidden=set(contract.forbidden_changes))
         result=validate_transition(contract,diff,
             before_snapshot_id=before.snapshot_id,after_snapshot_id=after.snapshot_id)
+
+        # A failed validation after a changed state is PARTIAL unless an explicit
+        # rollback callback restores the exact before-state. Never issue a certificate.
+        if result.status=="FAILED" and diff.state_changed:
+            rollback_status="NOT_CONFIGURED"
+            if contract.rollback is not None:
+                try:
+                    restored_state=contract.rollback(dict(after_state), dict(state))
+                    restored=StateSnapshot.capture(
+                        f"{execution_id}:rollback:{sequence}", character_id, sequence+2,
+                        restored_state, parent_snapshot_id=after.snapshot_id,
+                        source_execution_id=execution_id)
+                    self.snapshots.save(restored)
+                    restored_diff=StateDiffEngine.compare(before,restored)
+                    if restored_diff.state_changed:
+                        result=TransformationResult.failed(
+                            "ROLLBACK_FAILED",
+                            {"rollback_status":"FAILED_TO_RESTORE","rollback_snapshot_id":restored.snapshot_id},
+                            before_snapshot_id=before.snapshot_id, after_snapshot_id=after.snapshot_id,
+                            status="ROLLBACK_FAILED", before_hash=before.state_hash,
+                            after_hash=after.state_hash, changed_fields=tuple(sorted(diff.changed)))
+                    else:
+                        result=TransformationResult.failed(
+                            result.failure_code or "VALIDATION_FAILED",
+                            {"rollback_status":"ROLLED_BACK","rollback_snapshot_id":restored.snapshot_id},
+                            before_snapshot_id=before.snapshot_id, after_snapshot_id=after.snapshot_id,
+                            status="ROLLED_BACK", before_hash=before.state_hash,
+                            after_hash=after.state_hash, changed_fields=tuple(sorted(diff.changed)))
+                    rollback_status=result.details.get("rollback_status")
+                except Exception as rollback_exc:
+                    result=TransformationResult.failed(
+                        "ROLLBACK_FAILED",
+                        {"rollback_status":"FAILED_TO_EXECUTE","error":str(rollback_exc)},
+                        before_snapshot_id=before.snapshot_id, after_snapshot_id=after.snapshot_id,
+                        status="ROLLBACK_FAILED", before_hash=before.state_hash,
+                        after_hash=after.state_hash, changed_fields=tuple(sorted(diff.changed)))
+                    rollback_status="FAILED_TO_EXECUTE"
+            else:
+                result=TransformationResult.failed(
+                    result.failure_code or "VALIDATION_FAILED",
+                    {"rollback_status":rollback_status, "partial_state":True},
+                    before_snapshot_id=before.snapshot_id, after_snapshot_id=after.snapshot_id,
+                    status="PARTIAL", before_hash=before.state_hash,
+                    after_hash=after.state_hash, changed_fields=tuple(sorted(diff.changed)))
 
         certificate=None
         if result.status=="VALIDATED" and result.certificate_eligible:
