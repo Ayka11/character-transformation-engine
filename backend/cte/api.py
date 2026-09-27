@@ -13,6 +13,7 @@ from .sprint import start_sprint, record_day
 from .outcome import evaluate_outcome
 from .runtime_events import make_event, lineage_descriptor
 from .analysis import descriptive
+from .longitudinal import longitudinal_change
 
 app = FastAPI(title="Character Transformation Engine", version="2.1.0")
 
@@ -54,6 +55,10 @@ class SprintStartInput(BaseModel):
     target_trait: str
     supporting_bio_habit: str
     daily_action: str
+
+class LongitudinalInput(BaseModel):
+    baseline: list[float | None]
+    current: list[float | None]
 
 class AnalysisInput(BaseModel):
     values: list[float | None]
@@ -132,6 +137,10 @@ def runtime_sprint_day(p: SprintDayInput):
     sprint.supporting_bio_habit=p.supporting_bio_habit
     sprint.daily_action=p.daily_action
     return asdict(record_day(sprint,p.day,p.action_completed,p.outcome,state))
+
+@app.post("/validation/longitudinal")
+def validation_longitudinal(p: LongitudinalInput):
+    return asdict(longitudinal_change(p.baseline, p.current))
 
 @app.post("/validation/descriptive")
 def validation_descriptive(p: AnalysisInput):
