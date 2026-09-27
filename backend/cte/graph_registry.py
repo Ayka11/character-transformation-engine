@@ -87,7 +87,7 @@ class GraphRegistry:
         req={"valid_result"} if self.nodes[result_id].metadata.get("qc_status")=="PASS" else set()
         if "ANALYSIS" in types:
             req.add("registered_analysis")
-        if self.nodes[result_id].metadata.get("qc_status")=="PASS":
+        if bool(self.nodes[result_id].metadata.get("validated_descriptive_result",False)):
             req.add("validated_descriptive_result")
         for node in nodes:
             md=node.metadata or {}
