@@ -28,3 +28,19 @@ def test_immutable_node_conflict_is_blocked():
         assert False
     except ValueError:
         assert True
+
+from cte.evidence_graph import register_node, register_edge
+
+def test_claim_upstream_types_are_derived_from_registered_graph():
+    g=build_registry()
+    d=register_node("d2","DATASET","d2","DRV","1",{})
+    a=register_node("a2","ANALYSIS","a2","DRV","1",{})
+    r=register_node("r2","RESULT","r2","DRV","1",{})
+    rep=register_node("rep2","REPLICATION","rep2","DRV","1",{})
+    gen=register_node("gen2","GENERALIZATION","gen2","DRV","1",{})
+    for n in (d,a,r,rep,gen): g.add_node(n)
+    g.add_edge(register_edge("x1",d,a,"ANALYZED_FROM"))
+    g.add_edge(register_edge("x2",a,r,"RESULTS_IN"))
+    g.add_edge(register_edge("x3",rep,r,"REPLICATES"))
+    g.add_edge(register_edge("x4",gen,r,"GENERALIZES"))
+    assert g.claim_upstream_types("r2") == {"RESULT","ANALYSIS","DATASET","REPLICATION","GENERALIZATION"}
