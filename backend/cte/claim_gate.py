@@ -18,7 +18,7 @@ def validate_claim_transition(current_state:str,target_level:str,upstream_types:
     state_gate=validate_transition(current_state,target_level,requirements)
     if target_level=="EVIDENCE_SUPPORTED" and provenance_class!="EVD":
         raise ValueError("EVIDENCE_SUPPORTED requires EVD provenance")
-    legacy_required=REQUIRED_UPSTREAM[target_level]
+    legacy_required=REQUIRED_UPSTREAM.get(target_level,set())
     missing=legacy_required-requirements
     if missing:
         raise ValueError("claim gate missing upstream: "+",".join(sorted(missing)))
