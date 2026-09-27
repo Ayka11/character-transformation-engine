@@ -78,7 +78,7 @@ class GraphRegistry:
                 frontier.append(node.node_id)
         return found
 
-    def claim_requirements(self, result_id: str) -> set[str]:
+    def claim_requirements(self, result_id: str, claim_ids: set[str] | None = None) -> set[str]:
         """Derive V1.4 transition prerequisites from registered graph metadata/lineage."""
         self.require_lineage_for_result(result_id)
         nodes=self._upstream_nodes(result_id)
@@ -93,7 +93,9 @@ class GraphRegistry:
             md=node.metadata or {}
             design=str(md.get("design_type","")).upper()
             if node.node_type=="PROTOCOL" and md.get("kind")=="EVIDENCE_CRITERIA":
-                req.add("registered_evidence_criteria")
+                allowed_claim_ids=claim_ids or set()
+                if md.get("claim_id") in allowed_claim_ids:
+                    req.add("registered_evidence_criteria")
             if node.node_type=="PROTOCOL" and design=="ASSOCIATIONAL":
                 req.add("association_design")
             if node.node_type=="PROTOCOL" and design=="INTERVENTION":
