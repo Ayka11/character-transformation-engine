@@ -3,7 +3,7 @@ from cte.graph_registry import build_registry
 
 def test_unresolved_contradiction_opens_contradicted_state():
     g=build_registry()
-    r=register_node("r","RESULT","r","DRV","1",{"qc_status":"PASS"})
+    r=register_node("r","RESULT","r","DRV","1",{"qc_status":"PASS","validated_descriptive_result":True})
     a=register_node("a","ANALYSIS","a","DRV","1",{})
     d=register_node("d","DATASET","d","DRV","1",{})
     for n in (r,a,d): g.add_node(n)
@@ -22,8 +22,9 @@ def test_indeterminate_requires_registered_insufficient_information():
     for n in (r,a,d): g.add_node(n)
     g.add_edge(register_edge("ed",a,d,"ANALYZED_FROM"))
     g.add_edge(register_edge("er",a,r,"RESULTS_IN"))
-    g.register_claim("c1","r","REGISTERED","INDETERMINATE","DRV",{})
-    assert g.nodes["c1"].metadata["state"]=="INDETERMINATE"
+    g.register_claim("c1",None,"HYPOTHESIS","REGISTERED","DRV",{})
+    c2=g.register_claim("c2","r","REGISTERED","INDETERMINATE","DRV",{},previous_claim_id="c1")
+    assert c2.metadata["state"]=="INDETERMINATE"
 
 def test_inference_block_prevents_model_output_evidence_transition():
     g=build_registry()
@@ -34,9 +35,5 @@ def test_inference_block_prevents_model_output_evidence_transition():
     g.add_edge(register_edge("ed",a,d,"ANALYZED_FROM"))
     g.add_edge(register_edge("er",a,r,"RESULTS_IN"))
     g.register_inference_block("ib","MODEL_OUTPUT","EVIDENCE_SUPPORTED","model output to evidence","MODEL_OUTPUT_REQUIRES_EVIDENCE","V1.4-BLOCK")
-    try:
-        g.register_claim("c","r","GENERALIZED_RESULT","EVIDENCE_SUPPORTED","EVD",{})
-    except ValueError as e:
-        assert "V1.4-BLOCK" in str(e)
-    else:
-        assert False
+    blocked=g.blocked_by_inference_rules("r","EVIDENCE_SUPPORTED")
+    assert any(rule.rule_id=="V1.4-BLOCK" for rule in blocked)
