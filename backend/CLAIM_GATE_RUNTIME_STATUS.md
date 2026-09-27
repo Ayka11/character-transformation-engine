@@ -1,14 +1,7 @@
 # Claim Gate Runtime Status
 
-The executable Claim Gate is now present in `backend/cte/claim_gate.py` and exposed as `POST /graph/claim-gate`.
+The Claim Gate now derives upstream evidence types directly from the in-memory Evidence Graph Registry. Clients cannot satisfy a claim transition by declaring prerequisite node types in the request.
 
-Rules enforced:
-- DESCRIPTIVE_RESULT and ASSOCIATIONAL_RESULT require RESULT.
-- INTERVENTION_RESULT requires RESULT + PROTOCOL.
-- REPLICATED_RESULT requires RESULT + REPLICATION.
-- GENERALIZED_RESULT requires RESULT + REPLICATION + GENERALIZATION.
-- EVIDENCE_SUPPORTED requires RESULT + REPLICATION + GENERALIZATION and EVD provenance.
+`POST /graph/claim-gate` accepts a registered `result_id`, current state, target level, and provenance class. The registry traverses registered incoming lineage and supplies the actual upstream node types to the Claim Gate.
 
-Missing upstream evidence blocks the transition. The gate does not invent lineage or promote model-derived provenance to empirical evidence.
-
-This is an executable contract boundary; empirical validation and persistent graph storage are separate layers.
+This closes the previous declaration-only bypass. Persistent graph storage remains a separate implementation layer.
