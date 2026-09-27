@@ -186,22 +186,28 @@ def test_postgres_transformation_executor_and_provenance_roundtrip():
 )
 def test_postgres_concurrent_transformation_guard_rejects_competing_request():
     from concurrent.futures import ThreadPoolExecutor
-    from cte.contracts.errors import CTEError, CTEErrorCode
     from cte.transformation_concurrency import TransformationConcurrencyGuard
 
     dsn = os.environ["CTE_DATABASE_URL"]
     character_id = f"pg-concurrency-{os.urandom(6).hex()}"
 
     def acquire(request_hash):
-        return TransformationConcurrencyGuard(
-            PostgreSQLRuntimeStore(dsn)
-        ).acquire(character_id, 1, None, request_hash)
+        try:
+            lock = TransformationConcurrencyGuard(
+                PostgreSQLRuntimeStore(dsn)
+            ).acquire(character_id, 1, None, request_hash)
+            return ("ok", lock)
+        except Exception as exc:
+            return ("error", exc)
 
     with ThreadPoolExecutor(max_workers=2) as pool:
         results = list(pool.map(acquire, ["request-A", "request-B"]))
 
-    successes = [r for r in results if not isinstance(r, Exception)]
+    successes = [r for status, r in results if status == "ok"]
+    errors = [r for status, r in results if status == "error"]
     assert len(successes) == 1
+    assert len(errors) == 1
+    assert getattr(errors[0], "code", None).value == "VERSION_CONFLICT"
 
     cleanup = PostgreSQLRuntimeStore(dsn)
     with cleanup.transaction() as conn:
