@@ -1,0 +1,47 @@
+{
+  "version": "1.6",
+  "status": "MDL/DRV",
+  "rules": [
+    {
+      "id": "LANG-001",
+      "when": "OBSERVATION",
+      "allowed": "Describe the recorded observation without causal interpretation."
+    },
+    {
+      "id": "LANG-002",
+      "when": "ASSOCIATIONAL_RESULT",
+      "allowed": "Use association/relationship language and identify the analyzed population and context."
+    },
+    {
+      "id": "LANG-003",
+      "when": "INTERVENTION_RESULT",
+      "allowed": "Describe the observed intervention contrast and uncertainty; do not generalize beyond the study target."
+    },
+    {
+      "id": "LANG-004",
+      "when": "REPLICATED_RESULT",
+      "allowed": "State that the registered replication criteria were met for the specified outcome and target conditions."
+    },
+    {
+      "id": "LANG-005",
+      "when": "GENERALIZED_RESULT",
+      "allowed": "State the registered transport target and its boundary conditions."
+    },
+    {
+      "id": "LANG-006",
+      "when": "INDETERMINATE",
+      "allowed": "State that available data do not establish the requested conclusion."
+    },
+    {
+      "id": "LANG-007",
+      "when": "CONTRADICTED",
+      "allowed": "Report the contradiction and identify the conflicting evidence."
+    }
+  ],
+  "forbidden_upgrades": [
+    "ASSOCIATIONAL_RESULT -> EVIDENCE_SUPPORTED",
+    "SINGLE_STUDY -> REPLICATED_RESULT",
+    "MODEL_OUTPUT -> EVIDENCE_SUPPORTED",
+    "GENERALIZED_RESULT -> UNIVERSAL_CLAIM"
+  ]
+}
