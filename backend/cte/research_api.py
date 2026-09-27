@@ -149,6 +149,7 @@ def install_research_api(app: FastAPI, registry: GraphRegistry, store: SQLiteRun
     service=ResearchService(registry,store)
     report_service=ReportService(registry,store)
     e2e=ResearchE2ECoordinator(orchestrator,service,registry) if orchestrator is not None else None
+    service.e2e_coordinator=e2e
     report_spec_id="research-v1.2-report"
     if report_spec_id not in report_service.specs:
         report_service.register_spec(register_report_spec(report_spec_id,"Research Execution V1.2 Report","1.2"))
