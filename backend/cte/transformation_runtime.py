@@ -8,6 +8,7 @@ from .state_snapshot_store import StateSnapshotStore
 from .transformation_ledger import TransformationLedger, TransformationLedgerEntry
 from .transformation_recovery import TransformationJournal, JournalAttempt
 from .transformation_concurrency import TransformationConcurrencyGuard
+from .persistence import SQLiteRuntimeStore
 from .provenance import content_hash
 
 @dataclass(frozen=True)
@@ -21,10 +22,17 @@ class TransformationExecution:
 class TransformationExecutor:
     def __init__(self, snapshot_store: StateSnapshotStore | None = None, ledger: TransformationLedger | None = None,
                  journal: TransformationJournal | None = None, concurrency_guard: TransformationConcurrencyGuard | None = None):
-        self.snapshots = snapshot_store or StateSnapshotStore()
-        self.ledger = ledger or TransformationLedger(self.snapshots.store)
-        self.journal = journal or TransformationJournal(self.snapshots.store)
-        self.concurrency = concurrency_guard or TransformationConcurrencyGuard(self.snapshots.store)
+        if snapshot_store is None and ledger is None and journal is None and concurrency_guard is None:
+            isolated_store=SQLiteRuntimeStore(":memory:")
+            self.snapshots=StateSnapshotStore(isolated_store)
+            self.ledger=TransformationLedger(isolated_store)
+            self.journal=TransformationJournal(isolated_store)
+            self.concurrency=TransformationConcurrencyGuard(isolated_store)
+        else:
+            self.snapshots = snapshot_store or StateSnapshotStore()
+            self.ledger = ledger or TransformationLedger(self.snapshots.store)
+            self.journal = journal or TransformationJournal(self.snapshots.store)
+            self.concurrency = concurrency_guard or TransformationConcurrencyGuard(self.snapshots.store)
 
     def execute(self, execution_id: str, character_id: str, sequence: int,
                 state: dict[str, Any], contract: TransformationContract,
@@ -38,16 +46,13 @@ class TransformationExecutor:
         existing=self.ledger.find_by_request_hash(request_hash)
         if existing is not None:
             return self._replay_existing(existing)
-
         try:
             self.concurrency.acquire(character_id, sequence, parent_snapshot_id, request_hash)
         except Exception as exc:
             code=getattr(exc, "code", "VERSION_CONFLICT")
             details=getattr(exc, "details", {"error":str(exc)})
-            result=TransformationResult.failed(
-                code, details, status="FAILED", before_snapshot_id="")
+            result=TransformationResult.failed(code, details, status="FAILED", before_snapshot_id="")
             return TransformationExecution(execution_id,"",None,result)
-
         before=StateSnapshot.capture(
             f"{execution_id}:before:{sequence}", character_id, sequence, state,
             parent_snapshot_id=parent_snapshot_id, source_execution_id=execution_id)
@@ -60,7 +65,6 @@ class TransformationExecutor:
         self.journal.record(attempt, "PREPARED")
         started=JournalAttempt(**{**attempt.__dict__, "status":"INTERVENTION_STARTED"})
         self.journal.record(started, "INTERVENTION_STARTED")
-
         try:
             after_state=intervention(dict(state))
         except Exception as exc:
@@ -70,10 +74,8 @@ class TransformationExecutor:
                 "INTERVENTION_FAILED", {"error":str(exc), "rollback_status":"NOT_REQUIRED"},
                 before_snapshot_id=before.snapshot_id)
             execution=TransformationExecution(execution_id,before.snapshot_id,None,result)
-            self.ledger.append(TransformationLedgerEntry.from_execution(
-                execution,character_id,contract,request_hash=request_hash))
+            self.ledger.append(TransformationLedgerEntry.from_execution(execution,character_id,contract,request_hash=request_hash))
             return execution
-
         after=StateSnapshot.capture(
             f"{execution_id}:after:{sequence}", character_id, sequence+1, after_state,
             parent_snapshot_id=before.snapshot_id, source_execution_id=execution_id)
@@ -81,75 +83,54 @@ class TransformationExecutor:
         captured=JournalAttempt(**{**started.__dict__, "status":"AFTER_CAPTURED",
                                    "after_snapshot_id":after.snapshot_id})
         self.journal.record(captured, "AFTER_CAPTURED", after_hash=after.state_hash)
-
         diff=StateDiffEngine.compare(
             before,after,expected=contract.expected_changes,
             allowed=set(contract.allowed_changes),forbidden=set(contract.forbidden_changes))
-        result=validate_transition(contract,diff,
-            before_snapshot_id=before.snapshot_id,after_snapshot_id=after.snapshot_id)
-
+        result=validate_transition(contract,diff,before_snapshot_id=before.snapshot_id,after_snapshot_id=after.snapshot_id)
         if result.status=="FAILED" and diff.state_changed:
             if contract.rollback is not None:
                 try:
                     restored_state=contract.rollback(dict(after_state), dict(state))
                     restored=StateSnapshot.capture(
                         f"{execution_id}:rollback:{sequence}", character_id, sequence+2,
-                        restored_state, parent_snapshot_id=after.snapshot_id,
-                        source_execution_id=execution_id)
+                        restored_state, parent_snapshot_id=after.snapshot_id, source_execution_id=execution_id)
                     self.snapshots.save(restored)
                     restored_diff=StateDiffEngine.compare(before,restored)
                     if restored_diff.state_changed:
-                        result=TransformationResult.failed(
-                            "ROLLBACK_FAILED",
+                        result=TransformationResult.failed("ROLLBACK_FAILED",
                             {"rollback_status":"FAILED_TO_RESTORE","rollback_snapshot_id":restored.snapshot_id},
-                            before_snapshot_id=before.snapshot_id, after_snapshot_id=after.snapshot_id,
-                            status="ROLLBACK_FAILED", before_hash=before.state_hash,
-                            after_hash=after.state_hash, changed_fields=tuple(sorted(diff.changed)))
+                            before_snapshot_id=before.snapshot_id,after_snapshot_id=after.snapshot_id,status="ROLLBACK_FAILED",
+                            before_hash=before.state_hash,after_hash=after.state_hash,changed_fields=tuple(sorted(diff.changed)))
                     else:
-                        result=TransformationResult.failed(
-                            result.failure_code or "VALIDATION_FAILED",
+                        result=TransformationResult.failed(result.failure_code or "VALIDATION_FAILED",
                             {"rollback_status":"ROLLED_BACK","rollback_snapshot_id":restored.snapshot_id},
-                            before_snapshot_id=before.snapshot_id, after_snapshot_id=after.snapshot_id,
-                            status="ROLLED_BACK", before_hash=before.state_hash,
-                            after_hash=after.state_hash, changed_fields=tuple(sorted(diff.changed)))
+                            before_snapshot_id=before.snapshot_id,after_snapshot_id=after.snapshot_id,status="ROLLED_BACK",
+                            before_hash=before.state_hash,after_hash=after.state_hash,changed_fields=tuple(sorted(diff.changed)))
                 except Exception as rollback_exc:
-                    result=TransformationResult.failed(
-                        "ROLLBACK_FAILED",
+                    result=TransformationResult.failed("ROLLBACK_FAILED",
                         {"rollback_status":"FAILED_TO_EXECUTE","error":str(rollback_exc)},
-                        before_snapshot_id=before.snapshot_id, after_snapshot_id=after.snapshot_id,
-                        status="ROLLBACK_FAILED", before_hash=before.state_hash,
-                        after_hash=after.state_hash, changed_fields=tuple(sorted(diff.changed)))
+                        before_snapshot_id=before.snapshot_id,after_snapshot_id=after.snapshot_id,status="ROLLBACK_FAILED",
+                        before_hash=before.state_hash,after_hash=after.state_hash,changed_fields=tuple(sorted(diff.changed)))
             else:
-                result=TransformationResult.failed(
-                    result.failure_code or "VALIDATION_FAILED",
-                    {"rollback_status":"NOT_CONFIGURED", "partial_state":True},
-                    before_snapshot_id=before.snapshot_id, after_snapshot_id=after.snapshot_id,
-                    status="PARTIAL", before_hash=before.state_hash,
-                    after_hash=after.state_hash, changed_fields=tuple(sorted(diff.changed)))
-
+                result=TransformationResult.failed(result.failure_code or "VALIDATION_FAILED",
+                    {"rollback_status":"NOT_CONFIGURED","partial_state":True},
+                    before_snapshot_id=before.snapshot_id,after_snapshot_id=after.snapshot_id,status="PARTIAL",
+                    before_hash=before.state_hash,after_hash=after.state_hash,changed_fields=tuple(sorted(diff.changed)))
         certificate=None
         if result.status=="VALIDATED" and result.certificate_eligible:
             certificate=TransformationCertificate.issue(execution_id,contract,result)
-        execution=TransformationExecution(
-            execution_id,before.snapshot_id,after.snapshot_id,result,certificate)
-        self.ledger.append(TransformationLedgerEntry.from_execution(
-            execution,character_id,contract,request_hash=request_hash))
+        execution=TransformationExecution(execution_id,before.snapshot_id,after.snapshot_id,result,certificate)
+        self.ledger.append(TransformationLedgerEntry.from_execution(execution,character_id,contract,request_hash=request_hash))
         terminal=JournalAttempt(**{**captured.__dict__, "status":result.status})
         self.journal.record(terminal, result.status, failure_code=result.failure_code)
         return execution
 
     def _replay_existing(self, entry):
-        result=TransformationResult(
-            entry.status,entry.failure_code,entry.before_snapshot_id,
-            entry.after_snapshot_id or "",entry.before_hash,entry.after_hash,(),
-            bool(entry.certificate_id),{"idempotent_replay":True})
+        result=TransformationResult(entry.status,entry.failure_code,entry.before_snapshot_id,
+            entry.after_snapshot_id or "",entry.before_hash,entry.after_hash,(),bool(entry.certificate_id),{"idempotent_replay":True})
         certificate=None
         if entry.certificate_id:
-            certificate=TransformationCertificate(
-                entry.certificate_id,entry.execution_id,entry.contract_id,
-                entry.contract_version,entry.before_snapshot_id,
-                entry.after_snapshot_id or "",entry.before_hash,entry.after_hash,(),
-                entry.certificate_id)
-        return TransformationExecution(
-            entry.execution_id,entry.before_snapshot_id,entry.after_snapshot_id,
-            result,certificate)
+            certificate=TransformationCertificate(entry.certificate_id,entry.execution_id,entry.contract_id,
+                entry.contract_version,entry.before_snapshot_id,entry.after_snapshot_id or "",
+                entry.before_hash,entry.after_hash,(),entry.certificate_id)
+        return TransformationExecution(entry.execution_id,entry.before_snapshot_id,entry.after_snapshot_id,result,certificate)
