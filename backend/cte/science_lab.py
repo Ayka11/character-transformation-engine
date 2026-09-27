@@ -643,7 +643,16 @@ class ScienceLabService:
         claims = self.claim_validation(matrix_id)
         transformation_provenance = []
         for run in runs:
-            tp = dict(run.get("transformation_provenance") or {})
+            tp = (
+                self.transformation_provenance.bind_execution(run["execution_id"])
+                if self.transformation_provenance is not None
+                else {
+                    "execution_id": run["execution_id"],
+                    "validated": False,
+                    "integrity_status": "FAIL",
+                    "issues": ["TRANSFORMATION_PROVENANCE_BINDER_UNAVAILABLE"],
+                }
+            )
             transformation_provenance.append({
                 "run_id": run["run_id"],
                 "execution_id": run["execution_id"],
