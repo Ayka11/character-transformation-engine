@@ -519,3 +519,104 @@ def test_postgres_backup_restore_preserves_transformation_provenance_chain():
                 "AND payload_json->>'source_execution_id'=%s",
                 (execution_id,),
             )
+
+
+@pytest.mark.skipif(
+    not os.getenv("CTE_DATABASE_URL"),
+    reason="CTE_DATABASE_URL is required for live PostgreSQL integration",
+)
+def test_postgres_retention_cannot_destroy_transformation_provenance():
+    from cte.audit_retention import apply_retention, build_policy
+    from cte.contracts.transformation import TransformationContract
+    from cte.state_snapshot_store import StateSnapshotStore
+    from cte.transformation_ledger import TransformationLedger
+    from cte.transformation_provenance import TransformationProvenanceBinder
+    from cte.transformation_recovery import TransformationJournal
+
+    dsn = os.environ["CTE_DATABASE_URL"]
+    store = PostgreSQLRuntimeStore(dsn)
+    execution_id = f"pg-retention-{os.urandom(6).hex()}"
+    character_id = f"pg-retention-character-{os.urandom(4).hex()}"
+
+    execution = __import__("cte.transformation_runtime", fromlist=["TransformationExecutor"]).TransformationExecutor(
+        StateSnapshotStore(store), TransformationLedger(store)
+    ).execute(
+        execution_id,
+        character_id,
+        1,
+        {"tempo": 5},
+        TransformationContract("pg-retention-contract", "1", expected_changes={"tempo": 6}),
+        lambda state: {"tempo": 6},
+    )
+    assert execution.result.status == "VALIDATED"
+
+    binder = TransformationProvenanceBinder(store)
+    before = binder.bind_execution(execution_id)
+    journal_before = [
+        e for e in TransformationJournal(store).events()
+        if e["payload"].get("execution_id") == execution_id
+    ]
+    assert before["validated"] is True
+    assert journal_before
+
+    with pytest.raises(ValueError, match="protected namespace"):
+        apply_retention(
+            store,
+            build_policy("forbidden-transformation-journal", retention_days=1, namespace="transformation.journal"),
+            archive_manifest_hash="archived",
+            now=datetime.now(timezone.utc) + timedelta(days=2),
+        )
+
+    # Ordinary audit retention remains allowed and must not alter the
+    # transformation snapshots/ledger/journal for this execution.
+    store.append_event(
+        f"pg-retention-audit-{os.urandom(4).hex()}",
+        "api",
+        "AUDIT",
+        {"execution_id": execution_id},
+    )
+    audit = apply_retention(
+        store,
+        build_policy("api-retention", retention_days=1, namespace="api"),
+        archive_manifest_hash="archived",
+        now=datetime.now(timezone.utc) + timedelta(days=2),
+    )
+    assert audit["deleted_events"] >= 1
+
+    after = binder.bind_execution(execution_id)
+    journal_after = [
+        e for e in TransformationJournal(store).events()
+        if e["payload"].get("execution_id") == execution_id
+    ]
+    assert after["validated"] is True
+    assert after["integrity_status"] == "PASS"
+    assert after["ledger_id"] == before["ledger_id"]
+    assert journal_after == journal_before
+
+    cleanup = PostgreSQLRuntimeStore(dsn)
+    with cleanup.transaction() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                "DELETE FROM runtime_events WHERE namespace='transformation.journal' "
+                "AND payload_json->>'execution_id'=%s",
+                (execution_id,),
+            )
+            cur.execute(
+                "DELETE FROM runtime_events WHERE namespace='api' "
+                "AND payload_json->>'execution_id'=%s",
+                (execution_id,),
+            )
+            cur.execute(
+                "DELETE FROM runtime_snapshots WHERE namespace='transformation.ledger' "
+                "AND key=%s",
+                (before["ledger_id"],),
+            )
+            cur.execute(
+                "DELETE FROM runtime_snapshots WHERE namespace='state.snapshot' "
+                "AND payload_json->>'source_execution_id'=%s",
+                (execution_id,),
+            )
+            cur.execute(
+                "DELETE FROM runtime_snapshots WHERE namespace='transformation.lock' AND key=%s",
+                (f"{character_id}:1",),
+            )
