@@ -41,6 +41,7 @@ class Assignment:
     adaptations:list["AdaptationDecision"]=field(default_factory=list)
     audit:list[dict]=field(default_factory=list)
     links:list[dict]=field(default_factory=list)
+    execution_id:str|None=None
 
 @dataclass
 class Session:
@@ -92,7 +93,7 @@ class InterventionService:
                 p["assignment_id"],p["user_id"],p["rule_id"],p["rule_version"],p["selected_level"],
                 p.get("source_assessment_id"),tuple(p.get("source_claim_ids",())),
                 p["selection_reason"],p["safety_gate_status"],p.get("status","ASSIGNED"),
-                sessions,adaptations,p.get("audit",[]),p.get("links",[])
+                sessions,adaptations,p.get("audit",[]),p.get("links",[]),p.get("execution_id")
             )
 
     def _persist_rule(self,rule:InterventionRule):
@@ -146,8 +147,10 @@ class InterventionService:
 
     def assign(self,assignment_id,user_id,rule_id,domain,required_inputs:dict,current_level:str,
                safety_status:str,data_quality_status:str,source_assessment_id=None,source_claim_ids=None,
-               context_flags:set[str]|None=None)->Assignment:
+               context_flags:set[str]|None=None,execution_id:str|None=None)->Assignment:
         if assignment_id in self.assignments: raise ValueError("assignment already registered")
+        if execution_id and self.store is not None and self.store.get_snapshot("orchestrator.execution",execution_id) is None:
+            raise ValueError("execution_id is not registered in orchestrator persistence")
         rule=self.rules.get(rule_id)
         if rule is None: raise ValueError("rule is not registered")
         if rule.status!="ACTIVE": raise ValueError("intervention rule is not ACTIVE")
@@ -171,7 +174,7 @@ class InterventionService:
                 "safety_status":safety_status,"data_quality_status":data_quality_status,
                 "contraindication_hit":contraindication_hit,"context_flags":sorted(flags)}
         assignment=Assignment(assignment_id,user_id,rule_id,rule.rule_version,level,source_assessment_id,
-            tuple(source_claim_ids or ()),reason,gate)
+            tuple(source_claim_ids or ()),reason,gate,execution_id=execution_id)
         self.assignments[assignment_id]=assignment
         assignment.audit.append(self._audit("ASSIGNMENT_CREATED",assignment_id,reason))
         self._persist_assignment(assignment)
