@@ -58,6 +58,72 @@ class GraphRegistry:
                 frontier.append(edge.from_node_id)
         return found
 
+
+    def _upstream_nodes(self, result_id: str) -> list[GraphNode]:
+        if result_id not in self.nodes or self.nodes[result_id].node_type != "RESULT":
+            raise ValueError("RESULT node is not registered")
+        found=[]
+        frontier=[result_id]
+        seen={result_id}
+        while frontier:
+            current=frontier.pop()
+            for edge in self.edges.values():
+                if edge.to_node_id != current or edge.from_node_id in seen:
+                    continue
+                node=self.nodes.get(edge.from_node_id)
+                if node is None:
+                    continue
+                seen.add(node.node_id)
+                found.append(node)
+                frontier.append(node.node_id)
+        return found
+
+    def claim_requirements(self, result_id: str) -> set[str]:
+        """Derive V1.4 transition prerequisites from registered graph metadata/lineage."""
+        self.require_lineage_for_result(result_id)
+        nodes=self._upstream_nodes(result_id)
+        all_nodes=[self.nodes[result_id],*nodes]
+        types={n.node_type for n in all_nodes}
+        req={"valid_result"} if self.nodes[result_id].metadata.get("qc_status")=="PASS" else set()
+        if "ANALYSIS" in types:
+            req.add("registered_analysis")
+        if self.nodes[result_id].metadata.get("qc_status")=="PASS":
+            req.add("validated_descriptive_result")
+        for node in nodes:
+            md=node.metadata or {}
+            design=str(md.get("design_type","")).upper()
+            if node.node_type=="PROTOCOL" and design=="ASSOCIATIONAL":
+                req.add("association_design")
+            if node.node_type=="PROTOCOL" and design=="INTERVENTION":
+                req.add("registered_intervention")
+            if node.node_type=="REPLICATION" and bool(md.get("independent",False)):
+                req.add("independent_replication")
+            if node.node_type=="REPLICATION" and bool(md.get("criteria_registered",False)):
+                req.add("registered_replication_criteria")
+            if node.node_type=="GENERALIZATION" and md.get("run_status")=="COMPLETED":
+                req.add("generalization_run")
+            if node.node_type=="GENERALIZATION" and md.get("target_population_context"):
+                req.add("target_population_context")
+            if bool(md.get("evidence_criteria_registered",False)):
+                req.add("registered_evidence_criteria")
+        if all(n.provenance_class and n.version and n.immutable_hash for n in all_nodes):
+            req.add("complete_provenance")
+        return req
+
+    def register_claim(self, claim_id: str, result_id: str, current_state: str,
+                       target_state: str, provenance_class: str, metadata: dict) -> GraphNode:
+        if claim_id in self.nodes:
+            raise ValueError("claim node already registered")
+        from .claim_gate import validate_claim_transition
+        requirements=self.claim_requirements(result_id)
+        validate_claim_transition(current_state,target_state,requirements,provenance_class)
+        payload=dict(metadata)
+        payload.update({"current_state":current_state,"state":target_state,"result_id":result_id})
+        claim=register_node(claim_id,"CLAIM",claim_id,provenance_class,"2.1.0",payload)
+        self.add_node(claim)
+        self.add_edge(register_edge(f"{claim_id}:supports:{result_id}",self.nodes[result_id],claim,"SUPPORTS",rationale=f"claim transition {current_state} -> {target_state}"))
+        return claim
+
     def require_lineage_for_result(self, result_id: str) -> None:
         result=self.nodes.get(result_id)
         if result is None or result.node_type != "RESULT":
