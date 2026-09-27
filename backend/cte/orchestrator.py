@@ -5,6 +5,7 @@ Model-derived implementation of the repository's orchestration contract; not emp
 from __future__ import annotations
 from dataclasses import dataclass, field
 from .provenance import content_hash
+from .persistence import SQLiteRuntimeStore
 
 LIFECYCLE=("INTAKE","PROFILE","ASSESSMENT","STATE_ESTIMATION","CAPACITY","RULE_ELIGIBILITY",
            "SAFETY_GATE","INTERVENTION","MEASUREMENT","QC","ANALYSIS","CLAIM",
@@ -70,11 +71,13 @@ class RuleRegistration:
     immutable_hash:str
 
 class OrchestratorService:
-    def __init__(self):
+    def __init__(self, store: SQLiteRuntimeStore | None = None):
+        self.store=store
         self.executions:dict[str,Execution]={}
         self.modules:dict[str,ModuleRegistration]={}
         self.schemas:dict[str,SchemaRegistration]={}
         self.rules:dict[str,RuleRegistration]={}
+        self._hydrate()
 
     def create_execution(self,execution_id:str,correlation_id:str,input_payload:dict,
                          required_stages:list[str]|None=None)->Execution:
