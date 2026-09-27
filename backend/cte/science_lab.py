@@ -120,6 +120,13 @@ class ScienceLabService:
         self.transformation_provenance = TransformationProvenanceBinder(store) if store is not None else None
         self._hydrate()
 
+    def _transformation_for_result(self, result_id: str) -> dict[str, Any]:
+        """Resolve the transformation provenance attached to a Science Lab result."""
+        for run in self.runs.values():
+            if result_id in run.result_ids:
+                return dict(run.transformation_provenance or {})
+        return {}
+
     def _put(self, namespace: str, key: str, payload: dict):
         if self.store is not None:
             self.store.put_snapshot(namespace, key, payload, VERSION)
@@ -422,6 +429,7 @@ class ScienceLabService:
                      "matrix_id":matrix_id,"source_result_id":source_result_id,
                      "independent":True,"criteria_registered":True,
                      "assessment_status":"REGISTERED"},
+                     "transformation_provenance": self._transformation_for_result(source_result_id),
         ))
         self.registry.add_edge(register_edge(
             f"{run.replication_run_id}:replicates:{source_result_id}",
@@ -497,6 +505,7 @@ class ScienceLabService:
             {"kind":"SCIENCE_LAB_GENERALIZATION_RUN","matrix_id":matrix_id,
              "source_result_id":source_result_id,"run_status":"REGISTERED",
              "target_context":target_context},
+             "transformation_provenance": self._transformation_for_result(source_result_id),
         ))
         self.registry.add_edge(register_edge(
             f"{node_id}:generalizes:{source_result_id}",
