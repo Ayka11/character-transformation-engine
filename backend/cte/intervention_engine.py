@@ -5,6 +5,7 @@ Model-derived implementation of the repository's V1.7 contract; not empirically 
 from __future__ import annotations
 from dataclasses import dataclass, field
 from .provenance import content_hash
+from .persistence import SQLiteRuntimeStore
 
 LEVELS=("A","B","C","D","E")
 DECISIONS=("CONTINUE","ADJUST","HOLD","DEESCALATE","STOP","INSUFFICIENT_DATA")
@@ -65,10 +66,12 @@ class AdaptationDecision:
     safety_status:str
 
 class InterventionService:
-    def __init__(self,registry):
+    def __init__(self,registry,store:SQLiteRuntimeStore|None=None):
         self.registry=registry
+        self.store=store
         self.rules:dict[str,InterventionRule]={}
         self.assignments:dict[str,Assignment]={}
+        self._hydrate()
 
     def register_rule(self,rule:InterventionRule)->InterventionRule:
         if rule.rule_id in self.rules: raise ValueError("intervention rule already registered")
