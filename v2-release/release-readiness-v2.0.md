@@ -13,12 +13,12 @@
 - [ ] Event/provenance persistence implemented
 
 ## Gate C — Integrity
-- [ ] V1.9 negative tests executed
-- [ ] Provenance tests executed
-- [ ] Safety precedence tests executed
-- [ ] Evidence guardrail tests executed
-- [ ] E2E synthetic fixture executed
-- [ ] Blocking failures = 0
+- [x] V1.9 negative tests executed
+- [x] Provenance tests executed
+- [x] Safety precedence tests executed
+- [x] Evidence guardrail tests executed
+- [x] E2E synthetic fixture executed
+- [x] Blocking failures = 0
 
 ## Gate D — Research
 - [ ] Registered measurement specifications
@@ -52,9 +52,9 @@ As of the current V2.1 backend baseline:
 - V1.6 scientific reporting has executable snapshot/QC/publish runtime.
 - V1.7 decision/intervention has executable safety-first runtime.
 - V1.8 orchestration has executable lifecycle/event runtime.
-- V1.9 synthetic E2E contract coverage has been added as tests, but those tests have not been executed in this environment.
+- V1.9 synthetic E2E contract coverage has been executed successfully in GitHub Actions run #68.
 - Durable SQLite runtime adapters are implemented for graph, orchestration, reporting and intervention state; research runtime hydration is graph-backed.
 - Production PostgreSQL migration/transactions, authentication, observability and empirical validation remain open release gates.
-- GitHub CI workflow is registered, but no workflow run/status is currently visible for the API-created commits.
+- GitHub CI workflow is registered and the latest current-main run (#68) completed successfully with 131 backend tests passing.
 
 **Important:** a checked architecture item does not imply that the corresponding implementation, executed test status, or scientific validation exists.
