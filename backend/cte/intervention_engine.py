@@ -156,7 +156,6 @@ class InterventionService:
         if rule.status!="ACTIVE": raise ValueError("intervention rule is not ACTIVE")
         if domain not in rule.eligible_domains: raise ValueError("rule is outside eligible domain scope")
         missing=[x for x in rule.required_inputs if required_inputs.get(x) is None]
-        if missing: raise ValueError("required intervention inputs missing: "+",".join(missing))
         if current_level not in LEVELS: raise ValueError("unsupported capacity level")
         if safety_status not in {"PASS","HOLD","BLOCK"}: raise ValueError("unsupported safety gate status")
         if data_quality_status not in {"PASS","UNKNOWN","FAIL"}: raise ValueError("unsupported data quality status")
@@ -166,7 +165,7 @@ class InterventionService:
             safety_status="BLOCK"
         if safety_status=="BLOCK" or data_quality_status=="FAIL":
             level=current_level; gate="BLOCK"
-        elif safety_status=="HOLD" or data_quality_status=="UNKNOWN":
+        elif missing or safety_status=="HOLD" or data_quality_status=="UNKNOWN":
             level=current_level; gate="HOLD"
         else:
             level=current_level; gate="PASS"
@@ -184,7 +183,9 @@ class InterventionService:
         assignment=self.assignments.get(assignment_id)
         if assignment is None: raise ValueError("assignment is not registered")
         if session_id in assignment.sessions: raise ValueError("session already registered")
-        if assignment.safety_gate_status!="PASS": raise ValueError("assignment is not executable: safety gate is not PASS")
+        if assignment.safety_gate_status!="PASS":
+            status=assignment.safety_gate_status.lower()
+            raise ValueError(f"assignment is {status}; safety gate is not PASS")
         session=Session(session_id,assignment_id,dict(planned_load))
         assignment.sessions[session_id]=session
         assignment.audit.append(self._audit("SESSION_CREATED",assignment_id,{"session_id":session_id}))
@@ -251,8 +252,9 @@ class InterventionService:
             raise ValueError("unsupported research link relation")
         if relation in {"SUPPORTS_CLAIM","LIMITS_CLAIM","CONTRADICTS_CLAIM"} and not claim_id:
             raise ValueError("claim_id is required for claim relation")
-        if result_node_id and (result_node_id not in self.registry.nodes or self.registry.nodes[result_node_id].node_type!="RESULT"):
-            raise ValueError("result_node_id must reference a registered RESULT")
+        if result_node_id and relation != "GENERATES_OBSERVATION":
+            if result_node_id not in self.registry.nodes or self.registry.nodes[result_node_id].node_type!="RESULT":
+                raise ValueError("result_node_id must reference a registered RESULT")
         if claim_id and (claim_id not in self.registry.nodes or self.registry.nodes[claim_id].node_type!="CLAIM"):
             raise ValueError("claim_id must reference a registered CLAIM")
         link={"session_id":session_id,"relation":relation,"research_result_node_id":result_node_id,"claim_id":claim_id,
