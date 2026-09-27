@@ -66,3 +66,47 @@ def test_repeated_identical_request_is_idempotent():
     assert calls["n"]==1
     assert len(ledger.list())==1
     assert ledger.list()[0].request_hash
+
+
+def test_validation_failure_with_changed_state_is_partial_without_rollback():
+    db=SQLiteRuntimeStore(":memory:")
+    ss=StateSnapshotStore(db)
+    ledger=__import__("cte.transformation_ledger",fromlist=["TransformationLedger"]).TransformationLedger(db)
+    runtime=TransformationExecutor(ss,ledger)
+    out=runtime.execute("partial","c1",50,{"tempo":5},
+        TransformationContract("t1","1",expected_changes={"tempo":6},allowed_changes=("tempo",)),
+        lambda state:{**state,"tempo":7,"unplanned":1})
+    assert out.result.status=="PARTIAL"
+    assert out.result.details["partial_state"] is True
+    assert out.certificate is None
+    assert ledger.list()[0].status=="PARTIAL"
+
+
+def test_validation_failure_can_be_rolled_back_to_exact_before_state():
+    db=SQLiteRuntimeStore(":memory:")
+    ss=StateSnapshotStore(db)
+    runtime=TransformationExecutor(ss)
+    contract=TransformationContract(
+        "t1","1",expected_changes={"tempo":6},allowed_changes=("tempo",),
+        rollback=lambda after,before: dict(before))
+    out=runtime.execute("rollback","c1",60,{"tempo":5},
+        contract,lambda state:{**state,"tempo":7})
+    assert out.result.status=="ROLLED_BACK"
+    assert out.result.details["rollback_status"]=="ROLLED_BACK"
+    assert out.certificate is None
+    lineage=ss.get_lineage("c1")
+    assert len(lineage)==3
+    assert lineage[-1].state==lineage[0].state
+
+
+def test_failed_rollback_is_distinct_from_partial():
+    db=SQLiteRuntimeStore(":memory:")
+    ss=StateSnapshotStore(db)
+    runtime=TransformationExecutor(ss)
+    contract=TransformationContract(
+        "t1","1",expected_changes={"tempo":6},rollback=lambda after,before: {**after,"tempo":99})
+    out=runtime.execute("rollback-fail","c1",70,{"tempo":5},
+        contract,lambda state:{**state,"tempo":7})
+    assert out.result.status=="ROLLBACK_FAILED"
+    assert out.result.failure_code=="ROLLBACK_FAILED"
+    assert out.certificate is None
