@@ -216,3 +216,101 @@ def test_postgres_concurrent_transformation_guard_rejects_competing_request():
                 "DELETE FROM runtime_snapshots WHERE namespace='transformation.lock' AND key=%s",
                 (f"{character_id}:1",),
             )
+
+
+@pytest.mark.skipif(
+    not os.getenv("CTE_DATABASE_URL"),
+    reason="CTE_DATABASE_URL is required for live PostgreSQL integration",
+)
+def test_postgres_recovery_closes_after_ledger_commit_without_rerun():
+    from cte.contracts.transformation import TransformationContract
+    from cte.state_snapshot_store import StateSnapshotStore
+    from cte.transformation_ledger import TransformationLedger
+    from cte.transformation_recovery import (
+        JournalAttempt,
+        TransformationJournal,
+        TransformationRecoveryService,
+    )
+    from cte.contracts.state import StateSnapshot
+    from cte.provenance import content_hash
+
+    dsn = os.environ["CTE_DATABASE_URL"]
+    store = PostgreSQLRuntimeStore(dsn)
+    snapshots = StateSnapshotStore(store)
+    ledger = TransformationLedger(store)
+    journal = TransformationJournal(store)
+    execution_id = f"pg-recovery-{os.urandom(6).hex()}"
+    attempt_id = f"pg-attempt-{os.urandom(6).hex()}"
+    request_hash = content_hash({
+        "execution_id": execution_id,
+        "character_id": "pg-recovery-character",
+        "sequence": 1,
+        "state": {"tempo": 5},
+        "contract_id": "pg-recovery-contract",
+        "contract_version": "1",
+        "parent_snapshot_id": None,
+    })
+
+    before = StateSnapshot.capture(
+        f"{execution_id}:before",
+        "pg-recovery-character",
+        1,
+        {"tempo": 5},
+        source_execution_id=execution_id,
+    )
+    after = StateSnapshot.capture(
+        f"{execution_id}:after",
+        "pg-recovery-character",
+        2,
+        {"tempo": 6},
+        parent_snapshot_id=before.snapshot_id,
+        source_execution_id=execution_id,
+    )
+    snapshots.save_pair_atomic(before, after)
+    attempt = JournalAttempt(
+        attempt_id,
+        execution_id,
+        "pg-recovery-character",
+        1,
+        request_hash,
+        "pg-recovery-contract",
+        "1",
+        "AFTER_CAPTURED",
+        before.snapshot_id,
+        after.snapshot_id,
+    )
+    journal.record(attempt, "AFTER_CAPTURED", after_hash=after.state_hash)
+
+    contract = TransformationContract(
+        "pg-recovery-contract",
+        "1",
+        expected_changes={"tempo": 6},
+    )
+    service = TransformationRecoveryService(snapshots, ledger, journal)
+    recovered = service.recover(attempt_id, contract)
+
+    assert recovered.status == "RECOVERED"
+    entry = ledger.find_by_request_hash(request_hash)
+    assert entry is not None
+    assert entry.status == "VALIDATED"
+
+    # Simulate the crash window: ledger is durable, terminal journal event was
+    # not yet written. Recovery must now see the attempt as terminally closed
+    # and must never execute the intervention again.
+    assert service.scan() == []
+
+    cleanup = PostgreSQLRuntimeStore(dsn)
+    with cleanup.transaction() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                "DELETE FROM runtime_events WHERE namespace='transformation.journal' AND payload_json->>'attempt_id'=%s",
+                (attempt_id,),
+            )
+            cur.execute(
+                "DELETE FROM runtime_snapshots WHERE namespace='transformation.ledger' AND key=%s",
+                (entry.ledger_id,),
+            )
+            cur.execute(
+                "DELETE FROM runtime_snapshots WHERE namespace='state.snapshot' AND payload_json->>'source_execution_id'=%s",
+                (execution_id,),
+            )
