@@ -8,8 +8,8 @@ from __future__ import annotations
 ALLOWED_TRANSITIONS = {
     ("HYPOTHESIS", "REGISTERED"): {"claim_registration"},
     ("REGISTERED", "DESCRIPTIVE_RESULT"): {"validated_descriptive_result"},
-    ("REGISTERED", "ASSOCIATIONAL_RESULT"): {"registered_analysis", "valid_result", "association_design"},
-    ("DESCRIPTIVE_RESULT", "ASSOCIATIONAL_RESULT"): {"registered_analysis", "valid_result", "association_design"},
+    ("REGISTERED", "ASSOCIATIONAL_RESULT"): {"valid_result"},
+    ("DESCRIPTIVE_RESULT", "ASSOCIATIONAL_RESULT"): {"valid_result"},
     ("REGISTERED", "INTERVENTION_RESULT"): {"registered_intervention", "valid_result"},
     ("DESCRIPTIVE_RESULT", "INTERVENTION_RESULT"): {"registered_intervention", "valid_result"},
     ("ASSOCIATIONAL_RESULT", "REPLICATED_RESULT"): {"independent_replication", "registered_replication_criteria"},
