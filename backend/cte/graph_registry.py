@@ -92,6 +92,8 @@ class GraphRegistry:
         for node in nodes:
             md=node.metadata or {}
             design=str(md.get("design_type","")).upper()
+            if node.node_type=="PROTOCOL" and md.get("kind")=="EVIDENCE_CRITERIA":
+                req.add("registered_evidence_criteria")
             if node.node_type=="PROTOCOL" and design=="ASSOCIATIONAL":
                 req.add("association_design")
             if node.node_type=="PROTOCOL" and design=="INTERVENTION":
