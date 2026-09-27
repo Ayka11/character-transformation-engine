@@ -11,7 +11,7 @@ def test_v19_synthetic_end_to_end_contract():
     result=register_node("result","RESULT","result","DRV","1",{"qc_status":"PASS","validated_descriptive_result":True})
     replication=register_node("rep","REPLICATION","rep","DRV","1",{"independent":True,"criteria_registered":True,"assessment_status":"REPLICATED"})
     generalization=register_node("gen","GENERALIZATION","gen","DRV","1",{"run_status":"COMPLETED","result_status":"GENERALIZABLE","target_population_context":"declared-target"})
-    criteria=register_node("criteria","PROTOCOL","criteria","DRV","1",{"kind":"EVIDENCE_CRITERIA","claim_id":"c3","rule_ids":["E1"]})
+    criteria=register_node("criteria","PROTOCOL","criteria","DRV","1",{"kind":"EVIDENCE_CRITERIA","claim_id":"c4","rule_ids":["E1"]})
     for n in (dataset,analysis,protocol,result,replication,generalization,criteria): graph.add_node(n)
     graph.add_edge(register_edge("e1",analysis,dataset,"ANALYZED_FROM"))
     graph.add_edge(register_edge("e2",analysis,result,"RESULTS_IN"))
