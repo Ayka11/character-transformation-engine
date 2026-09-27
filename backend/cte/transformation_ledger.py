@@ -22,9 +22,10 @@ class TransformationLedgerEntry:
     after_hash: str
     certificate_id: str | None
     payload_hash: str
+    request_hash: str = ""
 
     @classmethod
-    def from_execution(cls, execution, character_id, contract):
+    def from_execution(cls, execution, character_id, contract, request_hash=""):
         result=execution.result
         certificate_id=execution.certificate.certificate_id if execution.certificate else None
         payload={
@@ -45,7 +46,7 @@ class TransformationLedgerEntry:
                    contract.contract_id, contract.version, result.status,
                    result.failure_code, result.before_snapshot_id,
                    result.after_snapshot_id, result.before_hash, result.after_hash,
-                   certificate_id, payload_hash)
+                   certificate_id, payload_hash, request_hash)
 
 class TransformationLedger:
     def __init__(self, runtime_store=None):
@@ -66,7 +67,7 @@ class TransformationLedger:
             "before_hash":entry.before_hash,
             "after_hash":entry.after_hash,
             "certificate_id":entry.certificate_id,
-            "payload_hash":entry.payload_hash,
+            "payload_hash":entry.payload_hash,"request_hash":entry.request_hash,
         }
 
     def append(self, entry):
@@ -75,6 +76,12 @@ class TransformationLedger:
     def get(self, ledger_id):
         row=self.store.get_snapshot(NAMESPACE, ledger_id)
         return TransformationLedger._from_payload(row.payload) if row else None
+
+    def find_by_request_hash(self, request_hash: str):
+        for entry in self.list():
+            if entry.request_hash == request_hash:
+                return entry
+        return None
 
     def list(self):
         return [TransformationLedger._from_payload(x.payload) for x in self.store.list_snapshots(NAMESPACE)]
