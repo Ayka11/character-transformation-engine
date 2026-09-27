@@ -5,12 +5,14 @@ from __future__ import annotations
 from dataclasses import asdict
 from fastapi import FastAPI
 from pydantic import BaseModel, Field
+from typing import Any
 
 from .evidence_graph import register_edge, register_node
 from .graph_registry import GraphRegistry
 from .persistence import SQLiteRuntimeStore
 from .reporting import SECTION_CODES, ReportService, register_spec as register_report_spec
 from .research_execution import ResearchService
+from .research_e2e import ResearchE2ECoordinator
 
 class StudyInput(BaseModel):
     study_id: str
@@ -128,12 +130,34 @@ class GeneralizeInput(BaseModel):
     run_status: str = "REGISTERED"
     target_population_context: str
 
-def install_research_api(app: FastAPI, registry: GraphRegistry, store: SQLiteRuntimeStore):
+class ResearchE2EInput(BaseModel):
+    execution_id: str
+    correlation_id: str
+    study: dict[str, Any]
+    protocol: dict[str, Any]
+    experiment: dict[str, Any]
+    arm: dict[str, Any]
+    participant: dict[str, Any]
+    assignment: dict[str, Any]
+    trial: dict[str, Any]
+    observations: list[dict[str, Any]]
+    requested_trait: str | None = None
+    blockers: dict[str, float] = Field(default_factory=dict)
+    recovery_indices: list[float | None] = Field(default_factory=list)
+
+def install_research_api(app: FastAPI, registry: GraphRegistry, store: SQLiteRuntimeStore, orchestrator=None):
     service=ResearchService(registry,store)
     report_service=ReportService(registry,store)
+    e2e=ResearchE2ECoordinator(orchestrator,service,registry) if orchestrator is not None else None
     report_spec_id="research-v1.2-report"
     if report_spec_id not in report_service.specs:
         report_service.register_spec(register_report_spec(report_spec_id,"Research Execution V1.2 Report","1.2"))
+
+    @app.post("/research/e2e")
+    def research_e2e(p: ResearchE2EInput):
+        if e2e is None:
+            raise ValueError("research E2E coordinator is not installed")
+        return e2e.run(**p.model_dump())
 
     @app.post("/research/studies")
     def research_study(p: StudyInput):
