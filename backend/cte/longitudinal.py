@@ -28,10 +28,10 @@ def longitudinal_change(baseline: list[float | None], current: list[float | None
         return LongitudinalResult(0,None,None,None,None,"NOT_ESTIMABLE",("No complete baseline/current pairs",),prov)
     changes=[c-b for b,c in pairs]
     avg_change=mean(changes)
-    # Relative change is the mean of each complete participant pair's
-    # relative change, rather than change of pooled means.
-    individual_relative=[(c-b)/b for b,c in pairs if b != 0]
-    relative=None if len(individual_relative) != len(pairs) else mean(individual_relative)
+    # Contract-defined relative change: mean absolute change divided by
+    # the mean baseline across complete pairs.
+    baseline_mean=mean(b for b,_ in pairs)
+    relative=None if baseline_mean == 0 else avg_change/baseline_mean
     sd=pstdev(changes)
     standardized=None if sd == 0 else avg_change/sd
     prov=Provenance(ProvenanceTag.DRV,source_id,source_version,content_hash({"baseline":baseline,"current":current}),"Longitudinal descriptive result; not evidence")
