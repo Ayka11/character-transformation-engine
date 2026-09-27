@@ -65,6 +65,28 @@
     </section>
 
     <section class="card">
+      <h2>Matrix overview</h2>
+      <div class="metrics" id="metrics">
+        <div><span>Scenarios</span><strong>—</strong></div>
+        <div><span>Runs</span><strong>—</strong></div>
+        <div><span>Completed</span><strong>—</strong></div>
+        <div><span>Blocked</span><strong>—</strong></div>
+        <div><span>Primary estimate</span><strong>—</strong></div>
+      </div>
+      <div class="table-wrap">
+        <table id="scenarioTable">
+          <thead><tr><th>Scenario</th><th>Conditions</th><th>Status</th><th>Estimate</th></tr></thead>
+          <tbody><tr><td colspan="4">No data loaded.</td></tr></tbody>
+        </table>
+      </div>
+      <div class="row-actions">
+        <button id="loadOverview">Refresh matrix</button>
+        <button id="loadClaims">Refresh claims</button>
+      </div>
+      <pre id="claims">{}</pre>
+    </section>
+
+    <section class="card">
       <h2>Runtime output</h2>
       <pre id="output">Ready.</pre>
     </section>
