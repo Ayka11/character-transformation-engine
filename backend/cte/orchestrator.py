@@ -334,7 +334,8 @@ class OrchestratorService:
         if "INTERVENTION" not in e.required_stages:
             raise ValueError("execution does not declare INTERVENTION as a required stage")
         from .transformation_runtime import TransformationExecutor
-        runtime=TransformationExecutor()
+        from .state_snapshot_store import StateSnapshotStore
+        runtime=TransformationExecutor(snapshot_store=StateSnapshotStore(self.store) if self.store is not None else None)
         stage=self.advance_stage(execution_id,"INTERVENTION","RUNNING",
                                  input_hash=content_hash(state),module_version=contract.version,
                                  provenance_record_id=f"{execution_id}:INTERVENTION")
