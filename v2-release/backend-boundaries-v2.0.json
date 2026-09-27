@@ -1,0 +1,134 @@
+{
+  "version": "2.0",
+  "status": "ARCHITECTURE_BASELINE",
+  "services": [
+    {
+      "id": "measurement",
+      "owns": [
+        "measurement_specs",
+        "assessments",
+        "metrics",
+        "responses"
+      ],
+      "must_not_own": [
+        "claims",
+        "publication_status"
+      ]
+    },
+    {
+      "id": "runtime",
+      "owns": [
+        "profiles",
+        "daily_state",
+        "capacity",
+        "sprints",
+        "behavior_events"
+      ],
+      "must_not_own": [
+        "scientific_evidence_status"
+      ]
+    },
+    {
+      "id": "research",
+      "owns": [
+        "studies",
+        "experiments",
+        "trials",
+        "datasets",
+        "analysis_runs",
+        "results"
+      ],
+      "must_not_own": [
+        "automatic_claim_promotion"
+      ]
+    },
+    {
+      "id": "analytics",
+      "owns": [
+        "effect_sizes",
+        "confidence_intervals",
+        "missing_data",
+        "sensitivity"
+      ],
+      "must_not_own": [
+        "causal_claim_without_design"
+      ]
+    },
+    {
+      "id": "evidence_graph",
+      "owns": [
+        "nodes",
+        "edges",
+        "claim_status",
+        "contradictions",
+        "qualifiers"
+      ],
+      "must_not_own": [
+        "silent_evidence_deletion"
+      ]
+    },
+    {
+      "id": "replication_generalization",
+      "owns": [
+        "replication_runs",
+        "transport_runs",
+        "boundaries",
+        "heterogeneity"
+      ],
+      "must_not_own": [
+        "universalization"
+      ]
+    },
+    {
+      "id": "reporting",
+      "owns": [
+        "report_specs",
+        "report_runs",
+        "sections",
+        "publication_gates"
+      ],
+      "must_not_own": [
+        "claim_status_upgrade"
+      ]
+    },
+    {
+      "id": "intervention",
+      "owns": [
+        "rules",
+        "assignments",
+        "sessions",
+        "adaptation"
+      ],
+      "must_not_own": [
+        "unsafe_execution",
+        "EVD_promotion"
+      ]
+    },
+    {
+      "id": "orchestrator",
+      "owns": [
+        "execution_runs",
+        "events",
+        "routing",
+        "module_registry",
+        "schema_registry"
+      ],
+      "must_not_own": [
+        "rewriting_module_truth"
+      ]
+    },
+    {
+      "id": "integrity",
+      "owns": [
+        "test_cases",
+        "test_runs",
+        "test_results",
+        "artifact_checks"
+      ],
+      "must_not_own": [
+        "scientific_validation"
+      ]
+    }
+  ],
+  "cross_service_rule": "Services communicate through versioned contracts and immutable artifact/event references."
+}
