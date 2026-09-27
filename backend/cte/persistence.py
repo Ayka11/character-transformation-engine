@@ -10,7 +10,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from .provenance import content_hash
 
-MUTABLE_SNAPSHOT_NAMESPACES = {"orchestrator.execution", "intervention.assignment", "report.run"}
+MUTABLE_SNAPSHOT_NAMESPACES = {"orchestrator.execution", "intervention.assignment", "report.run", "research.study", "research.experiment", "research.participant", "research.assignment", "research.analysis"}
 
 @dataclass(frozen=True)
 class Snapshot:
