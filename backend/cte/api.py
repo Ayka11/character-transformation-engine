@@ -384,6 +384,9 @@ def graph_evidence_criteria(p: EvidenceCriteriaInput):
     analysis=GRAPH_REGISTRY.nodes.get(p.analysis_id)
     if analysis is None or analysis.node_type!="ANALYSIS":
         raise ValueError("analysis_id must reference a registered ANALYSIS")
+    claim=GRAPH_REGISTRY.nodes.get(p.claim_id)
+    if claim is None or claim.node_type!="CLAIM":
+        raise ValueError("claim_id must reference a registered CLAIM")
     criteria=register_criteria(p.criteria_id,p.claim_id,rule_ids=p.rule_ids,acceptance_rules=p.acceptance_rules)
     EVIDENCE_CRITERIA[p.criteria_id]=criteria
     node=register_node(p.criteria_id,"PROTOCOL",p.criteria_id,criteria.provenance.tag.value,criteria.version,
