@@ -38,3 +38,15 @@ def test_blocked_state_is_persisted_before_restart():
         first.advance_stage("x","INTAKE","BLOCKED",reason="blocked",metadata={})
         second=OrchestratorService(SQLiteRuntimeStore(path))
         assert second.executions["x"].state=="BLOCKED"
+
+def test_orchestrator_registries_survive_restart():
+    with TemporaryDirectory() as d:
+        path=str(Path(d)/"runtime.sqlite3")
+        first=OrchestratorService(SQLiteRuntimeStore(path))
+        first.register_module("m","1.0","1.8")
+        first.register_schema("s","1.0","backward-compatible")
+        first.register_rule("r","1.0","MDL")
+        second=OrchestratorService(SQLiteRuntimeStore(path))
+        assert second.modules["m"].version=="1.0"
+        assert second.schemas["s"].compatibility_policy=="backward-compatible"
+        assert second.rules["r"].provenance_class=="MDL"
