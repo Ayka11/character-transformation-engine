@@ -38,3 +38,35 @@ def test_postgres_runtime_contract_matches_sqlite():
         with conn.cursor() as cur:
             cur.execute("DELETE FROM runtime_events WHERE event_id=%s", ("e1",))
             cur.execute("DELETE FROM runtime_snapshots WHERE namespace LIKE 'parity.%'")
+
+
+def _atomic_rollback_contract(store):
+    store.put_snapshot("parity.rollback", "existing", {"value": 1}, "1.0")
+    with pytest.raises(ValueError, match="immutable snapshot conflict"):
+        store.put_snapshots_atomic([
+            ("parity.rollback", "new-before", {"value": 2}, "1.0"),
+            ("parity.rollback", "existing", {"value": 999}, "1.0"),
+        ])
+    assert store.get_snapshot("parity.rollback", "new-before") is None
+    assert store.get_snapshot("parity.rollback", "existing").payload == {"value": 1}
+
+
+def test_sqlite_atomic_snapshot_rollback_contract():
+    _atomic_rollback_contract(SQLiteRuntimeStore(":memory:"))
+
+
+@pytest.mark.skipif(
+    not os.getenv("CTE_DATABASE_URL"),
+    reason="CTE_DATABASE_URL is required for live PostgreSQL parity",
+)
+def test_postgres_atomic_snapshot_rollback_matches_sqlite():
+    from cte.postgres_persistence import PostgreSQLRuntimeStore
+
+    _atomic_rollback_contract(SQLiteRuntimeStore(":memory:"))
+    store = PostgreSQLRuntimeStore(os.environ["CTE_DATABASE_URL"])
+    _atomic_rollback_contract(store)
+    with store.transaction() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                "DELETE FROM runtime_snapshots WHERE namespace='parity.rollback'"
+            )
