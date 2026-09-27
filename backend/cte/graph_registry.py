@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from .evidence_graph import GraphNode, GraphEdge, register_node, register_edge
 from .provenance import content_hash
+from .persistence import SQLiteRuntimeStore
 
 @dataclass(frozen=True)
 class GraphAuditEvent:
@@ -42,10 +43,19 @@ class GraphRegistry:
     audit_events: list[GraphAuditEvent] = field(default_factory=list)
     contradiction_sets: dict[str, ContradictionSet] = field(default_factory=dict)
     inference_blocks: dict[str, InferenceBlock] = field(default_factory=dict)
+    store: SQLiteRuntimeStore | None = None
 
     @classmethod
-    def empty(cls) -> "GraphRegistry":
-        return cls({}, {})
+    def empty(cls, store: SQLiteRuntimeStore | None = None) -> "GraphRegistry":
+        registry=cls({}, {}, store=store)
+        if store is not None:
+            for snap in store.list_snapshots("graph.node"):
+                p=snap.payload
+                registry.nodes[p["node_id"]]=GraphNode(**p)
+            for snap in store.list_snapshots("graph.edge"):
+                p=snap.payload
+                registry.edges[p["edge_id"]]=GraphEdge(**p)
+        return registry
 
     def add_node(self, node: GraphNode) -> GraphNode:
         if node.node_id in self.nodes:
@@ -54,6 +64,8 @@ class GraphRegistry:
                 raise ValueError("immutable node conflict")
             return existing
         self.nodes[node.node_id]=node
+        if self.store is not None:
+            self.store.put_snapshot("graph.node",node.node_id,{"node_id":node.node_id,"node_type":node.node_type,"entity_id":node.entity_id,"provenance_class":node.provenance_class,"version":node.version,"immutable_hash":node.immutable_hash,"metadata":node.metadata},node.version)
         self.audit_events.append(GraphAuditEvent("NODE_REGISTERED",node.node_id,None,
             node.node_id if node.node_type=="CLAIM" else None,node.immutable_hash,"runtime"))
         return node
@@ -67,6 +79,8 @@ class GraphRegistry:
         if edge.from_node_id not in self.nodes or edge.to_node_id not in self.nodes:
             raise ValueError("edge references unknown node")
         self.edges[edge.edge_id]=edge
+        if self.store is not None:
+            self.store.put_snapshot("graph.edge",edge.edge_id,{"edge_id":edge.edge_id,"from_node_id":edge.from_node_id,"to_node_id":edge.to_node_id,"edge_type":edge.edge_type,"relation_status":edge.relation_status,"input_hash":edge.input_hash,"rationale":edge.rationale},"1.4")
         claim_id = edge.to_node_id if self.nodes.get(edge.to_node_id, None) and self.nodes[edge.to_node_id].node_type=="CLAIM" else (edge.from_node_id if self.nodes.get(edge.from_node_id, None) and self.nodes[edge.from_node_id].node_type=="CLAIM" else None)
         self.audit_events.append(GraphAuditEvent("EDGE_REGISTERED",None,edge.edge_id,claim_id,edge.input_hash,"runtime"))
         return edge
@@ -322,5 +336,5 @@ class GraphRegistry:
             if not any(self.nodes[x].node_type in {"DATASET","MEASUREMENT"} for x in upstream):
                 raise ValueError("ANALYSIS requires DATASET or MEASUREMENT upstream")
 
-def build_registry() -> GraphRegistry:
-    return GraphRegistry.empty()
+def build_registry(store: SQLiteRuntimeStore | None = None) -> GraphRegistry:
+    return GraphRegistry.empty(store)
