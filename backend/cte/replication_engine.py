@@ -94,9 +94,11 @@ def evaluate_outcome(run:ReplicationRun, *, source_estimate:float|None, target_e
                      effect_tolerance:float=0.20,
                      protocol_fidelity:bool|None=None, measurement_fidelity:bool|None=None,
                      outcome_definition:bool|None=None, data_quality:bool|None=None)->ReplicationOutcome:
+    interval_provided=any(x is not None for x in (source_ci_low,source_ci_high,target_ci_low,target_ci_high))
+    interval_check=_interval(source_ci_low,source_ci_high,target_ci_low,target_ci_high) if interval_provided else True
     checks={"direction":_direction(source_effect_size,target_effect_size),
             "effect":_effect(source_effect_size,target_effect_size,effect_tolerance),
-            "interval":_interval(source_ci_low,source_ci_high,target_ci_low,target_ci_high),
+            "interval":interval_check,
             "protocol":protocol_fidelity,"measurement":measurement_fidelity,
             "outcome":outcome_definition,"data_quality":data_quality}
     unknown=[k for k,v in checks.items() if v is None]
