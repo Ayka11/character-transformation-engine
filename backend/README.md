@@ -1,15 +1,17 @@
 # Backend V2.1 Implementation Baseline
 
-This backend contains executable runtime implementations for selected V2.0/V1.3-V1.6 contracts. Runtime state is currently in-memory unless explicitly stated otherwise.
+This backend contains executable runtime implementations for the Master Matrix V1.0 and the V1.3-V1.9 execution contracts. Model-derived rules are explicitly marked and are not presented as empirically validated findings.
 
 Implemented runtime layers:
 - provenance tags and immutable content hashing
 - canonical Master Matrix V1.0 catalog (30 items, P1-P5)
 - assessment profile and daily-state derivation
 - C_cap calculation with UNKNOWN handling, A-E capacity levels and safety precedence
-- trait-graph traversal and intervention planning
-- 21-day sprint state machine
-- outcome evaluation and runtime lineage events
+- trait-graph traversal and root-cause intervention planning
+- 21-day sprint state machine with Safety Gate and consecutive-low-recovery Bio Reset pause
+- structured Compatibility Engine V1.0 with V1 Bio/Tempo, V2 ranked Values, V3 role-interaction vectors and scenario/intervention mapping
+- Level A recovery/digital-stimulus restriction protocol with 5-30 second micro-action window
+- explicit CURRENT STATE vs TRAIT isolation invariant
 - descriptive and longitudinal validation primitives
 - registered paired analysis with immutable dataset manifest hashing
 - canonical RESULT graph boundary
@@ -24,19 +26,24 @@ Implemented runtime layers:
 - shared SQLite durable runtime persistence for graph, orchestration, reporting and intervention state
 - FastAPI endpoints exposing the executable baseline
 
-Not yet implemented:
-- persistent database connection/storage for runtime registries
-- authentication/authorization
-- durable sprint/intervention persistence
-- full orchestrator event bus
-- executable V1.9 integration test runner
-- empirical validation of the model or its derived rules
+Compatibility Engine notes:
+- Compatibility never emits an authoritative scalar score.
+- V1 expects tempo, energy, reactivity and recovery. Energy/recovery accept Master Matrix aliases `subjective_energy` and `recovery_index`.
+- Tempo and reactivity are reported as missing when not explicitly supplied; the engine does not silently infer them from another P1 variable.
+- V2 computes Spearman rank correlation, top alignments, value gaps and explicitly labeled heuristic potential conflict zones.
+- V3 reports role-pair synergies/complementarity and competition; interaction defaults are model-derived.
+- Scenarios are rule-based interventions such as a 24-hour decision buffer for a material tempo gap. These rules are DRV, not empirical evidence.
+
+Recovery / Detox notes:
+- Level A is forced when `subjective_stress >= 8` or `C_cap < 3.0`; missing required capacity inputs remain UNKNOWN and safety-blocked.
+- Recovery below 4.0/10 for three consecutive supplied days triggers `BIO_RESET_DETOX` and pauses the sprint.
+- Compromised daily state is recorded separately from P2-P5 trait values; recovery logic does not rewrite a trait as "low" merely because the current state is compromised.
+- Recovery mode can restrict incoming stimuli, keep micro-actions within 5-30 seconds, and exclude cognitively costly behavioral tests. This is an executable model protocol, not a clinical detox claim.
 
 Important status boundary:
 - SPECIFIED contracts are not automatically IMPLEMENTED.
-- Runtime acceptance is not TESTED or VALIDATED.
+- Runtime acceptance is not TESTED or VALIDATED until the GitHub Actions test suite completes successfully.
 - Model-derived rules remain model-derived unless separately supported by empirical evidence.
+- Production PostgreSQL, authentication/authorization, observability, and empirical validation remain open work.
 
 Platform status: IMPLEMENTATION_BASELINE.
-
-Additional executable layers now include V1.6 Scientific Reporting and V1.7 Decision/Intervention runtime; both remain in-memory and are not empirically validated.
