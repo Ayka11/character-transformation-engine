@@ -163,8 +163,6 @@ def install_research_api(app: FastAPI, registry: GraphRegistry, store: SQLiteRun
 
     @app.post("/research/experiments/{experiment_id}/trials")
     def research_trial(experiment_id: str,p: TrialInput):
-        if p.experiment_id if hasattr(p,"experiment_id") else False:
-            pass
         return asdict(service.ingest_trial(experiment_id=experiment_id,**p.model_dump()))
 
     @app.post("/research/experiments/{experiment_id}/qc")
