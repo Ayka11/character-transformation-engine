@@ -894,6 +894,33 @@ def test_postgres_science_lab_provenance_rebind_matches_sqlite_after_restore():
     assert tampered_report["transformation_provenance"]["runs"][0]["certificate_id"] == pg_tp["certificate_id"]
     assert tampered_report["transformation_provenance"]["runs"][0]["ledger_id"] != "forged-ledger"
 
+    # Adversarial graph attack: durable transformation remains valid, but claim
+    # validation must fail when the trusted graph lineage is destroyed.
+    with cleanup.transaction() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                "DELETE FROM runtime_snapshots WHERE namespace='graph.node' AND key=%s",
+                (f"transform-{suffix}",),
+            )
+
+    attacked_service = object.__new__(ScienceLabService)
+    attacked_service.registry = GraphRegistry.empty(pg)
+    attacked_service.store = pg
+    attacked_service.research = None
+    attacked_service.coordinator = None
+    attacked_service.transformation_provenance = TransformationProvenanceBinder(pg)
+    attacked_service.matrices = {}
+    attacked_service.scenarios = {}
+    attacked_service.runs = {}
+    attacked_service.replication_assessments = {}
+    attacked_service.generalization_assessments = {}
+    attacked_service._hydrate()
+
+    attacked_claim = attacked_service.claim_validation(matrix_id)["claims"][0]
+    assert attacked_claim["transformation_support"]["status"] == "NOT_VALIDATED"
+    assert attacked_claim["transformation_support"]["graph_lineage_valid"] is False
+    assert "RESULT requires TRANSFORMATION lineage" in attacked_claim["transformation_support"]["issues"]
+
     with cleanup.transaction() as conn:
         with conn.cursor() as cur:
             cur.execute(
