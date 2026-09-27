@@ -1,0 +1,18 @@
+{
+  "version": "1.9",
+  "status": "MDL/DRV",
+  "checks": [
+    "every derived artifact references source artifact IDs",
+    "every derived artifact has input_hash",
+    "every rule-driven decision has rule_id and rule_version",
+    "every stochastic analysis records seed when applicable",
+    "every report has source_manifest_hash",
+    "every claim binding records supporting and limiting nodes",
+    "contradictions are preserved",
+    "synthetic fixtures are marked NON_EVIDENCE",
+    "module/schema versions are captured at execution boundaries"
+  ],
+  "failure_policy": "BLOCK_DOWNSTREAM",
+  "hash_policy": "SHA256_OR_EQUIVALENT_CONTENT_HASH",
+  "unknown_policy": "PRESERVE_UNKNOWN"
+}
