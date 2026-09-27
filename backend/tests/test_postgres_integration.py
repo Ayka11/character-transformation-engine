@@ -178,3 +178,35 @@ def test_postgres_transformation_executor_and_provenance_roundtrip():
                 "DELETE FROM runtime_snapshots WHERE namespace='transformation.certificate' AND key=%s",
                 (binding["certificate_id"],),
             )
+
+
+@pytest.mark.skipif(
+    not os.getenv("CTE_DATABASE_URL"),
+    reason="CTE_DATABASE_URL is required for live PostgreSQL integration",
+)
+def test_postgres_concurrent_transformation_guard_rejects_competing_request():
+    from concurrent.futures import ThreadPoolExecutor
+    from cte.contracts.errors import CTEError, CTEErrorCode
+    from cte.transformation_concurrency import TransformationConcurrencyGuard
+
+    dsn = os.environ["CTE_DATABASE_URL"]
+    character_id = f"pg-concurrency-{os.urandom(6).hex()}"
+
+    def acquire(request_hash):
+        return TransformationConcurrencyGuard(
+            PostgreSQLRuntimeStore(dsn)
+        ).acquire(character_id, 1, None, request_hash)
+
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        results = list(pool.map(acquire, ["request-A", "request-B"]))
+
+    successes = [r for r in results if not isinstance(r, Exception)]
+    assert len(successes) == 1
+
+    cleanup = PostgreSQLRuntimeStore(dsn)
+    with cleanup.transaction() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                "DELETE FROM runtime_snapshots WHERE namespace='transformation.lock' AND key=%s",
+                (f"{character_id}:1",),
+            )
