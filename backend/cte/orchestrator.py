@@ -90,6 +90,15 @@ class OrchestratorService:
                 p["execution_id"],p["correlation_id"],p["state"],tuple(p["required_stages"]),
                 stages,events,p.get("input_hash",""),p.get("output_hash")
             )
+        for snap in self.store.list_snapshots("orchestrator.module"):
+            p=snap.payload
+            self.modules[p["module_id"]]=ModuleRegistration(p["module_id"],p["version"],p["contract_version"],p["status"],p["immutable_hash"])
+        for snap in self.store.list_snapshots("orchestrator.schema"):
+            p=snap.payload
+            self.schemas[p["schema_id"]]=SchemaRegistration(p["schema_id"],p["version"],p["compatibility_policy"],p["immutable_hash"])
+        for snap in self.store.list_snapshots("orchestrator.rule"):
+            p=snap.payload
+            self.rules[p["rule_id"]]=RuleRegistration(p["rule_id"],p["version"],p["provenance_class"],p["status"],p["immutable_hash"])
 
     def _persist_execution(self,e:Execution):
         if self.store is None:
@@ -250,6 +259,10 @@ class OrchestratorService:
         item=ModuleRegistration(module_id,version,contract_version,status,
                                 content_hash({"module_id":module_id,"version":version,"contract_version":contract_version,"status":status}))
         self.modules[module_id]=item
+        if self.store is not None:
+            self.store.put_snapshot("orchestrator.module",module_id,{
+                "module_id":item.module_id,"version":item.version,"contract_version":item.contract_version,
+                "status":item.status,"immutable_hash":item.immutable_hash},"1.8")
         return item
 
     def register_schema(self,schema_id,version,compatibility_policy):
@@ -257,6 +270,10 @@ class OrchestratorService:
         item=SchemaRegistration(schema_id,version,compatibility_policy,
                                 content_hash({"schema_id":schema_id,"version":version,"compatibility_policy":compatibility_policy}))
         self.schemas[schema_id]=item
+        if self.store is not None:
+            self.store.put_snapshot("orchestrator.schema",schema_id,{
+                "schema_id":item.schema_id,"version":item.version,
+                "compatibility_policy":item.compatibility_policy,"immutable_hash":item.immutable_hash},"1.8")
         return item
 
     def register_rule(self,rule_id,version,provenance_class,status="REGISTERED"):
@@ -265,6 +282,10 @@ class OrchestratorService:
         item=RuleRegistration(rule_id,version,provenance_class,status,
                                content_hash({"rule_id":rule_id,"version":version,"provenance_class":provenance_class,"status":status}))
         self.rules[rule_id]=item
+        if self.store is not None:
+            self.store.put_snapshot("orchestrator.rule",rule_id,{
+                "rule_id":item.rule_id,"version":item.version,"provenance_class":item.provenance_class,
+                "status":item.status,"immutable_hash":item.immutable_hash},"1.8")
         return item
 
     def route(self,execution_id,module_id,stage_name)->dict:
