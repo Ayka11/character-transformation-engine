@@ -121,7 +121,8 @@ class GraphRegistry:
         payload.update({"current_state":current_state,"state":target_state,"result_id":result_id})
         claim=register_node(claim_id,"CLAIM",claim_id,provenance_class,"2.1.0",payload)
         self.add_node(claim)
-        self.add_edge(register_edge(f"{claim_id}:supports:{result_id}",self.nodes[result_id],claim,"SUPPORTS",rationale=f"claim transition {current_state} -> {target_state}"))
+        try:
+            self.add_edge(register_edge(f"{claim_id}:supports:{result_id}",self.nodes[result_id],claim,"SUPPORTS",rationale=f"claim transition {current_state} -> {target_state}"))
         return claim
 
     def require_lineage_for_result(self, result_id: str) -> None:
