@@ -138,7 +138,7 @@ def test_postgres_concurrent_immutable_snapshot_and_event_writes_are_idempotent(
 def test_postgres_transformation_executor_and_provenance_roundtrip():
     from cte.contracts.transformation import TransformationContract
     from cte.state_snapshot_store import StateSnapshotStore
-    from cte.transformation_ledger import TransformationLedger
+    from cte.transformation_ledger import TransformationLedger, TransformationLedgerEntry
     from cte.transformation_provenance import TransformationProvenanceBinder
     from cte.transformation_runtime import TransformationExecutor
 
@@ -286,17 +286,41 @@ def test_postgres_recovery_closes_after_ledger_commit_without_rerun():
         "1",
         expected_changes={"tempo": 6},
     )
+    # Simulate the exact crash window: ledger commit succeeded, but the
+    # terminal journal event was never written.
+    from types import SimpleNamespace
+    from cte.contracts.transformation import TransformationResult
+    durable_result = TransformationResult(
+        "VALIDATED",
+        None,
+        before.snapshot_id,
+        after.snapshot_id,
+        before.state_hash,
+        after.state_hash,
+        ("tempo",),
+        False,
+        {},
+    )
+    ledger_entry = TransformationLedgerEntry.from_execution(
+        SimpleNamespace(
+            execution_id=execution_id,
+            result=durable_result,
+            certificate=None,
+        ),
+        "pg-recovery-character",
+        contract,
+        request_hash=request_hash,
+    )
+    ledger.append(ledger_entry)
+
     service = TransformationRecoveryService(snapshots, ledger, journal)
+    assert len(service.scan()) == 1
     recovered = service.recover(attempt_id, contract)
 
     assert recovered.status == "RECOVERED"
     entry = ledger.find_by_request_hash(request_hash)
     assert entry is not None
     assert entry.status == "VALIDATED"
-
-    # Simulate the crash window: ledger is durable, terminal journal event was
-    # not yet written. Recovery must now see the attempt as terminally closed
-    # and must never execute the intervention again.
     assert service.scan() == []
 
     cleanup = PostgreSQLRuntimeStore(dsn)
