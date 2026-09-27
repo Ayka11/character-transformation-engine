@@ -80,3 +80,41 @@ def test_science_lab_lineage_can_reach_transformation_node():
     )
     nodes,edges=registry.claim_subgraph("claim:lineage-1")
     assert "transformation:lineage-1" in {n.node_id for n in nodes}
+
+
+def test_science_lab_report_exposes_transformation_provenance_without_promotion():
+    from cte.science_lab import ScienceLabService
+
+    db=SQLiteRuntimeStore(":memory:")
+    binder=TransformationProvenanceBinder(db)
+    registry=__import__("cte.graph_registry",fromlist=["GraphRegistry"]).GraphRegistry(db)
+
+    # A missing execution is deliberately not promoted to validated evidence.
+    tp=binder.bind_execution("report-missing")
+    assert tp["validated"] is False
+
+    service=object.__new__(ScienceLabService)
+    service.store=db
+    service.registry=registry
+    service.matrices={
+        "m1": __import__("cte.science_lab",fromlist=["ExperimentMatrix"]).ExperimentMatrix(
+            "m1","study-1","Matrix","outcome",{},("s1",),"ACTIVE","hash"
+        )
+    }
+    service.scenarios={
+        "s1": __import__("cte.science_lab",fromlist=["ScenarioDefinition"]).ScenarioDefinition(
+            "s1","m1","Scenario","desc",{},("outcome",),True,"hash"
+        )
+    }
+    service.runs={}
+    service.replication_assessments={}
+    service.generalization_assessments={}
+    service.claim_validation=lambda matrix_id: []
+    service.descriptive_statistics=lambda matrix_id: {
+        "scenario_count": 1, "run_count": 0, "completed_runs": 0,
+        "descriptive_estimate_mean": None
+    }
+
+    bundle=service.report_bundle("m1")
+    assert bundle["transformation_provenance"]["run_count"] == 0
+    assert bundle["transformation_provenance"]["all_runs_validated"] is False
