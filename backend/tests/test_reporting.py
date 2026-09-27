@@ -6,7 +6,7 @@ def _service():
     g=build_registry()
     d=register_node("d","DATASET","d","DRV","1",{})
     a=register_node("a","ANALYSIS","a","DRV","1",{})
-    r=register_node("r","RESULT","r","DRV","1",{"qc_status":"PASS"})
+    r=register_node("r","RESULT","r","DRV","1",{"qc_status":"PASS","validated_descriptive_result":True})
     for n in (d,a,r): g.add_node(n)
     g.add_edge(register_edge("ed",a,d,"ANALYZED_FROM"))
     g.add_edge(register_edge("er",a,r,"RESULTS_IN"))
@@ -28,3 +28,22 @@ def test_report_claim_binding_preserves_claim_language_rule():
     b=s.bind_claim("rr","c1")
     assert b.claim_status=="DESCRIPTIVE_RESULT"
     assert b.allowed_language_rule_id=="DESCRIPTIVE_STATUS"
+
+def test_full_report_lifecycle_reaches_immutable_published_state():
+    s=_service()
+    s.specs["rs"]=register_spec("rs","Test")
+    run=s.create("rr","rs","study-1",["r"])
+    for i,code in enumerate(SECTION_CODES):
+        s.add_section("rr",code,{"section":code},["r"],i)
+    s.bind_claim("rr","c1")
+    qc=s.qc_run("rr")
+    assert qc["status"]=="QC_PASSED"
+    published=s.publish("rr")
+    assert published.status=="PUBLISHED"
+    assert published.report_output_hash
+    try:
+        s.add_section("rr","EXECUTIVE_SUMMARY",{},["r"],0)
+    except ValueError as e:
+        assert "immutable" in str(e)
+    else:
+        assert False
