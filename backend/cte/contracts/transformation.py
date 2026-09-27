@@ -13,6 +13,7 @@ class TransformationContract:
     postconditions: tuple[dict[str, Any], ...] = ()
     reversible: bool = False
     idempotent: bool = False
+    rollback: Any | None = None
 
 @dataclass(frozen=True)
 class TransformationResult:
@@ -27,8 +28,8 @@ class TransformationResult:
     details: dict[str, Any] = field(default_factory=dict)
 
     @classmethod
-    def failed(cls, code: str, details: dict[str, Any] | None = None, *, before_snapshot_id: str = "", after_snapshot_id: str = ""):
-        return cls("FAILED", code, before_snapshot_id, after_snapshot_id, "", "", (), False, details or {})
+    def failed(cls, code: str, details: dict[str, Any] | None = None, *, before_snapshot_id: str = "", after_snapshot_id: str = "", status: str = "FAILED", before_hash: str = "", after_hash: str = "", changed_fields: tuple[str, ...] = ()):
+        return cls(status, code, before_snapshot_id, after_snapshot_id, before_hash, after_hash, changed_fields, False, details or {})
 
 def validate_transition(contract, diff, *, before_snapshot_id="", after_snapshot_id=""):
     if contract.expected_changes and not diff.state_changed:
