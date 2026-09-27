@@ -2,6 +2,7 @@
 from __future__ import annotations
 from dataclasses import dataclass, field
 from .evidence_graph import GraphNode, GraphEdge, register_node, register_edge
+from .provenance import content_hash
 
 @dataclass(frozen=True)
 class GraphAuditEvent:
@@ -111,9 +112,9 @@ class GraphRegistry:
         self.inference_blocks[inference_block_id]=item
         return item
 
-    def contradiction_requirements(self, claim_id: str) -> set[str]:
+    def contradiction_requirements(self, claim_ids: set[str]) -> set[str]:
         return {"unresolved_material_contradiction"} if any(
-            s.claim_id==claim_id and s.resolution_status in {"OPEN","UNRESOLVED"}
+            s.claim_id in claim_ids and s.resolution_status in {"OPEN","UNRESOLVED"}
             for s in self.contradiction_sets.values()) else set()
 
     def claim_subgraph(self, claim_id: str) -> tuple[list[GraphNode], list[GraphEdge]]:
@@ -237,7 +238,8 @@ class GraphRegistry:
                 raise ValueError("current_state does not match previous claim state")
             if result_id is None:
                 result_id=previous.metadata.get("result_id")
-        if target_state != "REGISTERED" or current_state != "HYPOTHESIS":
+        terminal_state=target_state in {"CONTRADICTED","INDETERMINATE"}
+        if not terminal_state and (target_state != "REGISTERED" or current_state != "HYPOTHESIS"):
             if not result_id:
                 raise ValueError("result_id is required for result-backed claim transitions")
         requirements={"claim_registration"} if current_state=="HYPOTHESIS" and target_state=="REGISTERED" else set()
