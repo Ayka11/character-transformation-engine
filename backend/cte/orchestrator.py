@@ -6,6 +6,9 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from .provenance import content_hash
 from .persistence import SQLiteRuntimeStore
+from .contracts.state import StateSnapshot, StateDiffEngine
+from .contracts.transformation import TransformationContract, TransformationResult, validate_transition
+
 
 LIFECYCLE=("INTAKE","PROFILE","ASSESSMENT","STATE_ESTIMATION","CAPACITY","RULE_ELIGIBILITY",
            "SAFETY_GATE","INTERVENTION","MEASUREMENT","QC","ANALYSIS","CLAIM",
@@ -296,6 +299,43 @@ class OrchestratorService:
         self.append_event(execution_id,"ROUTED",e.input_hash,None,f"{execution_id}:route:{stage_name}",
                           {"module_id":module_id,"module_version":module.version,"stage":stage_name})
         return {"execution_id":execution_id,"module_id":module_id,"module_version":module.version,"stage":stage_name}
+
+    def validate_transformation_transition(self, execution_id: str, contract: TransformationContract,
+                                        before: StateSnapshot, after: StateSnapshot) -> TransformationResult:
+        """Validate an executed intervention against immutable before/after snapshots.
+
+        This does not mutate production state. It records the transition outcome in the
+        existing orchestrator event stream and only permits a validated certificate path
+        when all transition invariants pass.
+        """
+        e=self._get(execution_id)
+        if e.state not in {"RUNNING", "FAILED"}:
+            raise ValueError("execution must be RUNNING or FAILED during transition validation")
+        if before.source_execution_id and before.source_execution_id != execution_id:
+            raise ValueError("before snapshot belongs to another execution")
+        if after.source_execution_id and after.source_execution_id != execution_id:
+            raise ValueError("after snapshot belongs to another execution")
+        diff=StateDiffEngine.compare(before,after,
+                                     expected=contract.expected_changes,
+                                     allowed=set(contract.allowed_changes),
+                                     forbidden=set(contract.forbidden_changes))
+        result=validate_transition(contract,diff,
+                                   before_snapshot_id=before.snapshot_id,
+                                   after_snapshot_id=after.snapshot_id)
+        self.append_event(execution_id,"TRANSITION_VALIDATED" if result.status=="VALIDATED" else "TRANSITION_FAILED",
+                          before.state_hash,after.state_hash,
+                          f"{execution_id}:transition:{before.snapshot_id}:{after.snapshot_id}",
+                          {"contract_id":contract.contract_id,"contract_version":contract.version,
+                           "status":result.status,"failure_code":result.failure_code,
+                           "changed_fields":list(result.changed_fields),"certificate_eligible":result.certificate_eligible,
+                           "before_snapshot_id":before.snapshot_id,"after_snapshot_id":after.snapshot_id,
+                           "lineage_hash_before":before.lineage_hash,"lineage_hash_after":after.lineage_hash})
+        if result.status=="FAILED":
+            e.state="FAILED"
+            self.append_event(execution_id,"EXECUTION_FAILED",before.state_hash,after.state_hash,
+                              f"{execution_id}:transition-failure",{"failure_code":result.failure_code,
+                              "rationale":result.details})
+        return result
 
     def provenance(self,execution_id)->dict:
         e=self._get(execution_id)
