@@ -27,3 +27,25 @@ def test_runtime_rejects_successful_noop_as_no_state_change():
     assert result.result.failure_code=="NO_STATE_CHANGE"
     assert not result.result.certificate_eligible
     assert result.after_snapshot_id is not None
+
+def test_certificate_exists_only_for_validated_transition():
+    ss=StateSnapshotStore(SQLiteRuntimeStore(":memory:"))
+    runtime=TransformationExecutor(ss)
+    ok=runtime.execute("e3","c1",30,{"tempo":5},
+        TransformationContract("t1","1",expected_changes={"tempo":6}),
+        lambda state:{**state,"tempo":6})
+    assert ok.certificate is not None
+    assert ok.certificate.execution_id=="e3"
+    assert ok.certificate.before_hash != ok.certificate.after_hash
+
+def test_intervention_exception_is_auditable_failure_without_certificate():
+    ss=StateSnapshotStore(SQLiteRuntimeStore(":memory:"))
+    runtime=TransformationExecutor(ss)
+    out=runtime.execute("e4","c1",40,{"tempo":5},
+        TransformationContract("t1","1",expected_changes={"tempo":6}),
+        lambda state: (_ for _ in ()).throw(RuntimeError("boom")))
+    assert out.result.status=="FAILED"
+    assert out.result.failure_code=="INTERVENTION_FAILED"
+    assert out.after_snapshot_id is None
+    assert out.certificate is None
+    assert out.before_snapshot_id=="e4:before:40"
