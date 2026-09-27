@@ -1,0 +1,49 @@
+{
+  "title": "Validation & Analytics Engine V1.3 — Analysis Specification",
+  "status": "MDL/DRV",
+  "pipeline": [
+    "REGISTER_SPEC",
+    "LOCK_DATASET_MANIFEST",
+    "QC",
+    "MISSINGNESS_ASSESSMENT",
+    "PRIMARY_ANALYSIS",
+    "EFFECT_SIZE",
+    "CONFIDENCE_INTERVAL",
+    "MULTIPLICITY",
+    "SENSITIVITY",
+    "REPLICATION_ASSESSMENT",
+    "CLAIM_DERIVATION",
+    "EVIDENCE_GRAPH_UPDATE",
+    "REPORT"
+  ],
+  "decision_rules": {
+    "qc_failed": "Do not issue final inferential interpretation.",
+    "material_missingness": "Run registered sensitivity analysis or mark result LIMITED/NOT_ESTIMABLE.",
+    "assumptions_failed": "Use an appropriate alternative model or mark INVALID/NOT_ESTIMABLE; record rationale.",
+    "effect_size_without_ci": "Allowed only for descriptive outputs where CI is not estimable; otherwise QC warning.",
+    "claim_status": "Claim level cannot exceed the strongest provenance-supported level.",
+    "evidence_status": "No automatic promotion from MDL/HYP/RPT/DRV to EVD."
+  },
+  "longitudinal_metrics": [
+    "absolute_change",
+    "relative_change",
+    "standardized_change",
+    "within_person_effect",
+    "between_group_difference_in_change"
+  ],
+  "report_requirements": [
+    "dataset manifest ID",
+    "analysis version",
+    "sample counts",
+    "missingness",
+    "primary estimate",
+    "effect size",
+    "confidence interval",
+    "p-value when appropriate",
+    "multiplicity handling",
+    "sensitivity analysis",
+    "limitations",
+    "claim level",
+    "provenance"
+  ]
+}
