@@ -92,7 +92,7 @@ Relevant current components:
 - `backend/tests/test_recovery.py`
 - `backend/tests/test_sprint.py`
 
-GitHub Actions is configured to run the backend suite on pushes to `main`. The latest successful GitHub Actions run is **#68** on the current `main`, with **131 passed** and the package-resolution/contract smoke checks also passing.
+GitHub Actions is configured to run the backend suite on pushes to `main`. The latest successful GitHub Actions run is **#86** on the current `main`, with **136 passed** and the package-resolution/contract smoke checks also passing. Research Execution V1.2 and V2.2 E2E coordinator tests are included.
 
 Therefore the repository runtime is **CI-TESTED**. It remains **IMPLEMENTATION_BASELINE** for scientific status because Compatibility/Recovery rules are still model-derived and have not undergone empirical validation.
 
