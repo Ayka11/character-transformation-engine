@@ -572,6 +572,16 @@ class ScienceLabService:
             if node.node_type != "CLAIM":
                 continue
             if node.metadata.get("execution_id") in execution_ids:
+                execution_id = node.metadata.get("execution_id")
+                run = next((
+                    (r for r in self.runs.values()
+                     if r.matrix_id == matrix_id and r.execution_id == execution_id),
+                    None,
+                )
+                tp = dict(run.transformation_provenance) if run else {}
+                transformation_supported = bool(
+                    tp.get("validated") and tp.get("integrity_status") == "PASS"
+                )
                 claims.append({
                     "claim_id": node.node_id,
                     "state": node.metadata.get("state"),
@@ -579,6 +589,14 @@ class ScienceLabService:
                     "requirements": sorted(self.registry.claim_requirements(
                         node.metadata.get("result_id")
                     )) if node.metadata.get("result_id") in self.registry.nodes else [],
+                    "transformation_support": {
+                        "status": "VALIDATED" if transformation_supported else "NOT_VALIDATED",
+                        "execution_id": execution_id,
+                        "ledger_id": tp.get("ledger_id"),
+                        "certificate_id": tp.get("certificate_id"),
+                        "integrity_status": tp.get("integrity_status"),
+                        "issues": list(tp.get("issues") or []),
+                    },
                 })
         return {"matrix_id": matrix_id, "claims": claims,
                 "scientific_status": "IMPLEMENTATION_BASELINE"}
