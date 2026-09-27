@@ -1,0 +1,70 @@
+{
+  "version": "1.8",
+  "status": "MDL/DRV",
+  "modules": [
+    "master-matrix",
+    "runtime",
+    "research-execution",
+    "validation-analytics",
+    "evidence-claim-graph",
+    "replication-generalization",
+    "scientific-reporting",
+    "decision-intervention",
+    "orchestrator"
+  ],
+  "cross_layer_contracts": [
+    {
+      "id": "INT-001",
+      "rule": "Every derived artifact references source artifact IDs and hashes."
+    },
+    {
+      "id": "INT-002",
+      "rule": "Every decision references a rule ID/version or is explicitly marked manual."
+    },
+    {
+      "id": "INT-003",
+      "rule": "Evidence status cannot be upgraded by orchestration alone."
+    },
+    {
+      "id": "INT-004",
+      "rule": "Research analysis requires immutable dataset manifest."
+    },
+    {
+      "id": "INT-005",
+      "rule": "Replication requires registered criteria."
+    },
+    {
+      "id": "INT-006",
+      "rule": "Generalization requires a declared transport target and boundaries."
+    },
+    {
+      "id": "INT-007",
+      "rule": "Reports preserve claim status, contradiction and limitations."
+    },
+    {
+      "id": "INT-008",
+      "rule": "Safety blocks have precedence over promotion/adaptation."
+    },
+    {
+      "id": "INT-009",
+      "rule": "Unknown data never silently becomes a positive value."
+    },
+    {
+      "id": "INT-010",
+      "rule": "All module versions are captured at execution time."
+    }
+  ],
+  "canonical_identity": [
+    "execution_id",
+    "correlation_id",
+    "input_hash",
+    "output_hash",
+    "provenance_record_id"
+  ],
+  "non_goals": [
+    "automatic scientific validation",
+    "automatic clinical diagnosis",
+    "universal personality ranking",
+    "single-number compatibility authority"
+  ]
+}
