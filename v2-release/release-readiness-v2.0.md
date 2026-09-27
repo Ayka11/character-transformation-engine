@@ -54,7 +54,7 @@ As of the current V2.1 backend baseline:
 - V1.8 orchestration has executable lifecycle/event runtime.
 - V1.9 synthetic E2E contract coverage and the V2.2 Research E2E coordinator are executed successfully in GitHub Actions run #86.
 - Durable SQLite runtime adapters are implemented for graph, orchestration, reporting, intervention and Research/Science Lab state; a PostgreSQL production adapter and runtime migration are implemented, and live snapshot/event integration is CI-tested against postgres:16 in run #124.
-- Live PostgreSQL deployment/migration execution, authentication/authorization, observability, backup/recovery, rollback operations and empirical validation remain open release gates.
+- Production deployment/rollback operations, authentication/authorization, observability, backup/recovery, rate limits and empirical validation remain open release gates.
 - GitHub CI workflow is registered and the latest current-main run (#86) completed successfully with 136 backend tests passing.
 
 **Important:** a checked architecture item does not imply that the corresponding implementation, executed test status, or scientific validation exists.
