@@ -20,11 +20,10 @@ def test_integrity_detects_lineage_hash_tampering():
     )
     entry=ledger.list()[0]
     with db._connect() as conn:
+        forged_payload = '{"snapshot_id":"%s","character_id":"c1","sequence":2,"state":{"tempo":6},"state_hash":"%s","lineage_hash":"FORGED","parent_snapshot_id":"%s","source_execution_id":"audit1","schema_version":"1.0","canonicalization_version":"1.0"}' % (entry.after_snapshot_id, entry.after_hash, entry.before_snapshot_id)
         conn.execute(
             "UPDATE runtime_snapshots SET payload_json=? WHERE namespace='state.snapshot' AND key=?",
-            ('{"snapshot_id":"%s","character_id":"c1","sequence":2,"state":{"tempo":6},"state_hash":"%s","lineage_hash":"FORGED","parent_snapshot_id":"%s","source_execution_id":"audit1","schema_version":"1.0","canonicalization_version":"1.0"}'
-            % (entry.after_snapshot_id, entry.after_hash, entry.before_snapshot_id),
-            entry.after_snapshot_id,
+            (forged_payload, entry.after_snapshot_id),
         )
         conn.commit()
     finding=TransformationIntegrityVerifier(ss,ledger).verify(entry.ledger_id)
