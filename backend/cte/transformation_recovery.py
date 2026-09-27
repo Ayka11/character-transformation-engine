@@ -6,7 +6,7 @@ from types import SimpleNamespace
 from .persistence import build_runtime_store
 from .provenance import content_hash
 from .contracts.state import StateDiffEngine
-from .contracts.transformation import validate_transition, TransformationCertificate
+from .contracts.transformation import validate_transition, TransformationCertificate, TransformationResult
 from .state_snapshot_store import StateSnapshotStore
 from .transformation_ledger import TransformationLedger, TransformationLedgerEntry
 
@@ -96,6 +96,32 @@ class TransformationRecoveryService:
             return recovered
         after = self.snapshots.get(attempt.after_snapshot_id) if attempt.after_snapshot_id else None
         before = self.snapshots.get(attempt.before_snapshot_id)
+        if after is None:
+            if before is None:
+                raise ValueError("recovery requires durable before snapshot")
+            result = TransformationResult.failed(
+                "INTERVENTION_OUTCOME_UNKNOWN",
+                {"recovery_status":"OUTCOME_UNKNOWN","rerun_forbidden":True},
+                before_snapshot_id=before.snapshot_id,
+            )
+            execution = SimpleNamespace(
+                execution_id=attempt.execution_id,
+                before_snapshot_id=before.snapshot_id,
+                after_snapshot_id=None,
+                result=result,
+                certificate=None,
+            )
+            entry = TransformationLedgerEntry.from_execution(
+                execution, attempt.character_id, contract, request_hash=attempt.request_hash)
+            self.ledger.append(entry)
+            recovered = JournalAttempt(**{**attempt.__dict__,"status":"RECOVERED"})
+            self.journal.record(
+                recovered, "RECOVERED",
+                recovered_status=result.status,
+                ledger_id=entry.ledger_id,
+                rerun_forbidden=True,
+            )
+            return recovered
         if after is None or before is None:
             raise ValueError("recovery requires durable before and after snapshots")
         if not self.snapshots.verify(before.snapshot_id) or not self.snapshots.verify(after.snapshot_id):
