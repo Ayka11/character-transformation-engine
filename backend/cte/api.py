@@ -408,6 +408,26 @@ def graph_claim(p: ClaimInput):
     claim=GRAPH_REGISTRY.register_claim(p.claim_id,p.result_id,p.current_state,p.target_state,p.provenance_class,p.metadata,p.previous_claim_id)
     return {"claim":asdict(claim),"supported_result_id":claim.metadata.get("result_id") if p.result_id is None else p.result_id}
 
+@app.get("/graph/claims/{claim_id}")
+def graph_claim_subgraph(claim_id: str):
+    nodes,edges=GRAPH_REGISTRY.claim_subgraph(claim_id)
+    return {"claim_id":claim_id,"nodes":[asdict(n) for n in nodes],"edges":[asdict(e) for e in edges]}
+
+@app.get("/graph/claims/{claim_id}/lineage")
+def graph_claim_lineage(claim_id: str):
+    nodes,edges=GRAPH_REGISTRY.claim_subgraph(claim_id)
+    return {"claim_id":claim_id,"nodes":[asdict(n) for n in nodes],"edges":[asdict(e) for e in edges]}
+
+@app.get("/graph/claims/{claim_id}/support")
+def graph_claim_support(claim_id: str):
+    nodes,edges=GRAPH_REGISTRY.claim_subgraph(claim_id)
+    allowed={"SUPPORTS","REPLICATES","GENERALIZES","QUALIFIES","CONTRADICTS","LIMITS","BLOCKS"}
+    return {"claim_id":claim_id,"edges":[asdict(e) for e in edges if e.edge_type in allowed]}
+
+@app.get("/graph/audit/{claim_id}")
+def graph_claim_audit(claim_id: str):
+    return {"claim_id":claim_id,"events":[asdict(e) for e in GRAPH_REGISTRY.claim_audit(claim_id)]}
+
 @app.get("/graph/lineage/{node_id}")
 def graph_lineage(node_id: str):
     if node_id not in GRAPH_REGISTRY.nodes:
