@@ -53,6 +53,8 @@ As of the current V2.1 backend baseline:
 - V1.7 decision/intervention has executable safety-first runtime.
 - V1.8 orchestration has executable lifecycle/event runtime.
 - V1.9 synthetic E2E contract coverage has been added as tests, but those tests have not been executed in this environment.
-- Persistent database/event storage, authentication, production observability and empirical validation remain open release gates.
+- Durable SQLite runtime adapters are implemented for graph, orchestration, reporting and intervention state; research runtime hydration is graph-backed.
+- Production PostgreSQL migration/transactions, authentication, observability and empirical validation remain open release gates.
+- GitHub CI workflow is registered, but no workflow run/status is currently visible for the API-created commits.
 
 **Important:** a checked architecture item does not imply that the corresponding implementation, executed test status, or scientific validation exists.
