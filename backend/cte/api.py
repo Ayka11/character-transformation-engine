@@ -534,7 +534,7 @@ def compatibility(p: CompatibilityInput):
 REPORT_SERVICE = install_reporting_api(app, GRAPH_REGISTRY)
 
 
-INTERVENTION_SERVICE = install_intervention_api(app, GRAPH_REGISTRY)
+INTERVENTION_SERVICE = install_intervention_api(app, GRAPH_REGISTRY, RUNTIME_STORE)
 
 
 ORCHESTRATOR_SERVICE = install_orchestrator_api(app, RUNTIME_STORE)
