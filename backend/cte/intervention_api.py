@@ -30,6 +30,7 @@ class InterventionAssignInput(BaseModel):
     source_assessment_id:str|None=None
     source_claim_ids:list[str]=Field(default_factory=list)
     context_flags:list[str]=Field(default_factory=list)
+    execution_id:str|None=None
 
 class InterventionSessionInput(BaseModel):
     session_id:str
@@ -83,7 +84,7 @@ def install_intervention_api(app, graph_registry, store:SQLiteRuntimeStore|None=
     def assign(p:InterventionAssignInput):
         try:
             return asdict(service.assign(p.assignment_id,p.user_id,p.rule_id,p.domain,p.required_inputs,p.current_level,
-                p.safety_status,p.data_quality_status,p.source_assessment_id,p.source_claim_ids,set(p.context_flags)))
+                p.safety_status,p.data_quality_status,p.source_assessment_id,p.source_claim_ids,set(p.context_flags),p.execution_id))
         except ValueError as e:
             raise HTTPException(400,str(e))
 
