@@ -325,12 +325,12 @@ class OrchestratorService:
                                *, parent_snapshot_id: str | None = None):
         """Execute the INTERVENTION boundary through the validated transition runtime."""
         e=self._get(execution_id)
-        if e.state != "RUNNING":
-            raise ValueError("execution must be RUNNING")
         if "SAFETY_GATE" in e.required_stages:
             safety=e.stages["SAFETY_GATE"]
             if safety.state != "PASSED" or safety.metadata.get("safety_status") != "PASS":
                 raise ValueError("transformation requires a passed safety gate")
+        if e.state != "RUNNING":
+            raise ValueError("execution must be RUNNING")
         if "INTERVENTION" not in e.required_stages:
             raise ValueError("execution does not declare INTERVENTION as a required stage")
         from .transformation_runtime import TransformationExecutor
