@@ -1,0 +1,32 @@
+{
+  "version": "1.7",
+  "status": "MDL/DRV",
+  "flow": [
+    "PROFILE_STATE",
+    "ASSESSMENT",
+    "RULE_ELIGIBILITY",
+    "SAFETY_GATE",
+    "INTERVENTION_ASSIGNMENT",
+    "SESSION",
+    "MEASUREMENT",
+    "RESPONSE",
+    "ADAPTATION",
+    "RESEARCH_LINK"
+  ],
+  "provenance_requirements": [
+    "rule_id and rule_version",
+    "input_snapshot_hash",
+    "decision_rule",
+    "decision_explanation",
+    "measurement provenance",
+    "research-link provenance"
+  ],
+  "evidence_boundaries": {
+    "runtime_data": "OBSERVATION_OR_MEASUREMENT",
+    "derived_adaptation": "DRV",
+    "registered_model_rule": "MDL",
+    "registered_hypothesis_rule": "HYP",
+    "validated_external_or_internal_evidence": "EVD",
+    "self_report": "RPT"
+  }
+}
