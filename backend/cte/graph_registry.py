@@ -266,9 +266,20 @@ class GraphRegistry:
         if not terminal_state and (target_state != "REGISTERED" or current_state != "HYPOTHESIS"):
             if not result_id:
                 raise ValueError("result_id is required for result-backed claim transitions")
+        linked_claim_ids={claim_id}
+        if previous_claim_id:
+            linked_claim_ids.add(previous_claim_id)
         requirements={"claim_registration"} if current_state=="HYPOTHESIS" and target_state=="REGISTERED" else set()
+        if target_state=="CONTRADICTED":
+            requirements |= self.contradiction_requirements(linked_claim_ids)
+        if target_state=="INDETERMINATE":
+            requirements |= self.indeterminate_requirements(linked_claim_ids,result_id)
+        if result_id and not terminal_state:
+            requirements=self.claim_requirements(result_id,linked_claim_ids) | requirements
         if result_id:
-            requirements=self.claim_requirements(result_id) | requirements
+            blocked=self.blocked_by_inference_rules(result_id,target_state)
+            if blocked:
+                raise ValueError("inference block: "+",".join(x.rule_id for x in blocked))
         from .claim_gate import validate_claim_transition
         validate_claim_transition(current_state,target_state,requirements,provenance_class)
         payload=dict(metadata)
