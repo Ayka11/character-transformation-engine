@@ -222,6 +222,30 @@ class GraphRegistry:
             req.add("complete_provenance")
         return req
 
+    def indeterminate_requirements(self, claim_ids: set[str], result_id: str | None) -> set[str]:
+        has_conflict=any(
+            s.claim_id in claim_ids and s.resolution_status in {"OPEN","UNRESOLVED"}
+            for s in self.contradiction_sets.values()
+        )
+        has_insufficient=bool(result_id and self.nodes[result_id].metadata.get("insufficient_information",False))
+        has_not_estimable=bool(result_id and self.nodes[result_id].metadata.get("qc_status")=="NOT_ESTIMABLE")
+        return {"insufficient_or_conflicting_information"} if (has_conflict or has_insufficient or has_not_estimable) else set()
+
+    def blocked_by_inference_rules(self, result_id: str, target_state: str) -> list[InferenceBlock]:
+        if result_id not in self.nodes or self.nodes[result_id].node_type!="RESULT":
+            raise ValueError("RESULT node is not registered")
+        nodes=[self.nodes[result_id],*self._upstream_nodes(result_id)]
+        blocked=[]
+        for rule in self.inference_blocks.values():
+            if rule.to_claim_level != target_state:
+                continue
+            for node in nodes:
+                md=node.metadata or {}
+                if node.node_type==rule.from_node_type or md.get("kind")==rule.from_node_type or md.get("inference_type")==rule.from_node_type:
+                    blocked.append(rule)
+                    break
+        return blocked
+
     def register_claim(self, claim_id: str, result_id: str | None, current_state: str,
                        target_state: str, provenance_class: str, metadata: dict,
                        previous_claim_id: str | None = None) -> GraphNode:
