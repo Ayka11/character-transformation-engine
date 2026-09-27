@@ -247,6 +247,8 @@ class OrchestratorService:
                 raise ValueError("INTERVENTION must be PASSED before completion")
             if md.get("transition_status") != "VALIDATED":
                 raise ValueError("INTERVENTION completion requires VALIDATED transition")
+            if md.get("transition_status") in {"PARTIAL", "ROLLBACK_FAILED", "FAILED"}:
+                raise ValueError("non-validated transformation cannot complete execution")
             if not md.get("certificate_id"):
                 raise ValueError("INTERVENTION completion requires transformation certificate")
             if not md.get("before_snapshot_id") or not md.get("after_snapshot_id"):
