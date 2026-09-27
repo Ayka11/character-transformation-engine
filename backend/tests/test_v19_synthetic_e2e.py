@@ -33,7 +33,8 @@ def test_v19_synthetic_end_to_end_contract():
     for i,code in enumerate(SECTION_CODES):
         reports.add_section("report",code,{"section":code},["result"],i)
     reports.bind_claim("report","c5")
-    assert reports.qc_run("report")["status"]=="QC_PASSED"
+    qc=reports.qc_run("report")
+    assert qc["status"]=="QC_PASSED", qc
     assert reports.publish("report").status=="PUBLISHED"
 
     orch=OrchestratorService()
