@@ -86,6 +86,14 @@ class ClaimInput(BaseModel):
     metadata: dict = Field(default_factory=dict)
     previous_claim_id: str | None = None
 
+class ContradictionInput(BaseModel):
+    contradiction_set_id: str
+    claim_id: str
+    node_ids: list[str]
+    contradiction_type: str
+    resolution_status: str = "UNRESOLVED"
+    resolution_note: str | None = None
+
 class EvidenceCriteriaInput(BaseModel):
     criteria_id: str
     claim_id: str
@@ -376,6 +384,13 @@ def validation_generalization(p: GeneralizationInput):
     GRAPH_REGISTRY.add_node(node)
     GRAPH_REGISTRY.add_edge(register_edge(f"{p.generalization_id}:generalizes:{p.source_result_id}",node,GRAPH_REGISTRY.nodes[p.source_result_id],"GENERALIZES",rationale="registered generalization record"))
     return {"record":asdict(record),"graph_node":asdict(node)}
+
+@app.post("/graph/contradictions")
+def graph_contradiction(p: ContradictionInput):
+    return asdict(GRAPH_REGISTRY.register_contradiction_set(
+        p.contradiction_set_id,p.claim_id,p.node_ids,p.contradiction_type,
+        p.resolution_status,p.resolution_note
+    ))
 
 @app.post("/graph/evidence-criteria")
 def graph_evidence_criteria(p: EvidenceCriteriaInput):
