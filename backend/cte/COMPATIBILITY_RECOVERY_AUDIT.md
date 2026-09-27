@@ -1,6 +1,6 @@
 # Compatibility & Recovery Audit — Master Matrix V1.0
 
-Status: IMPLEMENTED / NOT EMPIRICALLY VALIDATED
+Status: IMPLEMENTED / CI-TESTED / NOT EMPIRICALLY VALIDATED
 
 ## 1. Compatibility Engine V1.0
 
@@ -92,9 +92,9 @@ Relevant current components:
 - `backend/tests/test_recovery.py`
 - `backend/tests/test_sprint.py`
 
-GitHub Actions is configured to run the backend suite on pushes to `main`. The latest observed run (#39) executed pytest and reported 97 passed / 34 failed. The failures are in pre-existing claim-gate, graph-lineage, persistence and longitudinal contracts; the new Compatibility/Recovery tests were not present among the reported failures.
+GitHub Actions is configured to run the backend suite on pushes to `main`. The latest successful GitHub Actions run is **#68** on the current `main`, with **131 passed** and the package-resolution/contract smoke checks also passing.
 
-Therefore the repository status remains **IMPLEMENTATION_BASELINE**, not fully TESTED/VALIDATED.
+Therefore the repository runtime is **CI-TESTED**. It remains **IMPLEMENTATION_BASELINE** for scientific status because Compatibility/Recovery rules are still model-derived and have not undergone empirical validation.
 
 ## 6. Remaining architectural gaps
 
