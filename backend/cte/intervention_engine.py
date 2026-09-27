@@ -184,8 +184,9 @@ class InterventionService:
         if assignment is None: raise ValueError("assignment is not registered")
         if session_id in assignment.sessions: raise ValueError("session already registered")
         if assignment.safety_gate_status!="PASS":
-            status=assignment.safety_gate_status.lower()
-            raise ValueError(f"assignment is {status}; safety gate is not PASS")
+            if assignment.safety_gate_status=="BLOCK":
+                raise ValueError("assignment is blocked; safety gate is not PASS")
+            raise ValueError("assignment is not executable; safety gate is not PASS")
         session=Session(session_id,assignment_id,dict(planned_load))
         assignment.sessions[session_id]=session
         assignment.audit.append(self._audit("SESSION_CREATED",assignment_id,{"session_id":session_id}))
@@ -244,6 +245,7 @@ class InterventionService:
             "BLOCKED" if safety_status=="BLOCK" else ("UNKNOWN" if response_status=="UNKNOWN" else "SAFE"))
         assignment.adaptations.append(item)
         assignment.audit.append(self._audit("ADAPTATION_DECIDED",assignment_id,{"adaptation":item.decision,"next_level":next_level}))
+        self._persist_assignment(assignment)
         return item
 
     def research_link(self,session_id,relation,result_node_id=None,claim_id=None):
