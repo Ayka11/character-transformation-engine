@@ -1,0 +1,40 @@
+{
+  "fixture_id": "CTE-E2E-SYNTHETIC-001",
+  "status": "NON_EVIDENCE_TEST_FIXTURE",
+  "execution_mode": "RUNTIME",
+  "stages": [
+    "validate_input",
+    "resolve_profile",
+    "assess_state",
+    "estimate_capacity",
+    "resolve_rule_eligibility",
+    "safety_gate",
+    "execute_intervention",
+    "capture_measurements",
+    "qc",
+    "analysis",
+    "claim",
+    "replication",
+    "generalization",
+    "report",
+    "adapt",
+    "audit"
+  ],
+  "expected": {
+    "input_valid": true,
+    "safety_gate": "PASS",
+    "qc": "PASS",
+    "claim_status": "DESCRIPTIVE_RESULT",
+    "replication_status": "NOT_RUN_OR_NOT_APPLICABLE",
+    "generalization_status": "NOT_RUN_OR_NOT_APPLICABLE",
+    "report_status": "PUBLISHED",
+    "adaptation_decision": "HOLD_OR_CONTINUE",
+    "final_execution_status": "COMPLETED"
+  },
+  "guardrails": [
+    "fixture data cannot create EVD",
+    "fixture claims remain test-only",
+    "fixture must carry synthetic provenance",
+    "fixture must not be mixed into research datasets"
+  ]
+}
