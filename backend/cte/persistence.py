@@ -10,6 +10,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from .provenance import content_hash
 
+MUTABLE_SNAPSHOT_NAMESPACES = {"orchestrator.execution", "intervention.assignment", "report.run"}
+
 @dataclass(frozen=True)
 class Snapshot:
     namespace:str
@@ -66,9 +68,16 @@ class SQLiteRuntimeStore:
                 (namespace,key)
             ).fetchone()
             if row is not None:
-                if row[1] != payload_hash:
-                    raise ValueError("immutable snapshot conflict")
-                return Snapshot(namespace,key,row[0],payload,payload_hash)
+                if row[1] == payload_hash:
+                    return Snapshot(namespace,key,row[0],payload,payload_hash)
+                if namespace in MUTABLE_SNAPSHOT_NAMESPACES:
+                    conn.execute(
+                        "UPDATE runtime_snapshots SET version=?, payload_json=?, payload_hash=? WHERE namespace=? AND key=?",
+                        (version,json.dumps(payload,sort_keys=True,separators=(",",":")),payload_hash,namespace,key)
+                    )
+                    conn.commit()
+                    return Snapshot(namespace,key,version,payload,payload_hash)
+                raise ValueError("immutable snapshot conflict")
             conn.execute(
                 "INSERT INTO runtime_snapshots(namespace,key,version,payload_json,payload_hash) VALUES(?,?,?,?,?)",
                 (namespace,key,version,json.dumps(payload,sort_keys=True,separators=(",",":")),payload_hash)
