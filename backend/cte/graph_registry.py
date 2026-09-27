@@ -1,12 +1,22 @@
 """In-memory executable registry for the evidence graph lineage contract."""
 from __future__ import annotations
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from .evidence_graph import GraphNode, GraphEdge, register_node, register_edge
+
+@dataclass(frozen=True)
+class GraphAuditEvent:
+    operation: str
+    node_id: str | None
+    edge_id: str | None
+    claim_id: str | None
+    payload_hash: str
+    actor_type: str
 
 @dataclass
 class GraphRegistry:
     nodes: dict[str, GraphNode]
     edges: dict[str, GraphEdge]
+    audit_events: list[GraphAuditEvent] = field(default_factory=list)
 
     @classmethod
     def empty(cls) -> "GraphRegistry":
@@ -19,6 +29,8 @@ class GraphRegistry:
                 raise ValueError("immutable node conflict")
             return existing
         self.nodes[node.node_id]=node
+        self.audit_events.append(GraphAuditEvent("NODE_REGISTERED",node.node_id,None,
+            node.node_id if node.node_type=="CLAIM" else None,node.immutable_hash,"runtime"))
         return node
 
     def add_edge(self, edge: GraphEdge) -> GraphEdge:
@@ -30,9 +42,37 @@ class GraphRegistry:
         if edge.from_node_id not in self.nodes or edge.to_node_id not in self.nodes:
             raise ValueError("edge references unknown node")
         self.edges[edge.edge_id]=edge
+        claim_id = edge.to_node_id if self.nodes.get(edge.to_node_id, None) and self.nodes[edge.to_node_id].node_type=="CLAIM" else (edge.from_node_id if self.nodes.get(edge.from_node_id, None) and self.nodes[edge.from_node_id].node_type=="CLAIM" else None)
+        self.audit_events.append(GraphAuditEvent("EDGE_REGISTERED",None,edge.edge_id,claim_id,edge.input_hash,"runtime"))
         return edge
 
 
+    def claim_subgraph(self, claim_id: str) -> tuple[list[GraphNode], list[GraphEdge]]:
+        claim=self.nodes.get(claim_id)
+        if claim is None or claim.node_type!="CLAIM":
+            raise ValueError("claim is not registered")
+        seen={claim_id}
+        queue=[claim_id]
+        while queue:
+            current=queue.pop()
+            for edge in self.edges.values():
+                if edge.to_node_id != current or edge.from_node_id in seen:
+                    continue
+                if edge.from_node_id not in self.nodes:
+                    continue
+                seen.add(edge.from_node_id)
+                queue.append(edge.from_node_id)
+        nodes=[self.nodes[nid] for nid in seen]
+        edges=[e for e in self.edges.values() if e.from_node_id in seen and e.to_node_id in seen]
+        return nodes,edges
+
+    def claim_audit(self, claim_id: str) -> list[GraphAuditEvent]:
+        nodes,edges=self.claim_subgraph(claim_id)
+        ids={n.node_id for n in nodes}
+        edge_ids={e.edge_id for e in edges}
+        return [e for e in self.audit_events if (e.claim_id==claim_id) or
+                (e.node_id in ids) or (e.edge_id in edge_ids)]
+    
     def upstream_types(self, node_id: str) -> set[str]:
         if node_id not in self.nodes:
             raise ValueError("node is not registered")
