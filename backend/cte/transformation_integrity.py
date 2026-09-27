@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from .transformation_ledger import TransformationLedger
 from .state_snapshot_store import StateSnapshotStore
+from .contracts.state import StateDiffEngine
 from .provenance import content_hash
 
 @dataclass(frozen=True)
@@ -61,6 +62,22 @@ class TransformationIntegrityVerifier:
             issues.append("VALIDATED_WITHOUT_CERTIFICATE")
         if not expected_certificate and entry.certificate_id:
             issues.append("FAILED_WITH_CERTIFICATE")
+        if entry.status=="VALIDATED" and entry.certificate_id and before is not None and entry.after_snapshot_id:
+            after=self.snapshots.get(entry.after_snapshot_id)
+            if after is not None:
+                diff=StateDiffEngine.compare(before,after)
+                certificate_payload={
+                    "execution_id":entry.execution_id,
+                    "contract_id":entry.contract_id,
+                    "contract_version":entry.contract_version,
+                    "before_snapshot_id":entry.before_snapshot_id,
+                    "after_snapshot_id":entry.after_snapshot_id,
+                    "before_hash":entry.before_hash,
+                    "after_hash":entry.after_hash,
+                    "changed_fields":sorted(diff.changed),
+                }
+                if content_hash(certificate_payload) != entry.certificate_id:
+                    issues.append("CERTIFICATE_HASH_MISMATCH")
         return IntegrityFinding(ledger_id,"PASS" if not issues else "FAIL",tuple(issues))
 
     def verify_all(self):
