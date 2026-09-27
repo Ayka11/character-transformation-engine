@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from typing import Callable, Any
 from .contracts.state import StateSnapshot, StateDiffEngine
 from .contracts.transformation import TransformationContract, TransformationResult, TransformationCertificate, validate_transition
+from .state_snapshot_store import SQLiteRuntimeStore
 from .state_snapshot_store import StateSnapshotStore
 from .transformation_ledger import TransformationLedger, TransformationLedgerEntry
 from .transformation_recovery import TransformationJournal, JournalAttempt
@@ -29,10 +30,10 @@ class TransformationExecutor:
             self.journal=TransformationJournal(isolated_store)
             self.concurrency=TransformationConcurrencyGuard(isolated_store)
         else:
-            self.snapshots = snapshot_store or StateSnapshotStore()
-            self.ledger = ledger or TransformationLedger(self.snapshots.store)
-            self.journal = journal or TransformationJournal(self.snapshots.store)
-            self.concurrency = concurrency_guard or TransformationConcurrencyGuard(self.snapshots.store)
+            self.snapshots=snapshot_store or StateSnapshotStore()
+            self.ledger=ledger or TransformationLedger(self.snapshots.store)
+            self.journal=journal or TransformationJournal(self.snapshots.store)
+            self.concurrency=concurrency_guard or TransformationConcurrencyGuard(self.snapshots.store)
 
     def execute(self, execution_id: str, character_id: str, sequence: int,
                 state: dict[str, Any], contract: TransformationContract,
@@ -41,59 +42,56 @@ class TransformationExecutor:
         request_hash=content_hash({
             "execution_id":execution_id,"character_id":character_id,"sequence":sequence,
             "state":state,"contract_id":contract.contract_id,"contract_version":contract.version,
-            "parent_snapshot_id":parent_snapshot_id
-        })
+            "parent_snapshot_id":parent_snapshot_id})
         existing=self.ledger.find_by_request_hash(request_hash)
         if existing is not None:
             return self._replay_existing(existing)
         try:
-            self.concurrency.acquire(character_id, sequence, parent_snapshot_id, request_hash)
+            self.concurrency.acquire(character_id,sequence,parent_snapshot_id,request_hash)
         except Exception as exc:
-            code=getattr(exc, "code", "VERSION_CONFLICT")
-            details=getattr(exc, "details", {"error":str(exc)})
-            result=TransformationResult.failed(code, details, status="FAILED", before_snapshot_id="")
-            return TransformationExecution(execution_id,"",None,result)
-        before=StateSnapshot.capture(
-            f"{execution_id}:before:{sequence}", character_id, sequence, state,
-            parent_snapshot_id=parent_snapshot_id, source_execution_id=execution_id)
+            code=getattr(exc,"code","VERSION_CONFLICT")
+            details=getattr(exc,"details",{"error":str(exc)})
+            return TransformationExecution(execution_id,"",None,
+                TransformationResult.failed(code,details,status="FAILED",before_snapshot_id=""))
+        before=StateSnapshot.capture(f"{execution_id}:before:{sequence}",character_id,sequence,state,
+                                     parent_snapshot_id=parent_snapshot_id,source_execution_id=execution_id)
         self.snapshots.save(before)
-        attempt=JournalAttempt(
-            attempt_id=request_hash, execution_id=execution_id, character_id=character_id,
-            sequence=sequence, request_hash=request_hash, contract_id=contract.contract_id,
-            contract_version=contract.version, status="PREPARED",
-            before_snapshot_id=before.snapshot_id)
-        self.journal.record(attempt, "PREPARED")
-        started=JournalAttempt(**{**attempt.__dict__, "status":"INTERVENTION_STARTED"})
-        self.journal.record(started, "INTERVENTION_STARTED")
+        attempt=JournalAttempt(request_hash,execution_id,character_id,sequence,request_hash,
+                               contract.contract_id,contract.version,"PREPARED",before.snapshot_id)
+        self.journal.record(attempt,"PREPARED")
+        started=JournalAttempt(**{**attempt.__dict__,"status":"INTERVENTION_STARTED"})
+        self.journal.record(started,"INTERVENTION_STARTED")
         try:
             after_state=intervention(dict(state))
         except Exception as exc:
-            failed=JournalAttempt(**{**started.__dict__, "status":"FAILED", "error":str(exc)})
-            self.journal.record(failed, "FAILED")
             result=TransformationResult.failed(
-                "INTERVENTION_FAILED", {"error":str(exc), "rollback_status":"NOT_REQUIRED"},
+                "INTERVENTION_FAILED",{"error":str(exc),"rollback_status":"NOT_REQUIRED"},
                 before_snapshot_id=before.snapshot_id)
             execution=TransformationExecution(execution_id,before.snapshot_id,None,result)
-            self.ledger.append(TransformationLedgerEntry.from_execution(execution,character_id,contract,request_hash=request_hash))
+            # Durable commit order is ledger first, terminal journal second.
+            # A crash before the ledger commit leaves the attempt non-terminal,
+            # allowing recovery to retry the durable bookkeeping.
+            self.ledger.append(TransformationLedgerEntry.from_execution(
+                execution,character_id,contract,request_hash=request_hash))
+            failed=JournalAttempt(**{**started.__dict__,"status":"FAILED","error":str(exc)})
+            self.journal.record(failed,"FAILED")
             return execution
-        after=StateSnapshot.capture(
-            f"{execution_id}:after:{sequence}", character_id, sequence+1, after_state,
-            parent_snapshot_id=before.snapshot_id, source_execution_id=execution_id)
+
+        after=StateSnapshot.capture(f"{execution_id}:after:{sequence}",character_id,sequence+1,after_state,
+                                    parent_snapshot_id=before.snapshot_id,source_execution_id=execution_id)
         self.snapshots.save(after)
-        captured=JournalAttempt(**{**started.__dict__, "status":"AFTER_CAPTURED",
-                                   "after_snapshot_id":after.snapshot_id})
-        self.journal.record(captured, "AFTER_CAPTURED", after_hash=after.state_hash)
-        diff=StateDiffEngine.compare(
-            before,after,expected=contract.expected_changes,
-            allowed=set(contract.allowed_changes),forbidden=set(contract.forbidden_changes))
+        captured=JournalAttempt(**{**started.__dict__,"status":"AFTER_CAPTURED","after_snapshot_id":after.snapshot_id})
+        self.journal.record(captured,"AFTER_CAPTURED",after_hash=after.state_hash)
+        diff=StateDiffEngine.compare(before,after,expected=contract.expected_changes,
+                                     allowed=set(contract.allowed_changes),forbidden=set(contract.forbidden_changes))
         result=validate_transition(contract,diff,before_snapshot_id=before.snapshot_id,after_snapshot_id=after.snapshot_id)
+
         if result.status=="FAILED" and diff.state_changed:
             if contract.rollback is not None:
                 try:
-                    restored_state=contract.rollback(dict(after_state), dict(state))
-                    restored=StateSnapshot.capture(
-                        f"{execution_id}:rollback:{sequence}", character_id, sequence+2,
-                        restored_state, parent_snapshot_id=after.snapshot_id, source_execution_id=execution_id)
+                    restored_state=contract.rollback(dict(after_state),dict(state))
+                    restored=StateSnapshot.capture(f"{execution_id}:rollback:{sequence}",character_id,sequence+2,
+                                                    restored_state,parent_snapshot_id=after.snapshot_id,source_execution_id=execution_id)
                     self.snapshots.save(restored)
                     restored_diff=StateDiffEngine.compare(before,restored)
                     if restored_diff.state_changed:
@@ -116,18 +114,20 @@ class TransformationExecutor:
                     {"rollback_status":"NOT_CONFIGURED","partial_state":True},
                     before_snapshot_id=before.snapshot_id,after_snapshot_id=after.snapshot_id,status="PARTIAL",
                     before_hash=before.state_hash,after_hash=after.state_hash,changed_fields=tuple(sorted(diff.changed)))
+
         certificate=None
         if result.status=="VALIDATED" and result.certificate_eligible:
             certificate=TransformationCertificate.issue(execution_id,contract,result)
         execution=TransformationExecution(execution_id,before.snapshot_id,after.snapshot_id,result,certificate)
         self.ledger.append(TransformationLedgerEntry.from_execution(execution,character_id,contract,request_hash=request_hash))
-        terminal=JournalAttempt(**{**captured.__dict__, "status":result.status})
-        self.journal.record(terminal, result.status, failure_code=result.failure_code)
+        terminal=JournalAttempt(**{**captured.__dict__,"status":result.status})
+        self.journal.record(terminal,result.status,failure_code=result.failure_code)
         return execution
 
-    def _replay_existing(self, entry):
+    def _replay_existing(self,entry):
         result=TransformationResult(entry.status,entry.failure_code,entry.before_snapshot_id,
-            entry.after_snapshot_id or "",entry.before_hash,entry.after_hash,(),bool(entry.certificate_id),{"idempotent_replay":True})
+            entry.after_snapshot_id or "",entry.before_hash,entry.after_hash,(),bool(entry.certificate_id),
+            {"idempotent_replay":True})
         certificate=None
         if entry.certificate_id:
             certificate=TransformationCertificate(entry.certificate_id,entry.execution_id,entry.contract_id,
