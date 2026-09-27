@@ -641,6 +641,30 @@ class ScienceLabService:
             x for x in transformation_provenance
             if not (x["validated"] and x["integrity_status"] == "PASS")
         ]
+        downstream_provenance = {
+            "replication": [],
+            "generalization": [],
+        }
+        for assessment in replications:
+            tp = self._transformation_for_result(assessment["source_result_id"])
+            downstream_provenance["replication"].append({
+                "assessment_id": assessment["assessment_id"],
+                "source_result_id": assessment["source_result_id"],
+                "status": assessment["status"],
+                "transformation_validated": bool(tp.get("validated") and tp.get("integrity_status") == "PASS"),
+                "transformation_ledger_id": tp.get("ledger_id"),
+                "transformation_certificate_id": tp.get("certificate_id"),
+            })
+        for assessment in generalizations:
+            tp = self._transformation_for_result(assessment["source_result_id"])
+            downstream_provenance["generalization"].append({
+                "assessment_id": assessment["assessment_id"],
+                "source_result_id": assessment["source_result_id"],
+                "status": assessment["status"],
+                "transformation_validated": bool(tp.get("validated") and tp.get("integrity_status") == "PASS"),
+                "transformation_ledger_id": tp.get("ledger_id"),
+                "transformation_certificate_id": tp.get("certificate_id"),
+            })
         payload = {
             "matrix": asdict(matrix),
             "scenarios": [asdict(self.scenarios[x]) for x in matrix.scenario_ids],
@@ -649,6 +673,7 @@ class ScienceLabService:
             "generalization_assessments": generalizations,
             "claim_validation": claims,
             "descriptive_statistics": self.descriptive_statistics(matrix_id),
+            "downstream_transformation_provenance": downstream_provenance,
             "transformation_provenance": {
                 "run_count": len(transformation_provenance),
                 "validated_run_count": validated_transformation_runs,
