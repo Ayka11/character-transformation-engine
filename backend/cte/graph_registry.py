@@ -55,6 +55,17 @@ class GraphRegistry:
             for snap in store.list_snapshots("graph.edge"):
                 p=snap.payload
                 registry.edges[p["edge_id"]]=GraphEdge(**p)
+            for snap in store.list_snapshots("graph.contradiction"):
+                p=snap.payload
+                registry.contradiction_sets[p["contradiction_set_id"]]=ContradictionSet(**p)
+            for snap in store.list_snapshots("graph.inference"):
+                p=snap.payload
+                registry.inference_blocks[p["inference_block_id"]]=InferenceBlock(**p)
+            for event in store.list_events("graph"):
+                registry.audit_events.append(GraphAuditEvent(
+                    event["event_type"],event["payload"].get("node_id"),event["payload"].get("edge_id"),
+                    event["payload"].get("claim_id"),event["payload"].get("payload_hash",""),"runtime"
+                ))
         return registry
 
     def add_node(self, node: GraphNode) -> GraphNode:
@@ -63,11 +74,16 @@ class GraphRegistry:
             if existing.immutable_hash != node.immutable_hash:
                 raise ValueError("immutable node conflict")
             return existing
-        self.nodes[node.node_id]=node
         if self.store is not None:
             self.store.put_snapshot("graph.node",node.node_id,{"node_id":node.node_id,"node_type":node.node_type,"entity_id":node.entity_id,"provenance_class":node.provenance_class,"version":node.version,"immutable_hash":node.immutable_hash,"metadata":node.metadata},node.version)
-        self.audit_events.append(GraphAuditEvent("NODE_REGISTERED",node.node_id,None,
-            node.node_id if node.node_type=="CLAIM" else None,node.immutable_hash,"runtime"))
+        self.nodes[node.node_id]=node
+        audit=GraphAuditEvent("NODE_REGISTERED",node.node_id,None,
+            node.node_id if node.node_type=="CLAIM" else None,node.immutable_hash,"runtime")
+        self.audit_events.append(audit)
+        if self.store is not None:
+            self.store.append_event(f"graph:node:{node.node_id}","graph","NODE_REGISTERED",
+                                     {"node_id":node.node_id,"payload_hash":node.immutable_hash,
+                                      "claim_id":audit.claim_id},provenance_record_id=node.version)
         return node
 
     def add_edge(self, edge: GraphEdge) -> GraphEdge:
