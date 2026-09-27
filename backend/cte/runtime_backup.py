@@ -27,7 +27,8 @@ def build_backup(store) -> dict:
             })
     events = []
     for namespace in event_namespaces:
-        events.extend(store.list_events(namespace))
+        for event in store.list_events(namespace):
+            events.append({**event, "namespace": namespace})
     snapshots.sort(key=lambda x: (x["namespace"], x["key"]))
     events.sort(key=lambda x: (x["namespace"], x["event_id"]))
     payload = {
