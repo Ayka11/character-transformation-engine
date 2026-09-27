@@ -33,3 +33,50 @@ def test_transformation_provenance_does_not_promote_missing_execution():
     assert bound["validated"] is False
     assert bound["status"]=="MISSING"
     assert "TRANSFORMATION_LEDGER_ENTRY_MISSING" in bound["issues"]
+
+def test_science_lab_lineage_can_reach_transformation_node():
+    from cte.graph_registry import GraphRegistry
+    from cte.provenance import Provenance, ProvenanceTag
+    from cte.science_lab import ScienceLabService
+
+    db=SQLiteRuntimeStore(":memory:")
+    registry=GraphRegistry(db)
+    binder=TransformationProvenanceBinder(db)
+    from cte.transformation_runtime import TransformationExecutor
+    executor=TransformationExecutor(StateSnapshotStore(db), TransformationLedger(db))
+    executor.execute(
+        "lineage-1","c1",1,{"tempo":5},
+        TransformationContract("protocol-1","1",expected_changes={"tempo":6}),
+        lambda state: {"tempo":6},
+    )
+    transformation=binder.bind_execution("lineage-1")
+    registry.add_node(__import__("cte.evidence_graph",fromlist=["register_node"]).register_node(
+        "transformation:lineage-1","TRANSFORMATION","lineage-1","EXP","1.0",transformation
+    ))
+    registry.add_node(__import__("cte.evidence_graph",fromlist=["register_node"]).register_node(
+        "scenario:lineage-1","ANALYSIS","scenario:lineage-1","EXP","1.0",
+        {"execution_id":"lineage-1"}
+    ))
+    registry.add_edge(__import__("cte.evidence_graph",fromlist=["register_edge"]).register_edge(
+        "scenario:lineage-1:transformation",
+        registry.nodes["scenario:lineage-1"],
+        registry.nodes["transformation:lineage-1"],
+        "DERIVED_FROM",
+        rationale="test lineage"
+    ))
+    registry.add_node(__import__("cte.evidence_graph",fromlist=["register_node"]).register_node(
+        "result:lineage-1","RESULT","result:lineage-1","EXP","1.0",{}
+    ))
+    registry.add_edge(__import__("cte.evidence_graph",fromlist=["register_edge"]).register_edge(
+        "scenario:lineage-1:result",
+        registry.nodes["scenario:lineage-1"],
+        registry.nodes["result:lineage-1"],
+        "DERIVED_FROM",
+        rationale="test result lineage"
+    ))
+    registry.register_claim(
+        "claim:lineage-1","result:lineage-1","REGISTERED","DESCRIPTIVE_RESULT","EXP",
+        {"execution_id":"lineage-1"}
+    )
+    nodes,edges=registry.claim_subgraph("claim:lineage-1")
+    assert "transformation:lineage-1" in {n.node_id for n in nodes}
