@@ -1,0 +1,63 @@
+{
+  "version": "1.9",
+  "tests": [
+    {
+      "id": "NEG-001",
+      "input": "UNKNOWN_REQUIRED_INPUT",
+      "expected": "BLOCK_OR_INSUFFICIENT_DATA"
+    },
+    {
+      "id": "NEG-002",
+      "input": "UNSAFE_INTERVENTION",
+      "expected": "BLOCK_OR_STOP"
+    },
+    {
+      "id": "NEG-003",
+      "input": "BLOCKED_EXECUTION",
+      "action": "COMPLETE",
+      "expected": "REJECT"
+    },
+    {
+      "id": "NEG-004",
+      "input": "FAILED_EXECUTION",
+      "action": "COMPLETE",
+      "expected": "REJECT"
+    },
+    {
+      "id": "NEG-005",
+      "input": "ASSOCIATIONAL_RESULT",
+      "action": "PROMOTE_EVIDENCE_SUPPORTED",
+      "expected": "REJECT"
+    },
+    {
+      "id": "NEG-006",
+      "input": "SINGLE_STUDY",
+      "action": "PROMOTE_REPLICATED_RESULT",
+      "expected": "REJECT"
+    },
+    {
+      "id": "NEG-007",
+      "input": "MODEL_OUTPUT",
+      "action": "PROMOTE_EVIDENCE_SUPPORTED",
+      "expected": "REJECT"
+    },
+    {
+      "id": "NEG-008",
+      "input": "GENERALIZED_RESULT",
+      "action": "PROMOTE_UNIVERSAL",
+      "expected": "REJECT"
+    },
+    {
+      "id": "NEG-009",
+      "input": "SYNTHETIC_FIXTURE",
+      "action": "CREATE_EVD",
+      "expected": "REJECT"
+    },
+    {
+      "id": "NEG-010",
+      "input": "MISSING_PROVENANCE",
+      "action": "PUBLISH_REPORT",
+      "expected": "REJECT"
+    }
+  ]
+}
