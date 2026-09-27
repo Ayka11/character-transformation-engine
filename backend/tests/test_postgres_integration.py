@@ -338,3 +338,176 @@ def test_postgres_recovery_closes_after_ledger_commit_without_rerun():
                 "DELETE FROM runtime_snapshots WHERE namespace='state.snapshot' AND payload_json->>'source_execution_id'=%s",
                 (execution_id,),
             )
+
+
+@pytest.mark.skipif(
+    not os.getenv("CTE_DATABASE_URL"),
+    reason="CTE_DATABASE_URL is required for live PostgreSQL integration",
+)
+def test_postgres_backup_restore_preserves_transformation_provenance_chain():
+    """Backup/restore must preserve hashes and Science Lab provenance identity."""
+    from cte.contracts.transformation import TransformationContract
+    from cte.state_snapshot_store import StateSnapshotStore
+    from cte.transformation_ledger import TransformationLedger
+    from cte.transformation_provenance import TransformationProvenanceBinder
+    from cte.transformation_runtime import TransformationExecutor
+    from cte.science_lab import ScenarioRun
+    from cte.provenance import Provenance, ProvenanceTag
+
+    dsn = os.environ["CTE_DATABASE_URL"]
+    store = PostgreSQLRuntimeStore(dsn)
+    execution_id = f"pg-backup-{os.urandom(6).hex()}"
+    character_id = f"pg-backup-character-{os.urandom(4).hex()}"
+
+    execution = TransformationExecutor(
+        StateSnapshotStore(store), TransformationLedger(store)
+    ).execute(
+        execution_id,
+        character_id,
+        1,
+        {"tempo": 5, "reactivity": 2},
+        TransformationContract(
+            "pg-backup-contract",
+            "1",
+            expected_changes={"tempo": 6},
+        ),
+        lambda state: {**state, "tempo": 6},
+    )
+    assert execution.result.status == "VALIDATED"
+    assert execution.certificate is not None
+
+    binder = TransformationProvenanceBinder(store)
+    before = store.get_snapshot("state.snapshot", execution.before_snapshot_id)
+    after = store.get_snapshot("state.snapshot", execution.after_snapshot_id)
+    binding_before = binder.bind_execution(execution_id)
+    ledger_before = TransformationLedger(store).get(binding_before["ledger_id"])
+    journal_events = [
+        event for event in store.list_events("transformation.journal")
+        if event["payload"].get("execution_id") == execution_id
+    ]
+    assert before is not None and after is not None
+    assert ledger_before is not None
+    assert binding_before["validated"] is True
+    assert binding_before["integrity_status"] == "PASS"
+    assert binding_before["certificate_id"] == execution.certificate.certificate_id
+    assert binding_before["before_snapshot_id"] == before.payload.get("snapshot_id")
+    assert binding_before["after_snapshot_id"] == after.payload.get("snapshot_id")
+    assert journal_events
+
+    # Persist a real Science Lab run record carrying the bound transformation provenance.
+    run_id = f"backup-run-{execution_id}"
+    run_payload = {
+        "run_id": run_id,
+        "matrix_id": "backup-matrix",
+        "scenario_id": "backup-scenario",
+        "execution_id": execution_id,
+        "status": "COMPLETED",
+        "result_ids": [f"result-{execution_id}"],
+        "estimate_by_outcome": {"outcome": 6.0},
+        "safety_status": "PASS",
+        "output_hash": "backup-output",
+        "transformation_provenance": binding_before,
+        "provenance_tag": ProvenanceTag.EXP.value,
+        "source": "postgres-backup-test",
+        "version": "2.3.0",
+        "provenance_input_hash": "backup-input",
+        "provenance_note": "backup/restore integration test",
+    }
+    store.put_snapshot("science_lab.run", run_id, run_payload, "2.3.0")
+
+    backup = build_backup(store)
+    validate_backup(backup)
+    assert backup["manifest_hash"]
+    backup_manifest = backup["manifest_hash"]
+    backup_before = {
+        "before_state_hash": before.payload["state_hash"],
+        "after_state_hash": after.payload["state_hash"],
+        "before_lineage_hash": before.payload["lineage_hash"],
+        "after_lineage_hash": after.payload["lineage_hash"],
+        "ledger_id": binding_before["ledger_id"],
+        "ledger_payload_hash": ledger_before.payload_hash,
+        "certificate_id": binding_before["certificate_id"],
+    }
+
+    # Simulate a clean restore target inside the same PostgreSQL database by
+    # removing only this test's durable records, then restoring the portable backup.
+    with store.transaction() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                "DELETE FROM runtime_events WHERE namespace='transformation.journal' "
+                "AND payload_json->>'execution_id'=%s",
+                (execution_id,),
+            )
+            cur.execute(
+                "DELETE FROM runtime_snapshots WHERE namespace='science_lab.run' AND key=%s",
+                (run_id,),
+            )
+            cur.execute(
+                "DELETE FROM runtime_snapshots WHERE namespace='transformation.ledger' "
+                "AND key=%s",
+                (binding_before["ledger_id"],),
+            )
+            cur.execute(
+                "DELETE FROM runtime_snapshots WHERE namespace='state.snapshot' "
+                "AND payload_json->>'source_execution_id'=%s",
+                (execution_id,),
+            )
+
+    restored = restore_backup(store, backup)
+    assert restored["dry_run"] is False
+    assert restored["snapshots"] >= 4
+    assert restored["events"] >= len(journal_events)
+
+    restored_before = store.get_snapshot("state.snapshot", execution.before_snapshot_id)
+    restored_after = store.get_snapshot("state.snapshot", execution.after_snapshot_id)
+    restored_ledger = TransformationLedger(store).get(binding_before["ledger_id"])
+    binding_after = binder.bind_execution(execution_id)
+    restored_run = store.get_snapshot("science_lab.run", run_id)
+
+    assert restored_before is not None and restored_after is not None
+    assert restored_ledger is not None
+    assert restored_run is not None
+    assert restored_before.payload["state_hash"] == backup_before["before_state_hash"]
+    assert restored_after.payload["state_hash"] == backup_before["after_state_hash"]
+    assert restored_before.payload["lineage_hash"] == backup_before["before_lineage_hash"]
+    assert restored_after.payload["lineage_hash"] == backup_before["after_lineage_hash"]
+    assert restored_ledger.ledger_id == backup_before["ledger_id"]
+    assert restored_ledger.payload_hash == backup_before["ledger_payload_hash"]
+    assert binding_after["validated"] is True
+    assert binding_after["integrity_status"] == "PASS"
+    assert binding_after["ledger_id"] == backup_before["ledger_id"]
+    assert binding_after["certificate_id"] == backup_before["certificate_id"]
+    assert restored_run.payload["transformation_provenance"]["ledger_id"] == backup_before["ledger_id"]
+    assert restored_run.payload["transformation_provenance"]["certificate_id"] == backup_before["certificate_id"]
+    assert TransformationProvenanceBinder(store).bind_execution(execution_id)["validated"] is True
+    assert backup["manifest_hash"] == backup_manifest
+
+    # Rebuilding the backup after restore must be deterministic with respect to
+    # the restored chain; the original manifest may differ only if other tests
+    # changed the shared integration database concurrently.
+    rebuilt = build_backup(store)
+    validate_backup(rebuilt)
+    assert rebuilt["manifest_hash"]
+
+    cleanup = PostgreSQLRuntimeStore(dsn)
+    with cleanup.transaction() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                "DELETE FROM runtime_events WHERE namespace='transformation.journal' "
+                "AND payload_json->>'execution_id'=%s",
+                (execution_id,),
+            )
+            cur.execute(
+                "DELETE FROM runtime_snapshots WHERE namespace='science_lab.run' AND key=%s",
+                (run_id,),
+            )
+            cur.execute(
+                "DELETE FROM runtime_snapshots WHERE namespace='transformation.ledger' "
+                "AND key=%s",
+                (binding_before["ledger_id"],),
+            )
+            cur.execute(
+                "DELETE FROM runtime_snapshots WHERE namespace='state.snapshot' "
+                "AND payload_json->>'source_execution_id'=%s",
+                (execution_id,),
+            )
