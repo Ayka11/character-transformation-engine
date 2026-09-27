@@ -34,3 +34,12 @@ def test_evidence_supported_requires_evd_and_evidence_criteria():
         assert True
     else:
         assert False
+
+def test_non_initial_claim_cannot_fabricate_current_state():
+    g=_result_graph()
+    try:
+        g.register_claim("c1","r","REGISTERED","ASSOCIATIONAL_RESULT","DRV",{})
+    except ValueError as e:
+        assert "previous_claim_id" in str(e)
+    else:
+        assert False
