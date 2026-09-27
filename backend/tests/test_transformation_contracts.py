@@ -25,3 +25,26 @@ def test_forbidden_change_fails():
     diff=StateDiffEngine.compare(before,after,expected={"tempo":6},forbidden={"recovery"})
     result=validate_transition(TransformationContract("t1","1",expected_changes={"tempo":6},forbidden_changes=("recovery",)),diff,before_snapshot_id="s1",after_snapshot_id="s2")
     assert result.status=="FAILED" and result.failure_code=="UNEXPECTED_CHANGE"
+
+
+def test_required_state_precondition_is_enforced():
+    before=StateSnapshot.capture("s1","c1",1,{"tempo":4})
+    after=StateSnapshot.capture("s2","c1",2,{"tempo":6})
+    diff=StateDiffEngine.compare(before,after,expected={"tempo":6})
+    contract=TransformationContract("t1","1",required_state={"tempo":5},expected_changes={"tempo":6})
+    result=validate_transition(contract,diff,before_snapshot_id="s1",after_snapshot_id="s2",before_state=before.state,after_state=after.state)
+    assert result.status=="FAILED"
+    assert result.failure_code=="PRECONDITION_FAILED"
+    assert not result.certificate_eligible
+
+
+def test_postconditions_are_enforced_before_certificate():
+    before=StateSnapshot.capture("s1","c1",1,{"tempo":5})
+    after=StateSnapshot.capture("s2","c1",2,{"tempo":6,"stable":False})
+    diff=StateDiffEngine.compare(before,after,expected={"tempo":6},allowed={"stable"})
+    contract=TransformationContract("t1","1",expected_changes={"tempo":6},postconditions=({"stable":True},))
+    result=validate_transition(contract,diff,before_snapshot_id="s1",after_snapshot_id="s2",before_state=before.state,after_state=after.state)
+    assert result.status=="FAILED"
+    assert result.failure_code=="VALIDATION_FAILED"
+    assert result.details["postconditions"]["stable"]["expected"] is True
+    assert not result.certificate_eligible

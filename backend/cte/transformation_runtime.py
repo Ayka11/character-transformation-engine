@@ -83,7 +83,7 @@ class TransformationExecutor:
         self.journal.record(captured,"AFTER_CAPTURED",after_hash=after.state_hash)
         diff=StateDiffEngine.compare(before,after,expected=contract.expected_changes,
                                      allowed=set(contract.allowed_changes),forbidden=set(contract.forbidden_changes))
-        result=validate_transition(contract,diff,before_snapshot_id=before.snapshot_id,after_snapshot_id=after.snapshot_id)
+        result=validate_transition(contract,diff,before_snapshot_id=before.snapshot_id,after_snapshot_id=after.snapshot_id,before_state=before.state,after_state=after.state)
 
         if result.status=="FAILED" and diff.state_changed:
             if contract.rollback is not None:
