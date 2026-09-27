@@ -15,6 +15,7 @@ from .runtime_events import make_event, lineage_descriptor
 from .analysis import descriptive
 from .longitudinal import longitudinal_change
 from .registered_analysis import lock_manifest, paired_effect
+from .result_node import build_result, graph_node
 
 app = FastAPI(title="Character Transformation Engine", version="2.1.0")
 
@@ -58,6 +59,8 @@ class SprintStartInput(BaseModel):
     daily_action: str
 
 class RegisteredPairedInput(BaseModel):
+    result_id: str = "result-1"
+    analysis_id: str = "analysis-1"
     baseline: list[float | None]
     current: list[float | None]
     manifest_id: str
@@ -148,7 +151,9 @@ def runtime_sprint_day(p: SprintDayInput):
 @app.post("/validation/paired")
 def validation_paired(p: RegisteredPairedInput):
     manifest=lock_manifest(p.baseline,p.current,manifest_id=p.manifest_id,analysis_spec_id=p.analysis_spec_id)
-    return {"manifest": asdict(manifest), "result": asdict(paired_effect(p.baseline,p.current,manifest))}
+    result=paired_effect(p.baseline,p.current,manifest)
+    node=build_result(result_id=p.result_id,analysis_id=p.analysis_id,manifest_id=manifest.manifest_id,analysis_spec_id=manifest.analysis_spec_id,qc_status="PASS" if result.status.startswith("ESTIMABLE") else result.status,n=result.n,estimate=result.mean_change,ci95_low=result.ci95_low,ci95_high=result.ci95_high)
+    return {"manifest": asdict(manifest), "result": asdict(result), "graph_node": graph_node(node)}
 
 @app.post("/validation/longitudinal")
 def validation_longitudinal(p: LongitudinalInput):
