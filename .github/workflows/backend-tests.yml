@@ -30,12 +30,19 @@ jobs:
           PYTHONPATH: ${{ github.workspace }}/backend
         run: |
           python -c "from cte.longitudinal import longitudinal_change; import cte.longitudinal as m; print(m.__file__); print(longitudinal_change([2,4],[3,6]).relative_change); assert longitudinal_change([2,4],[3,6]).relative_change == 0.5"
+      - name: Collect backend tests
+        env:
+          PYTHONPATH: ${{ github.workspace }}/backend
+        run: |
+          cd backend
+          python -m pytest --collect-only -q > /tmp/pytest-collect.txt
+          tail -n 5 /tmp/pytest-collect.txt
       - name: Run backend tests
         env:
           PYTHONPATH: ${{ github.workspace }}/backend
         run: |
           cd backend
-          python -m pytest -vv --timeout=120 --durations=20
+          python -m pytest -vv --timeout=120 --durations=20 --maxfail=1
       - name: Check Science Lab UI JavaScript
         run: node --check frontend/app.js
 
