@@ -149,6 +149,44 @@ class PostgreSQLRuntimeStore:
                     )
         return Snapshot(namespace, key, version, payload, payload_hash)
 
+    def put_snapshots_atomic(self, items: list[tuple[str, str, dict, str]]) -> list[Snapshot]:
+        """Insert a snapshot batch atomically with immutable conflict checks."""
+        prepared = [
+            (namespace, key, payload, version, content_hash(payload))
+            for namespace, key, payload, version in items
+        ]
+        results: list[Snapshot] = []
+        with self.transaction() as conn:
+            with conn.cursor() as cur:
+                for namespace, key, payload, version, payload_hash in prepared:
+                    cur.execute(
+                        """
+                        INSERT INTO runtime_snapshots
+                        (namespace,key,version,payload_json,payload_hash)
+                        VALUES (%s,%s,%s,%s,%s)
+                        ON CONFLICT (namespace,key) DO NOTHING
+                        """,
+                        (namespace, key, version, Jsonb(payload), payload_hash),
+                    )
+                    if cur.rowcount == 1:
+                        results.append(Snapshot(namespace, key, version, payload, payload_hash))
+                        continue
+
+                    cur.execute(
+                        "SELECT version,payload_hash,payload_json FROM runtime_snapshots WHERE namespace=%s AND key=%s",
+                        (namespace, key),
+                    )
+                    existing = cur.fetchone()
+                    if existing is None:
+                        raise ValueError("snapshot disappeared during atomic write")
+                    if existing[1] != payload_hash:
+                        raise ValueError("immutable snapshot conflict")
+                    existing_payload = existing[2] if isinstance(existing[2], dict) else json.loads(existing[2])
+                    results.append(
+                        Snapshot(namespace, key, existing[0], existing_payload, existing[1])
+                    )
+        return results
+
     def get_snapshot(self, namespace: str, key: str) -> Snapshot | None:
         with self._connect() as conn:
             with conn.cursor() as cur:
