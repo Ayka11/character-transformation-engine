@@ -28,3 +28,19 @@ def test_snapshot_lineage_hash_changes_with_parent():
     b=StateSnapshot.capture("s1","c1",1,{"tempo":6},parent_snapshot_id="other")
     assert a.state_hash==b.state_hash
     assert a.lineage_hash!=b.lineage_hash
+
+def test_atomic_before_after_snapshot_commit_rolls_back_on_conflict():
+    db=SQLiteRuntimeStore(":memory:")
+    store=StateSnapshotStore(db)
+    before=StateSnapshot.capture("b","c",1,{"tempo":5})
+    after=StateSnapshot.capture("a","c",2,{"tempo":6},parent_snapshot_id="b")
+    store.save(after)
+    bad=StateSnapshot.capture("b","c",1,{"tempo":99})
+    try:
+        store.save_pair_atomic(before,bad)
+    except ValueError:
+        pass
+    else:
+        assert False
+    assert store.get("b") is None
+    assert store.get("a") == after
