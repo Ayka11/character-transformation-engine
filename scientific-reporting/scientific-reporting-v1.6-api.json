@@ -1,0 +1,82 @@
+{
+  "name": "Character Transformation Engine — Scientific Reporting & Decision API",
+  "version": "1.6",
+  "status": "MDL/DRV design specification",
+  "endpoints": [
+    [
+      "POST",
+      "/reports/specs",
+      "Register a versioned report specification."
+    ],
+    [
+      "POST",
+      "/reports",
+      "Create a report snapshot from registered study/analysis artifacts."
+    ],
+    [
+      "POST",
+      "/reports/{report_id}/sections",
+      "Render or register a report section with source artifacts."
+    ],
+    [
+      "POST",
+      "/reports/{report_id}/claims",
+      "Bind claims to supporting, limiting and contradictory graph nodes."
+    ],
+    [
+      "POST",
+      "/reports/{report_id}/decisions",
+      "Record a rule-based reporting decision."
+    ],
+    [
+      "POST",
+      "/reports/{report_id}/qc",
+      "Run report integrity and provenance QC."
+    ],
+    [
+      "GET",
+      "/reports/{report_id}",
+      "Return the complete report manifest."
+    ],
+    [
+      "GET",
+      "/reports/{report_id}/provenance",
+      "Return the report's complete source lineage."
+    ],
+    [
+      "POST",
+      "/reports/{report_id}/publish",
+      "Publish an immutable report snapshot when QC permits."
+    ],
+    [
+      "POST",
+      "/reports/{report_id}/supersede",
+      "Supersede a prior report while preserving its history."
+    ]
+  ],
+  "report_contract": {
+    "immutable_snapshot": true,
+    "source_artifacts_required": true,
+    "claim_status_preserved": true,
+    "contradictions_visible": true,
+    "limitations_visible": true,
+    "provenance_complete": true
+  },
+  "publication_gates": [
+    "all required sections present",
+    "source manifest hash matches registered inputs",
+    "no unresolved provenance failures",
+    "claim language does not exceed claim status",
+    "replication/generalization status is explicitly reported when applicable",
+    "limitations and boundaries are present",
+    "QC contains no blocking failure"
+  ],
+  "language_guardrails": [
+    "Do not call an association causal without an eligible causal design.",
+    "Do not call one study replicated.",
+    "Do not describe a generalized result as universal.",
+    "Do not turn a model output into direct evidence.",
+    "Do not suppress contradictory evidence.",
+    "Do not replace unknown values with favorable defaults."
+  ]
+}
