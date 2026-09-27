@@ -101,6 +101,7 @@ class ReportRun:
     qc:dict[str,ReportQC]=field(default_factory=dict)
     report_output_hash:str|None=None
     superseded_by:str|None=None
+    execution_id:str|None=None
 
 def claim_language(claim_status:str)->tuple[str,str]:
     if claim_status=="HYPOTHESIS":
@@ -163,7 +164,7 @@ class ReportService:
             self.runs[p["report_run_id"]]=ReportRun(
                 p["report_run_id"],p["report_spec_id"],p["study_id"],p["source_manifest_hash"],
                 p["report_input_hash"],p.get("status","REGISTERED"),tuple(p.get("source_artifacts",())),
-                dict(p.get("decisions",{})),sections,bindings,qc,p.get("report_output_hash"),p.get("superseded_by")
+                dict(p.get("decisions",{})),sections,bindings,qc,p.get("report_output_hash"),p.get("superseded_by"),p.get("execution_id")
             )
 
     def _persist_run(self,run:ReportRun):
@@ -188,7 +189,7 @@ class ReportService:
                 "report_qc_id":v.report_qc_id,"report_run_id":v.report_run_id,"check_code":v.check_code,
                 "status":v.status,"observed":v.observed,"expected":v.expected,"message":v.message,"immutable_hash":v.immutable_hash
             } for k,v in run.qc.items()},
-            "report_output_hash":run.report_output_hash,"superseded_by":run.superseded_by}
+            "report_output_hash":run.report_output_hash,"superseded_by":run.superseded_by,"execution_id":run.execution_id}
         self.store.put_snapshot("report.run",run.report_run_id,payload,"1.6")
 
 
@@ -203,13 +204,15 @@ class ReportService:
                 "immutable_hash":spec.immutable_hash},spec.version)
         return spec
 
-    def create(self,report_run_id:str,report_spec_id:str,study_id:str,artifact_ids:list[str])->ReportRun:
+    def create(self,report_run_id:str,report_spec_id:str,study_id:str,artifact_ids:list[str],execution_id:str|None=None)->ReportRun:
         if report_run_id in self.runs: raise ValueError("report run already registered")
         spec=self.specs.get(report_spec_id)
         if spec is None: raise ValueError("report spec is not registered")
         if not artifact_ids: raise ValueError("source artifacts are required")
+        if execution_id and self.store is not None and self.store.get_snapshot("orchestrator.execution",execution_id) is None:
+            raise ValueError("execution_id is not registered in orchestrator persistence")
         manifest=build_source_manifest(self.registry,artifact_ids)
-        run=ReportRun(report_run_id,report_spec_id,study_id,manifest,content_hash({"report_run_id":report_run_id,"spec":report_spec_id,"manifest":manifest}),"REGISTERED",tuple(artifact_ids),{})
+        run=ReportRun(report_run_id,report_spec_id,study_id,manifest,content_hash({"report_run_id":report_run_id,"spec":report_spec_id,"manifest":manifest}),"REGISTERED",tuple(artifact_ids),{},execution_id=execution_id)
         self.runs[report_run_id]=run
         self._persist_run(run)
         return run
