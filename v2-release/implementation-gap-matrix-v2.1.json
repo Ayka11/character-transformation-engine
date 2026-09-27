@@ -1,0 +1,145 @@
+{
+  "version": "2.1",
+  "status": "AUDIT_BASELINE",
+  "audit_basis": "Current GitHub main metadata/README plus V1.0-V2.0 architecture artifacts in this repository. This matrix does not claim that specifications are implemented.",
+  "status_semantics": {
+    "SPECIFIED": "Contract/schema/specification exists in repository.",
+    "IMPLEMENTED": "Executable backend/frontend code exists and is wired to the contract.",
+    "TESTED": "Executable implementation has been run and required tests passed.",
+    "VALIDATED": "Empirical/scientific validation supports the capability."
+  },
+  "current_assessment": [
+    {
+      "area": "Master Matrix ontology P1-P5",
+      "specified": "YES",
+      "implemented": "UNVERIFIED",
+      "tested": "NO_EVIDENCE",
+      "validated": "NO_EVIDENCE"
+    },
+    {
+      "area": "State/trait separation",
+      "specified": "YES",
+      "implemented": "UNVERIFIED",
+      "tested": "NO_EVIDENCE",
+      "validated": "NO_EVIDENCE"
+    },
+    {
+      "area": "Provenance tags EVD/MDL/HYP/RPT/DRV/OBS/EXT/EXP",
+      "specified": "YES",
+      "implemented": "UNVERIFIED",
+      "tested": "NO_EVIDENCE",
+      "validated": "NO_EVIDENCE"
+    },
+    {
+      "area": "C_cap adaptive dosimeter",
+      "specified": "YES",
+      "implemented": "UNVERIFIED",
+      "tested": "NO_EVIDENCE",
+      "validated": "NO_EVIDENCE"
+    },
+    {
+      "area": "A-E adaptive levels",
+      "specified": "YES",
+      "implemented": "UNVERIFIED",
+      "tested": "NO_EVIDENCE",
+      "validated": "NO_EVIDENCE"
+    },
+    {
+      "area": "Root-cause graph navigation",
+      "specified": "YES",
+      "implemented": "UNVERIFIED",
+      "tested": "NO_EVIDENCE",
+      "validated": "NO_EVIDENCE"
+    },
+    {
+      "area": "Bio-Reset/Recovery intervention rules",
+      "specified": "PARTIAL_SPEC",
+      "implemented": "UNVERIFIED",
+      "tested": "NO_EVIDENCE",
+      "validated": "NO_EVIDENCE"
+    },
+    {
+      "area": "Compatibility V1 Bio/Tempo",
+      "specified": "YES",
+      "implemented": "UNVERIFIED",
+      "tested": "NO_EVIDENCE",
+      "validated": "NO_EVIDENCE"
+    },
+    {
+      "area": "Compatibility V2 Values/Spearman",
+      "specified": "YES",
+      "implemented": "UNVERIFIED",
+      "tested": "NO_EVIDENCE",
+      "validated": "NO_EVIDENCE"
+    },
+    {
+      "area": "Compatibility V3 Role synergy",
+      "specified": "YES",
+      "implemented": "UNVERIFIED",
+      "tested": "NO_EVIDENCE",
+      "validated": "NO_EVIDENCE"
+    },
+    {
+      "area": "Research execution",
+      "specified": "YES",
+      "implemented": "UNVERIFIED",
+      "tested": "NO_EVIDENCE",
+      "validated": "NO_EVIDENCE"
+    },
+    {
+      "area": "Evidence/Claim Graph",
+      "specified": "YES",
+      "implemented": "UNVERIFIED",
+      "tested": "NO_EVIDENCE",
+      "validated": "NO_EVIDENCE"
+    },
+    {
+      "area": "Replication/Generalization",
+      "specified": "YES",
+      "implemented": "UNVERIFIED",
+      "tested": "NO_EVIDENCE",
+      "validated": "NO_EVIDENCE"
+    },
+    {
+      "area": "Scientific reporting",
+      "specified": "YES",
+      "implemented": "UNVERIFIED",
+      "tested": "NO_EVIDENCE",
+      "validated": "NO_EVIDENCE"
+    },
+    {
+      "area": "Decision/Intervention runtime",
+      "specified": "YES",
+      "implemented": "UNVERIFIED",
+      "tested": "NO_EVIDENCE",
+      "validated": "NO_EVIDENCE"
+    },
+    {
+      "area": "Integrated orchestrator",
+      "specified": "YES",
+      "implemented": "UNVERIFIED",
+      "tested": "NO_EVIDENCE",
+      "validated": "NO_EVIDENCE"
+    },
+    {
+      "area": "Integrity test harness",
+      "specified": "YES",
+      "implemented": "UNVERIFIED",
+      "tested": "NO_EVIDENCE",
+      "validated": "NO_EVIDENCE"
+    }
+  ],
+  "audit_conclusion": "The supplied 15-20% implementation estimate cannot be verified from the available repository metadata/code-index results. The defensible current statement is: the repository contains a substantial architecture/specification layer, while executable implementation coverage of V1.0-V2.0 remains to be established by inspecting and executing the actual backend/frontend code.",
+  "next_implementation_order": [
+    "Inventory executable source tree and package manifests",
+    "Map each V2.0 contract to concrete source modules/routes/tables",
+    "Implement provenance at the telemetry boundary",
+    "Implement strict state/trait separation and C_cap",
+    "Implement dynamic trait graph/root-cause traversal",
+    "Implement Bio-Reset/Recovery rules and A-E adaptation",
+    "Implement V1/V2/V3 compatibility runtime",
+    "Wire research/evidence/replication/reporting to actual runtime events",
+    "Execute V1.9 integrity tests against the implementation",
+    "Only then mark capabilities IMPLEMENTED or TESTED"
+  ]
+}
