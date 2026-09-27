@@ -93,6 +93,8 @@ class ReportRun:
     source_manifest_hash:str
     report_input_hash:str
     status:str="REGISTERED"
+    source_artifacts:tuple[str,...]=()
+    decisions:dict[str,dict]=field(default_factory=dict)
     sections:dict[str,ReportSection]=field(default_factory=dict)
     bindings:dict[str,ReportClaimBinding]=field(default_factory=dict)
     qc:dict[str,ReportQC]=field(default_factory=dict)
@@ -137,9 +139,19 @@ class ReportService:
         if spec is None: raise ValueError("report spec is not registered")
         if not artifact_ids: raise ValueError("source artifacts are required")
         manifest=build_source_manifest(self.registry,artifact_ids)
-        run=ReportRun(report_run_id,report_spec_id,study_id,manifest,content_hash({"report_run_id":report_run_id,"spec":report_spec_id,"manifest":manifest}))
+        run=ReportRun(report_run_id,report_spec_id,study_id,manifest,content_hash({"report_run_id":report_run_id,"spec":report_spec_id,"manifest":manifest}),"REGISTERED",tuple(artifact_ids),{})
         self.runs[report_run_id]=run
         return run
+
+    def add_decision(self,run_id:str,decision_id:str,decision_type:str,decision:str,rule_id:str,inputs:dict,rationale:str)->dict:
+        run=self.runs.get(run_id)
+        if run is None: raise ValueError("report run is not registered")
+        if run.status in {"PUBLISHED","SUPERSEDED"}: raise ValueError("immutable report cannot be modified")
+        if decision_id in run.decisions: raise ValueError("report decision already registered")
+        payload={"decision_id":decision_id,"report_run_id":run_id,"decision_type":decision_type,"decision":decision,"rule_id":rule_id,"inputs":inputs,"rationale":rationale}
+        item={**payload,"immutable_hash":content_hash(payload)}
+        run.decisions[decision_id]=item
+        return item
 
     def add_section(self,run_id:str,section_code:str,content:dict,source_artifacts:list[str],
                     ordinal:int,derivation_rule_id:str="V1.6_RENDER",derivation_rule_version:str="1.6",
@@ -194,7 +206,7 @@ class ReportService:
         add("REQUIRED_SECTIONS","PASS" if observed==expected else "FAIL",
             {"present":sorted(observed),"missing":sorted(expected-observed)},
             {"required":sorted(expected)},"required section coverage")
-        artifact_ids=sorted({a for s in run.sections.values() for a in s.source_artifacts})
+        artifact_ids=sorted(set(run.source_artifacts))
         try: manifest=build_source_manifest(self.registry,artifact_ids)
         except ValueError: manifest=None
         add("SOURCE_MANIFEST","PASS" if manifest==run.source_manifest_hash else "FAIL",
