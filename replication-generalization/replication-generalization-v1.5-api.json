@@ -1,0 +1,117 @@
+{
+  "name": "Character Transformation Engine — Replication & Generalization API",
+  "version": "1.5",
+  "status": "MDL/DRV design specification",
+  "endpoints": [
+    [
+      "POST",
+      "/replication/specs",
+      "Register replication criteria before evaluating a replication."
+    ],
+    [
+      "POST",
+      "/replication/runs",
+      "Register an independent replication run."
+    ],
+    [
+      "POST",
+      "/replication/runs/{id}/dimensions",
+      "Compare protocol, measurement, outcome, data-quality and other fidelity dimensions."
+    ],
+    [
+      "POST",
+      "/replication/runs/{id}/outcomes",
+      "Evaluate source/target outcome compatibility."
+    ],
+    [
+      "POST",
+      "/replication/runs/{id}/assess",
+      "Apply registered replication criteria."
+    ],
+    [
+      "GET",
+      "/replication/runs/{id}",
+      "Return replication status and provenance."
+    ],
+    [
+      "POST",
+      "/generalization/specs",
+      "Register a source-to-target transport specification."
+    ],
+    [
+      "POST",
+      "/generalization/runs",
+      "Register a generalization/transport run."
+    ],
+    [
+      "POST",
+      "/generalization/runs/{id}/dimensions",
+      "Evaluate population, context, task, measurement, intervention and time differences."
+    ],
+    [
+      "POST",
+      "/generalization/runs/{id}/results",
+      "Store transported outcome estimates and heterogeneity."
+    ],
+    [
+      "POST",
+      "/generalization/runs/{id}/boundaries",
+      "Register explicit generalization boundaries."
+    ],
+    [
+      "GET",
+      "/generalization/runs/{id}",
+      "Return generalization status and provenance."
+    ],
+    [
+      "POST",
+      "/claims/{claim_id}/v15-decision",
+      "Create an auditable replication/generalization decision."
+    ]
+  ],
+  "replication_contract": {
+    "independence_required": true,
+    "criteria_pre_registration": true,
+    "minimum_dimensions": [
+      "protocol_fidelity",
+      "measurement_fidelity",
+      "outcome_definition",
+      "direction",
+      "effect_compatibility",
+      "data_quality"
+    ],
+    "p_value_only_replication": false,
+    "unknown_data_behavior": "INDETERMINATE"
+  },
+  "generalization_contract": {
+    "target_context_required": true,
+    "transport_dimensions": [
+      "population",
+      "context",
+      "task",
+      "measurement",
+      "intervention",
+      "time",
+      "data_quality"
+    ],
+    "transport_error_recorded": true,
+    "heterogeneity_recorded": true,
+    "boundary_record_required": true,
+    "unknown_data_behavior": "LIMITED_OR_INDETERMINATE"
+  },
+  "status_semantics": {
+    "REPLICATED": "Registered replication criteria are met for the specified outcome(s).",
+    "PARTIAL": "Some outcomes/criteria meet replication rules while others do not.",
+    "NOT_REPLICATED": "Registered replication criteria are not met.",
+    "GENERALIZABLE": "Registered transport criteria are met within the declared target.",
+    "LIMITED_GENERALIZABILITY": "Some transport dimensions or outcomes limit the claim.",
+    "NOT_GENERALIZABLE": "Registered transport criteria are not met."
+  },
+  "guardrails": [
+    "Replication does not imply generalization.",
+    "Generalization does not erase replication failures.",
+    "Different measurement instruments are not silently treated as identical.",
+    "Transport differences are recorded explicitly.",
+    "No automatic universal claim is generated."
+  ]
+}
