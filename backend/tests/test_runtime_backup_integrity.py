@@ -256,10 +256,10 @@ def test_adversarial_lineage_damage_blocks_transformation_backed_claim():
 
     # Attack 1: remove the transformation graph node.
     registry.nodes.pop("attack-transform")
-    assert support()["status"] == "VALIDATED"
-    # Graph lineage is damaged, but the durable transformation source is still valid.
-    # Claim validation must therefore remain provenance-valid while graph-specific
-    # validation is separately inspectable.
+    damaged_graph = support()
+    assert damaged_graph["status"] == "NOT_VALIDATED"
+    assert damaged_graph["graph_lineage_valid"] is False
+    assert "RESULT requires TRANSFORMATION lineage" in damaged_graph["issues"]
     assert "attack-transform" not in {n.node_id for n in registry.claim_subgraph("attack-claim")[0]}
 
     # Attack 2: destroy the durable ledger. This must invalidate transformation support.
