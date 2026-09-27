@@ -166,3 +166,61 @@ def test_corrupted_transformation_provenance_cannot_support_claim():
     claims=service.claim_validation("m1")
     assert claims["claims"][0]["transformation_support"]["status"]=="NOT_VALIDATED"
     assert claims["claims"][0]["transformation_support"]["integrity_status"]=="FAIL"
+
+
+def test_transformation_provenance_survives_science_lab_reload_and_report_hash():
+    from cte.graph_registry import GraphRegistry
+    from cte.science_lab import ScienceLabService, ExperimentMatrix, ScenarioDefinition, ScenarioRun
+
+    db=SQLiteRuntimeStore(":memory:")
+    registry=GraphRegistry(db)
+    binder=TransformationProvenanceBinder(db)
+    executor=TransformationExecutor(StateSnapshotStore(db), TransformationLedger(db))
+    execution=executor.execute(
+        "reload-1","character-1",1,{"tempo":5},
+        TransformationContract("protocol-reload","1",expected_changes={"tempo":6}),
+        lambda state: {"tempo":6},
+    )
+    tp=binder.bind_execution("reload-1")
+    prov=__import__("cte.provenance",fromlist=["Provenance","ProvenanceTag"]).Provenance(
+        __import__("cte.provenance",fromlist=["ProvenanceTag"]).ProvenanceTag.EXP,
+        "test","1","hash","test"
+    )
+    matrix=ExperimentMatrix("reload-matrix","study","Reload","outcome",{},("scenario",),"ACTIVE","hash")
+    scenario=ScenarioDefinition("scenario","reload-matrix","Scenario","desc",{},("outcome",),True,"hash")
+    service=object.__new__(ScienceLabService)
+    service.registry=registry
+    service.store=db
+    service.research=None
+    service.coordinator=None
+    service.matrices={"reload-matrix":matrix}
+    service.scenarios={"scenario":scenario}
+    service.replication_assessments={}
+    service.generalization_assessments={}
+    service.runs={
+        "reload-run": ScenarioRun(
+            "reload-run","reload-matrix","scenario","reload-1","COMPLETED",
+            ("result-reload",),{"outcome":6.0},"PASS","output",prov,tp
+        )
+    }
+    bundle1=service.report_bundle("reload-matrix")
+    assert bundle1["transformation_provenance"]["validated_run_count"] == 1
+    assert bundle1["transformation_provenance"]["all_runs_validated"] is True
+    assert bundle1["transformation_provenance"]["runs"][0]["certificate_id"] == execution.certificate.certificate_id
+
+    registry2=GraphRegistry(db)
+    service2=object.__new__(ScienceLabService)
+    service2.registry=registry2
+    service2.store=db
+    service2.research=None
+    service2.coordinator=None
+    service2.matrices={"reload-matrix":matrix}
+    service2.scenarios={"scenario":scenario}
+    service2.replication_assessments={}
+    service2.generalization_assessments={}
+    service2.runs={}
+    service2._hydrate()
+    bundle2=service2.report_bundle("reload-matrix")
+    assert bundle2["transformation_provenance"]["validated_run_count"] == 1
+    assert bundle2["transformation_provenance"]["runs"][0]["ledger_id"] == tp["ledger_id"]
+    assert bundle2["provenance"]["input_hash"] == bundle1["provenance"]["input_hash"]
