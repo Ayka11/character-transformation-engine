@@ -4,6 +4,7 @@ from dataclasses import asdict
 from fastapi import HTTPException
 from pydantic import BaseModel, Field
 from .reporting import ReportService, register_spec
+from .evidence_graph import register_node, register_edge
 
 class ReportSpecInput(BaseModel):
     report_spec_id:str
@@ -110,7 +111,21 @@ def install_reporting_api(app, graph_registry):
     @app.post("/reports/{report_id}/publish")
     def publish_report(report_id:str):
         try:
-            return asdict(service.publish(report_id))
+            run=service.publish(report_id)
+            report_node=register_node(
+                run.report_run_id,"REPORT",run.report_run_id,"DRV",
+                service.specs[run.report_spec_id].version,
+                {"status":run.status,"source_manifest_hash":run.source_manifest_hash,
+                 "report_output_hash":run.report_output_hash,"study_id":run.study_id},
+            )
+            graph_registry.add_node(report_node)
+            for artifact_id in run.source_artifacts:
+                graph_registry.add_edge(register_edge(
+                    f"{run.report_run_id}:documents:{artifact_id}",
+                    report_node,graph_registry.nodes[artifact_id],"DOCUMENTS",
+                    rationale="published V1.6 report source artifact",
+                ))
+            return {"report":asdict(run),"graph_node":asdict(report_node)}
         except ValueError as e:
             raise HTTPException(400,str(e))
 
