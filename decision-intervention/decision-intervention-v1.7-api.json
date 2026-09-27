@@ -1,0 +1,82 @@
+{
+  "name": "Character Transformation Engine — Integrated Decision & Intervention API",
+  "version": "1.7",
+  "status": "MDL/DRV design specification",
+  "endpoints": [
+    [
+      "POST",
+      "/interventions/rules",
+      "Register a versioned intervention rule and provenance class."
+    ],
+    [
+      "POST",
+      "/interventions/assign",
+      "Select an eligible registered rule after safety evaluation."
+    ],
+    [
+      "POST",
+      "/interventions/{assignment_id}/sessions",
+      "Create an intervention session."
+    ],
+    [
+      "POST",
+      "/interventions/sessions/{session_id}/measurements",
+      "Record session measurements, including explicit missingness."
+    ],
+    [
+      "POST",
+      "/interventions/sessions/{session_id}/response",
+      "Evaluate target/state/behavior/safety/adherence/capacity response."
+    ],
+    [
+      "POST",
+      "/interventions/{assignment_id}/adapt",
+      "Generate a rule-linked adaptation decision."
+    ],
+    [
+      "GET",
+      "/interventions/{assignment_id}",
+      "Return assignment, sessions, responses and provenance."
+    ],
+    [
+      "POST",
+      "/interventions/sessions/{session_id}/research-link",
+      "Link runtime observations/results into the research graph."
+    ],
+    [
+      "GET",
+      "/interventions/{assignment_id}/audit",
+      "Return execution audit trail."
+    ]
+  ],
+  "decision_contract": {
+    "required_before_assignment": [
+      "current_state",
+      "capacity",
+      "safety",
+      "rule_scope",
+      "data_quality"
+    ],
+    "unknown_behavior": "HOLD_OR_INSUFFICIENT_DATA",
+    "rule_selection": "REGISTERED_RULES_ONLY",
+    "promotion_rule": "NO_SINGLE_USER_OUTCOME_PROMOTES_HYP_OR_MDL_TO_EVD"
+  },
+  "adaptation_contract": {
+    "allowed": [
+      "CONTINUE",
+      "ADJUST",
+      "HOLD",
+      "DEESCALATE",
+      "STOP",
+      "INSUFFICIENT_DATA"
+    ],
+    "safety_precedence": true,
+    "input_snapshot_required": true,
+    "rule_version_required": true
+  },
+  "research_bridge": {
+    "runtime_observation_is_not_automatically_evidence": true,
+    "research_result_requires_registered_analysis": true,
+    "claim_graph_link_required": true
+  }
+}
