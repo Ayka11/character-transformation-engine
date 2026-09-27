@@ -600,7 +600,9 @@ class ResearchService:
             node=build_result(result_id=result_id,analysis_id=analysis_run_id,manifest_id=dataset_manifest_id,
                               analysis_spec_id=analysis_version,qc_status="PASS" if result.result_status=="ESTIMABLE" else "NOT_ESTIMABLE",
                               n=result.sample_size,estimate=result.estimate,ci95_low=None,ci95_high=None)
-            self.registry.add_node(register_node(result_id,"RESULT",result_id,"EXP",analysis_version,graph_node(node)["metadata_json"]))
+            result_metadata=graph_node(node)["metadata_json"]
+            result_metadata["validated_descriptive_result"]=result.result_status=="ESTIMABLE"
+            self.registry.add_node(register_node(result_id,"RESULT",result_id,"EXP",analysis_version,result_metadata))
             self.registry.add_edge(register_edge(f"{analysis_run_id}:result:{result_id}",
                 self.registry.nodes[analysis_run_id],self.registry.nodes[result_id],"RESULTS_IN",
                 rationale="research statistical result"))
