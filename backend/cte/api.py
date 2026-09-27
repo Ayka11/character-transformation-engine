@@ -20,12 +20,15 @@ from .evidence_graph import register_node, register_edge
 from .graph_registry import build_registry
 from .claim_gate import validate_claim_transition
 from .replication import register_replication, register_generalization
-from .replication_engine import ReplicationRun as EngineReplicationRun, register_spec, register_run, evaluate_outcome as evaluate_replication_outcome
+from .replication_engine import ReplicationRun as EngineReplicationRun, register_spec as register_replication_spec, register_run as register_replication_run, evaluate_outcome as evaluate_replication_outcome
+from .generalization_engine import register_spec as register_generalization_spec, register_run as register_generalization_run, evaluate as evaluate_generalization
 
 app = FastAPI(title="Character Transformation Engine", version="2.1.0")
 GRAPH_REGISTRY = build_registry()
 REPLICATION_SPECS = {}
 REPLICATION_RUNS = {}
+GENERALIZATION_SPECS = {}
+GENERALIZATION_RUNS = {}
 
 class StateInput(BaseModel):
     sleep_quality: float | None = Field(None, ge=0, le=10)
@@ -80,6 +83,37 @@ class ClaimInput(BaseModel):
     provenance_class: str = "DRV"
     metadata: dict = Field(default_factory=dict)
     previous_claim_id: str | None = None
+
+class GeneralizationSpecInput(BaseModel):
+    generalization_spec_id: str
+    source_claim_id: str
+    source_population: dict
+    target_population: dict
+    source_context: dict
+    target_context: dict
+    transport_dimensions: list[str] = Field(default_factory=list)
+    acceptance_rules: dict = Field(default_factory=dict)
+
+class GeneralizationRunInput(BaseModel):
+    generalization_run_id: str
+    generalization_spec_id: str
+    source_result_node_id: str
+    dataset_manifest_id: str
+    transport_analysis_version: str = "1.5"
+    input_hash: str
+
+class GeneralizationResultInput(BaseModel):
+    generalization_run_id: str
+    source_estimate: float | None = None
+    transported_estimate: float | None = None
+    transport_error: float | None = None
+    ci_low: float | None = None
+    ci_high: float | None = None
+    heterogeneity_statistic: float | None = None
+    heterogeneity_p_value: float | None = None
+    dimensions: dict[str,str] = Field(default_factory=dict)
+    max_transport_error: float = Field(0.20, ge=0)
+    max_heterogeneity: float | None = Field(None, ge=0)
 
 class ReplicationSpecInput(BaseModel):
     replication_spec_id: str
@@ -235,7 +269,7 @@ def runtime_sprint_day(p: SprintDayInput):
 
 @app.post("/replication/specs")
 def replication_spec_register(p: ReplicationSpecInput):
-    spec=register_spec(p.replication_spec_id,p.source_claim_id,p.primary_outcome_id,p.criteria)
+    spec=register_replication_spec(p.replication_spec_id,p.source_claim_id,p.primary_outcome_id,p.criteria)
     if p.replication_spec_id in REPLICATION_SPECS:
         raise ValueError("replication spec already registered")
     REPLICATION_SPECS[p.replication_spec_id]=spec
@@ -250,7 +284,7 @@ def replication_run_register(p: ReplicationRunInput):
     source=GRAPH_REGISTRY.nodes.get(p.source_result_node_id)
     if source is None or source.node_type!="RESULT":
         raise ValueError("source_result_node_id must reference a registered RESULT")
-    run=register_run(p.replication_run_id,spec,source_result_node_id=p.source_result_node_id,independent_study_id=p.independent_study_id,dataset_manifest_id=p.dataset_manifest_id,protocol_hash=p.protocol_hash,input_hash=p.input_hash,independent=p.independent)
+    run=register_replication_run(p.replication_run_id,spec,source_result_node_id=p.source_result_node_id,independent_study_id=p.independent_study_id,dataset_manifest_id=p.dataset_manifest_id,protocol_hash=p.protocol_hash,input_hash=p.input_hash,independent=p.independent)
     if p.replication_run_id in REPLICATION_RUNS:
         raise ValueError("replication run already registered")
     REPLICATION_RUNS[p.replication_run_id]=run
@@ -282,6 +316,47 @@ def validation_replication(p: ReplicationInput):
     GRAPH_REGISTRY.add_node(node)
     GRAPH_REGISTRY.add_edge(register_edge(f"{p.replication_id}:replicates:{p.source_result_id}",node,GRAPH_REGISTRY.nodes[p.source_result_id],"REPLICATES",rationale="registered replication record"))
     return {"record":asdict(record),"graph_node":asdict(node)}
+
+@app.post("/generalization/specs")
+def generalization_spec_register(p: GeneralizationSpecInput):
+    spec=register_generalization_spec(p.generalization_spec_id,p.source_claim_id,
+        source_population=p.source_population,target_population=p.target_population,
+        source_context=p.source_context,target_context=p.target_context,
+        transport_dimensions=p.transport_dimensions or None,acceptance_rules=p.acceptance_rules)
+    if p.generalization_spec_id in GENERALIZATION_SPECS:
+        raise ValueError("generalization spec already registered")
+    GENERALIZATION_SPECS[p.generalization_spec_id]=spec
+    GRAPH_REGISTRY.add_node(register_node(spec.generalization_spec_id,"PROTOCOL",spec.generalization_spec_id,spec.provenance.tag.value,"1.5",{"kind":"GENERALIZATION_SPEC","source_claim_id":spec.source_claim_id,"target_context":spec.target_context,"acceptance_rules":spec.acceptance_rules}))
+    return asdict(spec)
+
+@app.post("/generalization/runs")
+def generalization_run_register(p: GeneralizationRunInput):
+    spec=GENERALIZATION_SPECS.get(p.generalization_spec_id)
+    if spec is None:
+        raise ValueError("generalization_spec_id must reference a registered generalization spec")
+    source=GRAPH_REGISTRY.nodes.get(p.source_result_node_id)
+    if source is None or source.node_type!="RESULT":
+        raise ValueError("source_result_node_id must reference a registered RESULT")
+    run=register_generalization_run(p.generalization_run_id,spec,source_result_node_id=p.source_result_node_id,dataset_manifest_id=p.dataset_manifest_id,transport_analysis_version=p.transport_analysis_version,input_hash=p.input_hash)
+    GENERALIZATION_RUNS[p.generalization_run_id]=run
+    node=register_node(run.generalization_run_id,"GENERALIZATION",run.generalization_run_id,run.provenance.tag.value,"1.5",{"source_result_id":run.source_result_node_id,"generalization_spec_id":run.generalization_spec_id,"dataset_manifest_id":run.dataset_manifest_id,"run_status":run.status})
+    GRAPH_REGISTRY.add_node(node)
+    GRAPH_REGISTRY.add_edge(register_edge(f"{node.node_id}:generalizes:{source.node_id}",node,source,"GENERALIZES",rationale="registered V1.5 generalization run"))
+    return {"run":asdict(run),"graph_node":asdict(node)}
+
+@app.post("/generalization/runs/{generalization_run_id}/results")
+def generalization_result_register(generalization_run_id: str,p: GeneralizationResultInput):
+    if p.generalization_run_id != generalization_run_id:
+        raise ValueError("path and payload generalization_run_id mismatch")
+    run=GENERALIZATION_RUNS.get(generalization_run_id)
+    if run is None:
+        raise ValueError("generalization run is not registered")
+    result=evaluate_generalization(run,source_estimate=p.source_estimate,transported_estimate=p.transported_estimate,transport_error=p.transport_error,ci_low=p.ci_low,ci_high=p.ci_high,heterogeneity_statistic=p.heterogeneity_statistic,heterogeneity_p_value=p.heterogeneity_p_value,dimensions=p.dimensions,max_transport_error=p.max_transport_error,max_heterogeneity=p.max_heterogeneity)
+    assessment_id=f"{generalization_run_id}:assessment:{result.result_status}"
+    node=register_node(assessment_id,"GENERALIZATION",assessment_id,result.provenance.tag.value,"1.5",{"source_result_id":run.source_result_node_id,"generalization_run_id":run.generalization_run_id,"run_status":"COMPLETED" if result.result_status=="GENERALIZABLE" else "LIMITED","result_status":result.result_status,"target_population_context":GENERALIZATION_SPECS[run.generalization_spec_id].target_population})
+    GRAPH_REGISTRY.add_node(node)
+    GRAPH_REGISTRY.add_edge(register_edge(f"{assessment_id}:generalizes:{run.source_result_node_id}",node,GRAPH_REGISTRY.nodes[run.source_result_node_id],"GENERALIZES",rationale="V1.5 generalization result assessment"))
+    return {"result":asdict(result),"assessment_graph_node":asdict(node)}
 
 @app.post("/validation/generalization/register")
 def validation_generalization(p: GeneralizationInput):
