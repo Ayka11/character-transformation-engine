@@ -1,0 +1,132 @@
+{
+  "name": "Character Transformation Engine — Evidence & Claim Graph API",
+  "version": "1.4",
+  "status": "MDL/DRV design specification",
+  "node_types": [
+    "OBSERVATION",
+    "MEASUREMENT",
+    "DATASET",
+    "ANALYSIS",
+    "RESULT",
+    "REPLICATION",
+    "GENERALIZATION",
+    "CLAIM",
+    "PROTOCOL",
+    "REPORT",
+    "SOURCE"
+  ],
+  "edge_types": [
+    "MEASURED_FROM",
+    "DERIVED_FROM",
+    "ANALYZED_FROM",
+    "RESULTS_IN",
+    "REPLICATES",
+    "GENERALIZES",
+    "SUPPORTS",
+    "CONTRADICTS",
+    "QUALIFIES",
+    "LIMITS",
+    "BLOCKS",
+    "DOCUMENTS",
+    "USES_PROTOCOL",
+    "CITES_SOURCE"
+  ],
+  "endpoints": [
+    [
+      "POST",
+      "/graph/nodes",
+      "Register an immutable graph node."
+    ],
+    [
+      "POST",
+      "/graph/edges",
+      "Create a provenance-aware typed edge."
+    ],
+    [
+      "GET",
+      "/graph/claims/{claim_id}",
+      "Return the complete claim subgraph."
+    ],
+    [
+      "GET",
+      "/graph/claims/{claim_id}/lineage",
+      "Traverse backward to observations and sources."
+    ],
+    [
+      "GET",
+      "/graph/claims/{claim_id}/support",
+      "Return support, replication, qualification and contradiction edges."
+    ],
+    [
+      "POST",
+      "/graph/claims/{claim_id}/assess",
+      "Assess claim level under registered rules."
+    ],
+    [
+      "POST",
+      "/graph/claims/{claim_id}/status-transition",
+      "Register an auditable claim-status transition."
+    ],
+    [
+      "POST",
+      "/graph/contradictions",
+      "Register or update a contradiction set."
+    ],
+    [
+      "POST",
+      "/graph/inference-blocks",
+      "Register a prohibited inference rule."
+    ],
+    [
+      "GET",
+      "/graph/audit/{claim_id}",
+      "Return immutable claim-graph audit history."
+    ]
+  ],
+  "lineage_contract": {
+    "minimum_chain": [
+      "OBSERVATION_OR_SOURCE",
+      "MEASUREMENT_OR_DATASET",
+      "ANALYSIS",
+      "RESULT",
+      "CLAIM"
+    ],
+    "required_metadata": [
+      "provenance_class",
+      "version_or_protocol",
+      "immutable_hash_or_manifest",
+      "provenance_record"
+    ],
+    "missing_link_behavior": "QUALIFIED_OR_INDETERMINATE",
+    "silent_link_invention": false
+  },
+  "claim_rules": {
+    "hypothesis_to_result": "Requires an analysis/result node linked to registered measurement/data.",
+    "result_to_replicated": "Requires an independent replication edge satisfying registered replication criteria.",
+    "replicated_to_generalized": "Requires explicit target population/context and generalization analysis.",
+    "evidence_supported": "Requires registered evidence criteria; no automatic promotion from statistical significance.",
+    "contradiction": "Contradictory results remain linked and visible."
+  },
+  "inference_blocks": [
+    {
+      "from": "ASSOCIATIONAL_RESULT",
+      "blocked": "CAUSAL_CLAIM",
+      "reason": "Association alone does not establish causality."
+    },
+    {
+      "from": "SINGLE_STUDY",
+      "blocked": "REPLICATED_RESULT",
+      "reason": "Replication requires an independent replication run."
+    },
+    {
+      "from": "STATISTICAL_SIGNIFICANCE",
+      "blocked": "PRACTICAL_IMPORTANCE",
+      "reason": "Significance alone does not establish practical importance."
+    },
+    {
+      "from": "MODEL_OUTPUT",
+      "blocked": "EVIDENCE_SUPPORTED",
+      "reason": "Model output requires provenance-supported evidence criteria."
+    }
+  ]
+}
