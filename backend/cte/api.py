@@ -5,9 +5,9 @@ from .models import DailyState
 from .capacity import compute_capacity
 from .compatibility import compatibility_v1, compatibility_v2, compatibility_v3
 from .catalog import ADAPTIVE_LEVELS, MASTER_MATRIX, MATRIX_VERSION, SPRINT_TEMPLATE
+from .assessment import build_profile
 
 app = FastAPI(title="Character Transformation Engine", version="2.1.0")
-
 
 class StateInput(BaseModel):
     sleep_quality: float | None = Field(None, ge=0, le=10)
@@ -16,7 +16,6 @@ class StateInput(BaseModel):
     metabolic_stability: float | None = Field(None, ge=0, le=10)
     subjective_stress: float | None = Field(None, ge=0, le=10)
     subjective_energy: float | None = Field(None, ge=0, le=10)
-
 
 class CompatibilityInput(BaseModel):
     bio_a: dict[str, float] = Field(default_factory=dict)
@@ -27,38 +26,34 @@ class CompatibilityInput(BaseModel):
     roles_b: list[str] = Field(default_factory=list)
     synergy: dict[str, float] = Field(default_factory=dict)
 
+class ObservationInput(BaseModel):
+    item_id: str
+    value: float = Field(ge=0, le=10)
+    observation_id: str
+
+class AssessmentInput(BaseModel):
+    observations: list[ObservationInput]
+    source_id: str = "assessment.api"
+    source_version: str = "1.0"
 
 @app.get("/health")
 def health():
     return {"status": "ok", "version": "2.1.0", "scientific_status": "implementation_baseline"}
 
-
 @app.get("/matrix")
 def matrix_catalog():
-    return {
-        "version": MATRIX_VERSION,
-        "items": [asdict(item) for item in MASTER_MATRIX],
-        "adaptive_levels": ADAPTIVE_LEVELS,
-        "sprint_template": SPRINT_TEMPLATE,
-    }
+    return {"version": MATRIX_VERSION, "items": [asdict(item) for item in MASTER_MATRIX], "adaptive_levels": ADAPTIVE_LEVELS, "sprint_template": SPRINT_TEMPLATE}
 
+@app.post("/assessment/profile")
+def assessment_profile(p: AssessmentInput):
+    profile = build_profile([row.model_dump() for row in p.observations], source_id=p.source_id, source_version=p.source_version)
+    return {"source_id": profile.source_id, "source_version": profile.source_version, "measurements": [asdict(m) for m in profile.measurements]}
 
 @app.post("/runtime/capacity")
 def runtime_capacity(p: StateInput):
     return asdict(compute_capacity(DailyState(**p.model_dump())))
 
-
 @app.post("/compatibility")
 def compatibility(p: CompatibilityInput):
-    s = {
-        (k.split("|")[0], k.split("|")[1]): v
-        for k, v in p.synergy.items()
-        if "|" in k
-    }
-    return {
-        "v1": compatibility_v1(p.bio_a, p.bio_b),
-        "v2": compatibility_v2(p.values_a, p.values_b),
-        "v3": compatibility_v3(set(p.roles_a), set(p.roles_b), s),
-        "authoritative_scalar": False,
-    }
-}
+    s = {(k.split("|")[0], k.split("|")[1]): v for k, v in p.synergy.items() if "|" in k}
+    return {"v1": compatibility_v1(p.bio_a, p.bio_b), "v2": compatibility_v2(p.values_a, p.values_b), "v3": compatibility_v3(set(p.roles_a), set(p.roles_b), s), "authoritative_scalar": False}
