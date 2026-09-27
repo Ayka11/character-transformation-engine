@@ -12,6 +12,7 @@ from .intervention import plan_bio_reset, plan_21_day_sprint
 from .sprint import start_sprint, record_day
 from .outcome import evaluate_outcome
 from .runtime_events import make_event, lineage_descriptor
+from .analysis import descriptive
 
 app = FastAPI(title="Character Transformation Engine", version="2.1.0")
 
@@ -53,6 +54,10 @@ class SprintStartInput(BaseModel):
     target_trait: str
     supporting_bio_habit: str
     daily_action: str
+
+class AnalysisInput(BaseModel):
+    values: list[float | None]
+    ids: list[str] | None = None
 
 class OutcomeInput(BaseModel):
     execution_id: str = "runtime-outcome"
@@ -127,6 +132,11 @@ def runtime_sprint_day(p: SprintDayInput):
     sprint.supporting_bio_habit=p.supporting_bio_habit
     sprint.daily_action=p.daily_action
     return asdict(record_day(sprint,p.day,p.action_completed,p.outcome,state))
+
+@app.post("/validation/descriptive")
+def validation_descriptive(p: AnalysisInput):
+    result=descriptive(p.values, ids=p.ids)
+    return asdict(result)
 
 @app.post("/runtime/outcome")
 def runtime_outcome(p: OutcomeInput):
