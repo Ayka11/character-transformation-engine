@@ -5,7 +5,7 @@ from typing import Callable, Any
 from .contracts.state import StateSnapshot
 from .contracts.transformation import TransformationContract, TransformationResult, TransformationCertificate, validate_transition\nfrom .contracts.errors import CTEErrorCode
 from .state_snapshot_store import StateSnapshotStore
-from .provenance import content_hash
+from .provenance import content_hash\nfrom .transformation_ledger import TransformationLedger, TransformationLedgerEntry
 
 @dataclass(frozen=True)
 class TransformationExecution:
@@ -31,7 +31,9 @@ class TransformationExecutor:
             after_state=intervention(dict(state))
         except Exception as exc:
             result=TransformationResult.failed("INTERVENTION_FAILED", {"error":str(exc)})
-            return TransformationExecution(execution_id,before.snapshot_id,None,result)
+            execution=TransformationExecution(execution_id,before.snapshot_id,None,result)
+            self.ledger.append(TransformationLedgerEntry.from_execution(execution, character_id, contract))
+            return execution
 
         after=StateSnapshot.capture(
             f"{execution_id}:after:{sequence}", character_id, sequence+1, after_state,
@@ -51,4 +53,6 @@ class TransformationExecutor:
         certificate = None
         if result.status == "VALIDATED" and result.certificate_eligible:
             certificate = TransformationCertificate.issue(execution_id, contract, result)
-        return TransformationExecution(execution_id,before.snapshot_id,after.snapshot_id,result,certificate)
+        execution=TransformationExecution(execution_id,before.snapshot_id,after.snapshot_id,result,certificate)
+        self.ledger.append(TransformationLedgerEntry.from_execution(execution, character_id, contract))
+        return execution
