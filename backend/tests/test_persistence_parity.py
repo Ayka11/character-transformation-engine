@@ -1,0 +1,40 @@
+import os
+import pytest
+from cte.persistence import SQLiteRuntimeStore
+
+def _contract_sequence(store):
+    store.put_snapshot("parity.immutable", "s1", {"value": 1}, "1.0")
+    same = store.put_snapshot("parity.immutable", "s1", {"value": 1}, "1.0")
+    with pytest.raises(ValueError, match="immutable snapshot conflict"):
+        store.put_snapshot("parity.immutable", "s1", {"value": 2}, "1.0")
+    store.append_event("e1", "parity", "CHECK", {"ok": True}, "in", "out", "prov")
+    store.append_event("e1", "parity", "CHECK", {"ok": True}, "in", "out", "prov")
+    with pytest.raises(ValueError, match="immutable event conflict"):
+        store.append_event("e1", "parity", "CHECK", {"ok": False}, "in", "out", "prov")
+    batch = store.put_snapshots_atomic([
+        ("parity.atomic", "before", {"n": 1}, "1.0"),
+        ("parity.atomic", "after", {"n": 2}, "1.0"),
+    ])
+    return {"snapshot_hash": same.payload_hash, "event": store.get_event("e1"),
+            "batch": [(x.key, x.payload_hash) for x in batch]}
+
+def test_sqlite_runtime_contract_is_self_consistent():
+    result = _contract_sequence(SQLiteRuntimeStore(":memory:"))
+    assert result["event"]["payload"] == {"ok": True}
+    assert [x[0] for x in result["batch"]] == ["before", "after"]
+
+@pytest.mark.skipif(not os.getenv("CTE_DATABASE_URL"), reason="CTE_DATABASE_URL is required for live PostgreSQL parity")
+def test_postgres_runtime_contract_matches_sqlite():
+    from cte.postgres_persistence import PostgreSQLRuntimeStore
+    sqlite_result = _contract_sequence(SQLiteRuntimeStore(":memory:"))
+    store = PostgreSQLRuntimeStore(os.environ["CTE_DATABASE_URL"])
+    result = _contract_sequence(store)
+    assert result["snapshot_hash"] == sqlite_result["snapshot_hash"]
+    assert result["event"]["payload"] == sqlite_result["event"]["payload"]
+    assert result["event"]["input_hash"] == sqlite_result["event"]["input_hash"]
+    assert result["event"]["output_hash"] == sqlite_result["event"]["output_hash"]
+    assert result["batch"] == sqlite_result["batch"]
+    with store.transaction() as conn:
+        with conn.cursor() as cur:
+            cur.execute("DELETE FROM runtime_events WHERE event_id=%s", ("e1",))
+            cur.execute("DELETE FROM runtime_snapshots WHERE namespace LIKE 'parity.%'")
