@@ -17,3 +17,15 @@ button{margin-top:8px;border:1px solid #44526a;background:#222b3a;color:#f4f7fb;
 button:hover{background:#2b374b}
 pre{margin:0;white-space:pre-wrap;overflow:auto;max-height:420px;background:#0c1016;border:1px solid #283143;border-radius:10px;padding:12px;font-size:12px;line-height:1.5}
 @media(max-width:840px){.shell{padding:18px}.grid{grid-template-columns:1fr}.span2{grid-column:auto}header{display:block}.status{display:inline-block;margin-top:16px}}
+
+.metrics{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:10px;margin-bottom:16px}
+.metrics>div{background:#0e1218;border:1px solid #283143;border-radius:10px;padding:13px}
+.metrics span{display:block;font-size:11px;color:#8f9bb0;text-transform:uppercase;letter-spacing:.07em}
+.metrics strong{display:block;font-size:24px;margin-top:5px}
+.table-wrap{overflow:auto;border:1px solid #283143;border-radius:10px}
+table{width:100%;border-collapse:collapse;font-size:12px}
+th,td{padding:10px 12px;border-bottom:1px solid #252e3d;text-align:left;vertical-align:top}
+th{font-size:11px;color:#8f9bb0;text-transform:uppercase;letter-spacing:.06em}
+.row-actions{display:flex;gap:10px;flex-wrap:wrap}
+.api-key{min-width:220px}
+@media(max-width:900px){.metrics{grid-template-columns:repeat(2,minmax(0,1fr))}}
