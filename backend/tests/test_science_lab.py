@@ -160,3 +160,41 @@ def test_lab_descriptive_statistics_is_explicitly_non_inferential(tmp_path):
     assert stats["completed_runs"]==1
     assert stats["descriptive_estimate_mean"]==7.0
     assert stats["scientific_status"]=="DESCRIPTIVE_ONLY_MODEL_DERIVED_RUNTIME"
+
+
+def test_factorial_scenario_generator_is_deterministic_and_bounded(tmp_path):
+    lab=make_lab(tmp_path)
+    matrix=lab.register_matrix(
+        matrix_id="m1",study_id="study-root",name="Factor Matrix",
+        primary_outcome="value",design={"type":"factorial"}
+    )
+    scenarios=lab.generate_scenarios(
+        matrix_id=matrix.matrix_id,
+        factors={"dose":[0,1],"tempo":["slow","fast"]},
+        max_scenarios=8,
+        name_prefix="Scenario"
+    )
+    assert len(scenarios)==4
+    assert [s.scenario_id for s in scenarios]==[
+        "m1:scenario:001","m1:scenario:002","m1:scenario:003","m1:scenario:004"
+    ]
+    assert scenarios[0].conditions=={"dose":0,"tempo":"slow"}
+    assert all(s.independent is False for s in scenarios)
+
+
+def test_factorial_scenario_generator_rejects_explosion(tmp_path):
+    lab=make_lab(tmp_path)
+    lab.register_matrix(
+        matrix_id="m1",study_id="study-root",name="Factor Matrix",
+        primary_outcome="value",design={"type":"factorial"}
+    )
+    try:
+        lab.generate_scenarios(
+            matrix_id="m1",
+            factors={"a":[1,2,3,4],"b":[1,2,3,4]},
+            max_scenarios=8
+        )
+    except ValueError as e:
+        assert "max is 8" in str(e)
+    else:
+        assert False
