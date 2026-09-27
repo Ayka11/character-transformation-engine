@@ -20,6 +20,7 @@ class ReportCreateInput(BaseModel):
     report_spec_id:str
     study_id:str
     source_artifacts:list[str]
+    execution_id:str|None=None
 
 class ReportSectionInput(BaseModel):
     section_code:str
@@ -60,7 +61,7 @@ def install_reporting_api(app, graph_registry, store:SQLiteRuntimeStore|None=Non
     @app.post("/reports")
     def create_report(p:ReportCreateInput):
         try:
-            return asdict(service.create(p.report_run_id,p.report_spec_id,p.study_id,p.source_artifacts))
+            return asdict(service.create(p.report_run_id,p.report_spec_id,p.study_id,p.source_artifacts,p.execution_id))
         except ValueError as e:
             raise HTTPException(400,str(e))
 
