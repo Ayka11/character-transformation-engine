@@ -22,6 +22,7 @@ from .claim_gate import validate_claim_transition
 from .replication import register_replication, register_generalization
 from .replication_engine import ReplicationRun as EngineReplicationRun, register_spec as register_replication_spec, register_run as register_replication_run, evaluate_outcome as evaluate_replication_outcome
 from .generalization_engine import register_spec as register_generalization_spec, register_run as register_generalization_run, evaluate as evaluate_generalization
+from .evidence_engine import register_criteria
 
 app = FastAPI(title="Character Transformation Engine", version="2.1.0")
 GRAPH_REGISTRY = build_registry()
@@ -29,6 +30,7 @@ REPLICATION_SPECS = {}
 REPLICATION_RUNS = {}
 GENERALIZATION_SPECS = {}
 GENERALIZATION_RUNS = {}
+EVIDENCE_CRITERIA = {}
 
 class StateInput(BaseModel):
     sleep_quality: float | None = Field(None, ge=0, le=10)
@@ -83,6 +85,13 @@ class ClaimInput(BaseModel):
     provenance_class: str = "DRV"
     metadata: dict = Field(default_factory=dict)
     previous_claim_id: str | None = None
+
+class EvidenceCriteriaInput(BaseModel):
+    criteria_id: str
+    claim_id: str
+    analysis_id: str
+    rule_ids: list[str]
+    acceptance_rules: dict = Field(default_factory=dict)
 
 class GeneralizationSpecInput(BaseModel):
     generalization_spec_id: str
@@ -367,6 +376,24 @@ def validation_generalization(p: GeneralizationInput):
     GRAPH_REGISTRY.add_node(node)
     GRAPH_REGISTRY.add_edge(register_edge(f"{p.generalization_id}:generalizes:{p.source_result_id}",node,GRAPH_REGISTRY.nodes[p.source_result_id],"GENERALIZES",rationale="registered generalization record"))
     return {"record":asdict(record),"graph_node":asdict(node)}
+
+@app.post("/graph/evidence-criteria")
+def graph_evidence_criteria(p: EvidenceCriteriaInput):
+    if p.criteria_id in EVIDENCE_CRITERIA:
+        raise ValueError("evidence criteria already registered")
+    analysis=GRAPH_REGISTRY.nodes.get(p.analysis_id)
+    if analysis is None or analysis.node_type!="ANALYSIS":
+        raise ValueError("analysis_id must reference a registered ANALYSIS")
+    criteria=register_criteria(p.criteria_id,p.claim_id,rule_ids=p.rule_ids,acceptance_rules=p.acceptance_rules)
+    EVIDENCE_CRITERIA[p.criteria_id]=criteria
+    node=register_node(p.criteria_id,"PROTOCOL",p.criteria_id,criteria.provenance.tag.value,criteria.version,
+                       {"kind":"EVIDENCE_CRITERIA","claim_id":criteria.claim_id,
+                        "rule_ids":list(criteria.rule_ids),"acceptance_rules":criteria.acceptance_rules})
+    GRAPH_REGISTRY.add_node(node)
+    GRAPH_REGISTRY.add_edge(register_edge(f"{analysis.node_id}:evidence-criteria:{node.node_id}",
+                                          analysis,node,"USES_PROTOCOL",
+                                          rationale="registered evidence criteria linked to analysis"))
+    return {"criteria":asdict(criteria),"graph_node":asdict(node)}
 
 @app.post("/graph/claim-gate")
 def graph_claim_gate(p: ClaimGateInput):
