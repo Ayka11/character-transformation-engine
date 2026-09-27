@@ -36,7 +36,7 @@ def test_generalized_claim_blocks_unsuccessful_transport():
 def test_evidence_supported_requires_claim_bound_evidence_criteria():
     from cte.evidence_graph import register_node, register_edge
     g=_generalized_graph()
-    criteria=register_node("ec","PROTOCOL","ec","DRV","1",{"kind":"EVIDENCE_CRITERIA","claim_id":"c3","rule_ids":["E1"]})
+    criteria=register_node("ec","PROTOCOL","ec","DRV","1",{"kind":"EVIDENCE_CRITERIA","claim_id":"unrelated-claim","rule_ids":["E1"]})
     g.add_node(criteria)
     g.add_edge(register_edge("epc",g.nodes["a"],criteria,"USES_PROTOCOL"))
     g.register_claim("c1","r","REGISTERED","DESCRIPTIVE_RESULT","DRV",{})
@@ -52,7 +52,7 @@ def test_evidence_supported_requires_claim_bound_evidence_criteria():
 def test_evidence_supported_opens_for_matching_prior_claim_and_criteria():
     from cte.evidence_graph import register_node, register_edge
     g=_generalized_graph()
-    criteria=register_node("ec2","PROTOCOL","ec2","DRV","1",{"kind":"EVIDENCE_CRITERIA","claim_id":"c3","rule_ids":["E1"]})
+    criteria=register_node("ec2","PROTOCOL","ec2","DRV","1",{"kind":"EVIDENCE_CRITERIA","claim_id":"c4","rule_ids":["E1"]})
     g.add_node(criteria)
     g.add_edge(register_edge("epc2",g.nodes["a"],criteria,"USES_PROTOCOL"))
     g.register_claim("c1","r","REGISTERED","DESCRIPTIVE_RESULT","DRV",{})
