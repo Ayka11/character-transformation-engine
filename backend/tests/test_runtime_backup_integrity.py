@@ -264,7 +264,7 @@ def test_adversarial_lineage_damage_blocks_transformation_backed_claim():
 
     # Attack 2: destroy the durable ledger. This must invalidate transformation support.
     ledger_id = tp["ledger_id"]
-    db.delete_snapshot("transformation.ledger", ledger_id)
+    with db._connect() as conn:\n        conn.execute("DELETE FROM runtime_snapshots WHERE namespace=? AND key=?", ("transformation.ledger", ledger_id))\n        conn.commit()
     damaged = support()
     assert damaged["status"] == "NOT_VALIDATED"
     assert damaged["integrity_status"] != "PASS"
