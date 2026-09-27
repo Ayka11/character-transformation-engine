@@ -24,6 +24,7 @@ from .replication_engine import ReplicationRun as EngineReplicationRun, register
 from .generalization_engine import register_spec as register_generalization_spec, register_run as register_generalization_run, evaluate as evaluate_generalization
 from .evidence_engine import register_criteria
 from .reporting_api import install_reporting_api
+from .intervention_api import install_intervention_api
 
 app = FastAPI(title="Character Transformation Engine", version="2.1.0")
 GRAPH_REGISTRY = build_registry()
@@ -525,3 +526,6 @@ def compatibility(p: CompatibilityInput):
 
 
 REPORT_SERVICE = install_reporting_api(app, GRAPH_REGISTRY)
+
+
+INTERVENTION_SERVICE = install_intervention_api(app, GRAPH_REGISTRY)
