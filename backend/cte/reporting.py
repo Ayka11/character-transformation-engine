@@ -128,7 +128,7 @@ def claim_language(claim_status:str)->tuple[str,str]:
 
 def build_source_manifest(registry, artifact_ids:list[str])->str:
     entries=[]
-    for artifact_id in artifact_ids:
+    for artifact_id in sorted(set(artifact_ids)):
         node=registry.nodes.get(artifact_id)
         if node is None:
             raise ValueError(f"source artifact is not registered: {artifact_id}")
