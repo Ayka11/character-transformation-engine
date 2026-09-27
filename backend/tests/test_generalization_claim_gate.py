@@ -5,7 +5,7 @@ def _generalized_graph():
     g=build_registry()
     d=register_node("d","DATASET","d","DRV","1",{})
     a=register_node("a","ANALYSIS","a","DRV","1",{})
-    r=register_node("r","RESULT","r","DRV","1",{"qc_status":"PASS"})
+    r=register_node("r","RESULT","r","DRV","1",{"qc_status":"PASS","validated_descriptive_result":True})
     rep=register_node("rep","REPLICATION","rep","DRV","1",{"independent":True,"criteria_registered":True,"assessment_status":"REPLICATED"})
     gen=register_node("gen","GENERALIZATION","gen","DRV","1",{"run_status":"COMPLETED","result_status":"GENERALIZABLE","target_population_context":{"site":"B"}})
     for n in (d,a,r,rep,gen): g.add_node(n)
@@ -38,7 +38,10 @@ def test_evidence_supported_requires_claim_bound_evidence_criteria():
     g=_generalized_graph()
     criteria=register_node("ec","PROTOCOL","ec","DRV","1",{"kind":"EVIDENCE_CRITERIA","claim_id":"c3","rule_ids":["E1"]})
     g.add_node(criteria)
-    g.add_edge(register_edge("epc","a", "ec","USES_PROTOCOL") if False else register_edge("epc",g.nodes["a"],criteria,"USES_PROTOCOL"))
+    g.add_edge(register_edge("epc",g.nodes["a"],criteria,"USES_PROTOCOL"))
+    g.register_claim("c1","r","REGISTERED","DESCRIPTIVE_RESULT","DRV",{})
+    g.register_claim("c2","r","DESCRIPTIVE_RESULT","ASSOCIATIONAL_RESULT","DRV",{},previous_claim_id="c1")
+    g.register_claim("c3","r","ASSOCIATIONAL_RESULT","REPLICATED_RESULT","DRV",{},previous_claim_id="c2")
     try:
         g.register_claim("c4","r","REPLICATED_RESULT","EVIDENCE_SUPPORTED","EVD",{},previous_claim_id="c3")
     except ValueError as e:
