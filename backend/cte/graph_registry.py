@@ -96,11 +96,11 @@ class GraphRegistry:
                 req.add("association_design")
             if node.node_type=="PROTOCOL" and design=="INTERVENTION":
                 req.add("registered_intervention")
-            if node.node_type=="REPLICATION" and bool(md.get("independent",False)):
+            if node.node_type=="REPLICATION" and bool(md.get("independent",False)) and md.get("assessment_status")=="REPLICATED":
                 req.add("independent_replication")
-            if node.node_type=="REPLICATION" and bool(md.get("criteria_registered",False)):
+            if node.node_type=="REPLICATION" and bool(md.get("criteria_registered",False)) and md.get("assessment_status")=="REPLICATED":
                 req.add("registered_replication_criteria")
-            if node.node_type=="GENERALIZATION" and md.get("run_status")=="COMPLETED":
+            if node.node_type=="GENERALIZATION" and md.get("run_status")=="COMPLETED" and md.get("result_status")=="GENERALIZABLE":
                 req.add("generalization_run")
             if node.node_type=="GENERALIZATION" and md.get("target_population_context"):
                 req.add("target_population_context")
