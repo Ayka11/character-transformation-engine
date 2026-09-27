@@ -22,4 +22,4 @@ CI contract coverage verifies:
 - runtime-store factory selection;
 - preservation of SQLite as the default when `CTE_DATABASE_URL` is absent.
 
-A live PostgreSQL integration test against a real database, migrations/rollback execution, backup/recovery, authentication/authorization, observability and production operational hardening remain open.
+A live PostgreSQL snapshot/event integration test now passes in GitHub Actions run #124 with a real postgres:16 service container. Migration/rollback execution as a deployment operation, backup/recovery, authentication/authorization, observability and production operational hardening remain open.
