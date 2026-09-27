@@ -1,0 +1,19 @@
+*{box-sizing:border-box}
+body{margin:0;font-family:Inter,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:#10131a;color:#e9eef5}
+.shell{max-width:1280px;margin:0 auto;padding:32px}
+header{display:flex;justify-content:space-between;gap:24px;align-items:flex-start;margin-bottom:28px}
+.eyebrow{font-size:12px;letter-spacing:.14em;color:#7f8ba3;font-weight:700}
+h1{font-size:42px;line-height:1.05;margin:8px 0}
+h2{font-size:18px;margin:0 0 18px}
+.muted{color:#9ca8ba;margin:0}
+.status{padding:8px 12px;border:1px solid #344055;border-radius:999px;font-size:13px}
+.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}
+.card{background:#171c25;border:1px solid #293244;border-radius:14px;padding:20px;box-shadow:0 8px 24px rgba(0,0,0,.18)}
+.span2{grid-column:1/-1}
+label{display:block;font-size:13px;color:#9ca8ba;margin:12px 0}
+input,textarea{display:block;width:100%;margin-top:7px;border:1px solid #344055;background:#0e1218;color:#edf2f8;border-radius:9px;padding:10px 12px;font:inherit}
+textarea{min-height:110px;resize:vertical}
+button{margin-top:8px;border:1px solid #44526a;background:#222b3a;color:#f4f7fb;border-radius:9px;padding:10px 14px;font-weight:700;cursor:pointer}
+button:hover{background:#2b374b}
+pre{margin:0;white-space:pre-wrap;overflow:auto;max-height:420px;background:#0c1016;border:1px solid #283143;border-radius:10px;padding:12px;font-size:12px;line-height:1.5}
+@media(max-width:840px){.shell{padding:18px}.grid{grid-template-columns:1fr}.span2{grid-column:auto}header{display:block}.status{display:inline-block;margin-top:16px}}
