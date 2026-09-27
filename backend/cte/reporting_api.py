@@ -4,6 +4,7 @@ from dataclasses import asdict
 from fastapi import HTTPException
 from pydantic import BaseModel, Field
 from .reporting import ReportService, register_spec
+from .persistence import SQLiteRuntimeStore
 from .evidence_graph import register_node, register_edge
 
 class ReportSpecInput(BaseModel):
@@ -45,15 +46,15 @@ class ReportDecisionInput(BaseModel):
 class ReportSupersedeInput(BaseModel):
     new_report_id:str
 
-def install_reporting_api(app, graph_registry):
-    service=ReportService(graph_registry)
+def install_reporting_api(app, graph_registry, store:SQLiteRuntimeStore|None=None):
+    service=ReportService(graph_registry,store)
     
     @app.post("/reports/specs")
     def create_spec(p:ReportSpecInput):
         if p.report_spec_id in service.specs:
             raise HTTPException(409,"report spec already registered")
         spec=register_spec(p.report_spec_id,p.name,p.version,p.section_order,p.rendering_rules,p.claim_language_rules)
-        service.specs[p.report_spec_id]=spec
+        service.register_spec(spec)
         return asdict(spec)
 
     @app.post("/reports")
