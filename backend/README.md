@@ -34,3 +34,5 @@ Important status boundary:
 - Model-derived rules remain model-derived unless separately supported by empirical evidence.
 
 Platform status: IMPLEMENTATION_BASELINE.
+
+Additional executable layers now include V1.6 Scientific Reporting and V1.7 Decision/Intervention runtime; both remain in-memory and are not empirically validated.
