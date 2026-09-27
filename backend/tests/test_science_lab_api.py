@@ -114,3 +114,25 @@ def test_science_lab_api_matrix_run_statistics_cycle():
     bundle=client.get(f"/science-lab/matrices/{matrix_id}/report")
     assert bundle.status_code==200
     assert bundle.json()["matrix"]["matrix_id"]==matrix_id
+
+
+def test_science_lab_html_report_endpoint_is_rendered():
+    client=TestClient(app)
+    suffix=uuid4().hex[:10]
+    matrix_id="html-matrix-"+suffix
+    response=client.post(
+        "/science-lab/matrices",
+        json={
+            "matrix_id":matrix_id,
+            "study_id":"html-study-"+suffix,
+            "name":"HTML Report Matrix",
+            "primary_outcome":"value",
+            "design":{"type":"scenario_matrix"}
+        }
+    )
+    assert response.status_code==200
+    report=client.get(f"/science-lab/matrices/{matrix_id}/report.html")
+    assert report.status_code==200
+    assert "Science Lab Report" in report.text
+    assert "Claim validation" in report.text
+    assert "Provenance" in report.text
