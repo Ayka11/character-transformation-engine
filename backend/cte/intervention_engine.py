@@ -193,6 +193,30 @@ class InterventionService:
         self._persist_assignment(assignment)
         return session
 
+    def execute_session_transformation(self, session_id: str, character_id: str, sequence: int,
+                                      state: dict, contract, intervention):
+        """Execute a session through the canonical validated transformation boundary."""
+        session, assignment = self._find_session(session_id)
+        if assignment.safety_gate_status != "PASS":
+            raise ValueError("session execution requires assignment safety gate PASS")
+        if not assignment.execution_id:
+            raise ValueError("session execution requires an execution_id")
+        from .transformation_runtime import TransformationExecutor
+        runtime=TransformationExecutor()
+        result=runtime.execute(assignment.execution_id, character_id, sequence, state, contract, intervention)
+        session.executed_load={"before_snapshot_id":result.before_snapshot_id,
+                               "after_snapshot_id":result.after_snapshot_id,
+                               "status":result.result.status,
+                               "failure_code":result.result.failure_code,
+                               "certificate_id":result.certificate.certificate_id if result.certificate else None}
+        session.completion_status="COMPLETED" if result.result.status=="VALIDATED" else "FAILED"
+        if result.result.status!="VALIDATED":
+            session.stop_reason=result.result.failure_code
+        assignment.audit.append(self._audit("SESSION_TRANSFORMATION_EXECUTED",assignment.assignment_id,
+                                            session.executed_load))
+        self._persist_assignment(assignment)
+        return result
+
     def record_measurement(self,session_id,metric_id, value_numeric=None, value_text=None, missing_reason=None):
         session,assignment=self._find_session(session_id)
         if value_numeric is None and value_text is None and not missing_reason:
