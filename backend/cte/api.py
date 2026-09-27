@@ -295,6 +295,7 @@ class SprintDayInput(BaseModel):
     action_completed: bool
     outcome: float | None = Field(None, ge=0, le=10)
     state: StateInput
+    recovery_indices: list[float | None] = Field(default_factory=list)
 
 GRAPH = TraitGraph({
     "P3.pause_capacity": ["P3.impulse_control"],
