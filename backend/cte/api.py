@@ -77,6 +77,14 @@ class ClaimInput(BaseModel):
     metadata: dict = Field(default_factory=dict)
     previous_claim_id: str | None = None
 
+class NodeInput(BaseModel):
+    node_id: str
+    node_type: str
+    entity_id: str
+    provenance_class: str = "DRV"
+    version: str = "2.1.0"
+    metadata: dict = Field(default_factory=dict)
+
 class GraphEdgeInput(BaseModel):
     edge_id: str
     from_node_id: str
@@ -194,14 +202,18 @@ def graph_lineage(node_id: str):
     return {"node_id":node_id,"node_type":GRAPH_REGISTRY.nodes[node_id].node_type,"upstream_nodes":[asdict(n) for n in nodes]}
 
 @app.post("/graph/register-node")
-def graph_register_node(p: GraphEdgeInput):
-    node=register_node(p.from_node_id,p.from_node_type,p.from_node_id,"DRV","2.1.0",{})
+def graph_register_node(p: NodeInput):
+    node=register_node(p.node_id,p.node_type,p.entity_id,p.provenance_class,p.version,p.metadata)
     return asdict(GRAPH_REGISTRY.add_node(node))
 
 @app.post("/graph/edge")
 def graph_edge(p: GraphEdgeInput):
-    source=GRAPH_REGISTRY.add_node(register_node(p.from_node_id,p.from_node_type,p.from_node_id,"DRV","2.1.0",{}))
-    target=GRAPH_REGISTRY.add_node(register_node(p.to_node_id,p.to_node_type,p.to_node_id,"DRV","2.1.0",{}))
+    source=GRAPH_REGISTRY.nodes.get(p.from_node_id)
+    target=GRAPH_REGISTRY.nodes.get(p.to_node_id)
+    if source is None or target is None:
+        raise ValueError("edge requires pre-registered nodes")
+    if source.node_type != p.from_node_type or target.node_type != p.to_node_type:
+        raise ValueError("edge node type does not match registered node")
     edge=GRAPH_REGISTRY.add_edge(register_edge(p.edge_id,source,target,p.edge_type,rationale=p.rationale))
     if target.node_type=="RESULT":
         GRAPH_REGISTRY.require_lineage_for_result(target.node_id)
