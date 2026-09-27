@@ -114,7 +114,7 @@ class InterventionService:
             "rule_version":assignment.rule_version,"selected_level":assignment.selected_level,
             "source_assessment_id":assignment.source_assessment_id,"source_claim_ids":list(assignment.source_claim_ids),
             "selection_reason":assignment.selection_reason,"safety_gate_status":assignment.safety_gate_status,
-            "status":assignment.status,
+            "status":assignment.status,"execution_id":assignment.execution_id,
             "sessions":{k:{
                 "session_id":v.session_id,"assignment_id":v.assignment_id,"planned_load":v.planned_load,
                 "completion_status":v.completion_status,"executed_load":v.executed_load,
