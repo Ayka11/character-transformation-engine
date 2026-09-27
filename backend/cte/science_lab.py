@@ -322,6 +322,32 @@ class ScienceLabService:
              "output_hash": item.output_hash,
              "transformation_provenance": item.transformation_provenance},
         ))
+        transformation = item.transformation_provenance
+        transformation_node_id = f"transformation:{item.execution_id}"
+        if transformation_node_id not in self.registry.nodes:
+            self.registry.add_node(register_node(
+                transformation_node_id, "TRANSFORMATION", item.execution_id, "EXP", VERSION,
+                {
+                    "kind": "VALIDATED_TRANSFORMATION_PROVENANCE",
+                    "execution_id": item.execution_id,
+                    "validated": transformation.get("validated", False),
+                    "integrity_status": transformation.get("integrity_status"),
+                    "ledger_id": transformation.get("ledger_id"),
+                    "certificate_id": transformation.get("certificate_id"),
+                    "before_snapshot_id": transformation.get("before_snapshot_id"),
+                    "after_snapshot_id": transformation.get("after_snapshot_id"),
+                    "contract_id": transformation.get("contract_id"),
+                    "contract_version": transformation.get("contract_version"),
+                    "issues": transformation.get("issues", []),
+                },
+            ))
+        self.registry.add_edge(register_edge(
+            f"{item.run_id}:transformation:{transformation_node_id}",
+            self.registry.nodes[item.run_id],
+            self.registry.nodes[transformation_node_id],
+            "DERIVED_FROM",
+            rationale="Science Lab scenario run is provenance-bound to transformation execution",
+        ))
         for result_id in result_ids:
             if result_id in self.registry.nodes:
                 self.registry.add_edge(register_edge(
