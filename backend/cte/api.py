@@ -18,6 +18,7 @@ from .registered_analysis import lock_manifest, paired_effect
 from .result_node import build_result, graph_node
 from .evidence_graph import register_node, register_edge
 from .graph_registry import build_registry
+from .claim_gate import validate_claim_transition
 
 app = FastAPI(title="Character Transformation Engine", version="2.1.0")
 GRAPH_REGISTRY = build_registry()
@@ -60,6 +61,12 @@ class SprintStartInput(BaseModel):
     target_trait: str
     supporting_bio_habit: str
     daily_action: str
+
+class ClaimGateInput(BaseModel):
+    current_state: str
+    target_level: str
+    upstream_types: list[str] = Field(default_factory=list)
+    provenance_class: str = "DRV"
 
 class GraphEdgeInput(BaseModel):
     edge_id: str
@@ -159,6 +166,10 @@ def runtime_sprint_day(p: SprintDayInput):
     sprint.supporting_bio_habit=p.supporting_bio_habit
     sprint.daily_action=p.daily_action
     return asdict(record_day(sprint,p.day,p.action_completed,p.outcome,state))
+
+@app.post("/graph/claim-gate")
+def graph_claim_gate(p: ClaimGateInput):
+    return validate_claim_transition(p.current_state,p.target_level,set(p.upstream_types),p.provenance_class)
 
 @app.post("/graph/register-node")
 def graph_register_node(p: GraphEdgeInput):
