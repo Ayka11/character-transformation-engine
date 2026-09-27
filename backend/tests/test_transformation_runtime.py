@@ -65,3 +65,4 @@ def test_repeated_identical_request_is_idempotent():
     assert first.certificate.certificate_id==second.certificate.certificate_id
     assert calls["n"]==1
     assert len(ledger.list())==1
+    assert ledger.list()[0].request_hash
