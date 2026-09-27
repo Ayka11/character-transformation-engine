@@ -34,7 +34,7 @@ from .orchestrator_api import install_orchestrator_api
 from .integrity_runner import run_v19_integrity_suite
 from .research_api import install_research_api
 from .science_lab_api import install_science_lab_api
-from .persistence import SQLiteRuntimeStore
+from .persistence import SQLiteRuntimeStore, build_runtime_store
 
 app = FastAPI(title="Character Transformation Engine", version="2.1.0")
 
@@ -47,7 +47,7 @@ if FRONTEND_DIR.exists():
         return FileResponse(FRONTEND_DIR / "index.html")
 
 RUNTIME_DB_PATH = os.getenv("CTE_RUNTIME_DB", "data/cte-runtime.sqlite3")
-RUNTIME_STORE = SQLiteRuntimeStore(RUNTIME_DB_PATH)
+RUNTIME_STORE = build_runtime_store(RUNTIME_DB_PATH)
 GRAPH_REGISTRY = build_registry(RUNTIME_STORE)
 REPLICATION_SPECS = {}
 REPLICATION_RUNS = {}
