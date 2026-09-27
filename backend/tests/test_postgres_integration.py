@@ -129,3 +129,44 @@ def test_postgres_concurrent_immutable_snapshot_and_event_writes_are_idempotent(
                 "DELETE FROM runtime_snapshots WHERE namespace=%s AND key=%s",
                 ("integration.concurrent", snapshot_key),
             )
+
+
+@pytest.mark.skipif(
+    not os.getenv("CTE_DATABASE_URL"),
+    reason="CTE_DATABASE_URL is required for live PostgreSQL integration",
+)
+def test_postgres_transformation_executor_and_provenance_roundtrip():
+    from cte.contracts.transformation import TransformationContract
+    from cte.state_snapshot_store import StateSnapshotStore
+    from cte.transformation_ledger import TransformationLedger
+    from cte.transformation_provenance import TransformationProvenanceBinder
+    from cte.transformation_runtime import TransformationExecutor
+
+    dsn = os.environ["CTE_DATABASE_URL"]
+    store = PostgreSQLRuntimeStore(dsn)
+    snapshots = StateSnapshotStore(store)
+    ledger = TransformationLedger(store)
+    execution_id = f"pg-provenance-{os.urandom(6).hex()}"
+
+    result = TransformationExecutor(snapshots, ledger).execute(
+        execution_id,
+        "pg-character",
+        1,
+        {"tempo": 5},
+        TransformationContract("pg-contract", "1", expected_changes={"tempo": 6}),
+        lambda state: {"tempo": 6},
+    )
+
+    assert result.status == "VALIDATED"
+    binding = TransformationProvenanceBinder(store).bind_execution(execution_id)
+    assert binding["validated"] is True
+    assert binding["integrity_status"] == "PASS"
+    assert binding["ledger_id"] == result.ledger_id
+    assert binding["certificate_id"] == result.certificate.certificate_id
+
+    with store.transaction() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                "DELETE FROM runtime_snapshots WHERE namespace IN ('state.snapshot','transformation.ledger','transformation.certificate') AND key LIKE %s",
+                (f"%{execution_id}%",),
+            )
