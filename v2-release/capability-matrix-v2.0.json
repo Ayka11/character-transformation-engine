@@ -1,0 +1,96 @@
+{
+  "version": "2.0",
+  "capabilities": [
+    [
+      "measurement",
+      "baseline assessment",
+      "required",
+      "V1.0"
+    ],
+    [
+      "measurement",
+      "daily state tracking",
+      "required",
+      "V1.1"
+    ],
+    [
+      "measurement",
+      "behavioral events",
+      "required",
+      "V1.1"
+    ],
+    [
+      "runtime",
+      "capacity estimation",
+      "required",
+      "V1.1"
+    ],
+    [
+      "runtime",
+      "adaptive sprint",
+      "required",
+      "V1.1"
+    ],
+    [
+      "research",
+      "study/protocol execution",
+      "required",
+      "V1.2"
+    ],
+    [
+      "analytics",
+      "effect/uncertainty analysis",
+      "required",
+      "V1.3"
+    ],
+    [
+      "evidence",
+      "claim lineage",
+      "required",
+      "V1.4"
+    ],
+    [
+      "replication",
+      "registered replication criteria",
+      "required",
+      "V1.5"
+    ],
+    [
+      "generalization",
+      "transport target/boundaries",
+      "required",
+      "V1.5"
+    ],
+    [
+      "reporting",
+      "provenance-linked reports",
+      "required",
+      "V1.6"
+    ],
+    [
+      "intervention",
+      "registered rule execution",
+      "required",
+      "V1.7"
+    ],
+    [
+      "orchestration",
+      "cross-layer execution graph",
+      "required",
+      "V1.8"
+    ],
+    [
+      "integrity",
+      "negative + provenance + E2E tests",
+      "required",
+      "V1.9"
+    ]
+  ],
+  "implementation_state_semantics": [
+    "SPECIFIED = architecture/contract exists",
+    "IMPLEMENTED = backend/frontend implementation exists",
+    "TESTED = implementation test has executed and passed",
+    "VALIDATED = scientific/empirical validation exists"
+  ],
+  "important": "V2.0 must not label a capability VALIDATED merely because its architecture is SPECIFIED."
+}
