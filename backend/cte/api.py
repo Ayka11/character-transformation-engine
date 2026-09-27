@@ -63,9 +63,9 @@ class SprintStartInput(BaseModel):
     daily_action: str
 
 class ClaimGateInput(BaseModel):
+    result_id: str
     current_state: str
     target_level: str
-    upstream_types: list[str] = Field(default_factory=list)
     provenance_class: str = "DRV"
 
 class GraphEdgeInput(BaseModel):
@@ -169,7 +169,8 @@ def runtime_sprint_day(p: SprintDayInput):
 
 @app.post("/graph/claim-gate")
 def graph_claim_gate(p: ClaimGateInput):
-    return validate_claim_transition(p.current_state,p.target_level,set(p.upstream_types),p.provenance_class)
+    upstream=GRAPH_REGISTRY.claim_upstream_types(p.result_id)
+    return validate_claim_transition(p.current_state,p.target_level,upstream,p.provenance_class)
 
 @app.post("/graph/register-node")
 def graph_register_node(p: GraphEdgeInput):
