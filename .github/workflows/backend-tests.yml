@@ -20,7 +20,7 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install -r backend/requirements.txt pytest
+          pip install -r backend/requirements.txt pytest pytest-timeout
       - name: Verify local backend package resolution
         env:
           PYTHONPATH: ${{ github.workspace }}/backend
@@ -31,7 +31,7 @@ jobs:
           PYTHONPATH: ${{ github.workspace }}/backend
         run: |
           cd backend
-          python -m pytest -q
+          python -m pytest -vv --timeout=120 --durations=20
       - name: Check Science Lab UI JavaScript
         run: node --check frontend/app.js
 
