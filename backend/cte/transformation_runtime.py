@@ -124,12 +124,18 @@ class TransformationExecutor:
         return execution
 
     def _replay_existing(self,entry):
+        changed_fields=()
+        if entry.before_snapshot_id and entry.after_snapshot_id:
+            before=self.snapshots.get(entry.before_snapshot_id)
+            after=self.snapshots.get(entry.after_snapshot_id)
+            if before is not None and after is not None:
+                changed_fields=tuple(sorted(StateDiffEngine.compare(before,after).changed))
         result=TransformationResult(entry.status,entry.failure_code,entry.before_snapshot_id,
-            entry.after_snapshot_id or "",entry.before_hash,entry.after_hash,(),bool(entry.certificate_id),
+            entry.after_snapshot_id or "",entry.before_hash,entry.after_hash,changed_fields,bool(entry.certificate_id),
             {"idempotent_replay":True})
         certificate=None
         if entry.certificate_id:
             certificate=TransformationCertificate(entry.certificate_id,entry.execution_id,entry.contract_id,
                 entry.contract_version,entry.before_snapshot_id,entry.after_snapshot_id or "",
-                entry.before_hash,entry.after_hash,(),entry.certificate_id)
+                entry.before_hash,entry.after_hash,changed_fields,entry.certificate_id)
         return TransformationExecution(entry.execution_id,entry.before_snapshot_id,entry.after_snapshot_id,result,certificate)
