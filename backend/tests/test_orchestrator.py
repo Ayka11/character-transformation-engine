@@ -93,3 +93,35 @@ def test_no_state_change_fails_execution_and_forbids_certificate():
     assert result.failure_code=="NO_STATE_CHANGE"
     assert not result.certificate_eligible
     assert o.executions["tx"].state=="FAILED"
+
+def test_orchestrator_intervention_uses_validated_transformation_runtime():
+    from cte.contracts.transformation import TransformationContract
+    o=OrchestratorService()
+    o.create_execution("tx2","c",{},["SAFETY_GATE","INTERVENTION"])
+    o.start("tx2")
+    o.advance_stage("tx2","SAFETY_GATE","PASSED",metadata={"safety_status":"PASS"})
+    result=o.execute_transformation(
+        "tx2","character-1",1,{"tempo":5},
+        TransformationContract("t1","1",expected_changes={"tempo":6}),
+        lambda state:{**state,"tempo":6},
+    )
+    assert result.result.status=="VALIDATED"
+    assert result.certificate is not None
+    assert o.executions["tx2"].stages["INTERVENTION"].state=="PASSED"
+
+def test_orchestrator_blocks_intervention_without_safety_pass():
+    from cte.contracts.transformation import TransformationContract
+    o=OrchestratorService()
+    o.create_execution("tx3","c",{},["SAFETY_GATE","INTERVENTION"])
+    o.start("tx3")
+    o.advance_stage("tx3","SAFETY_GATE","BLOCKED",reason="safety",metadata={"safety_status":"BLOCK"})
+    try:
+        o.execute_transformation(
+            "tx3","character-1",1,{"tempo":5},
+            TransformationContract("t1","1",expected_changes={"tempo":6}),
+            lambda state:{**state,"tempo":6},
+        )
+    except ValueError as exc:
+        assert "safety gate" in str(exc)
+    else:
+        assert False
