@@ -307,6 +307,7 @@ class ScienceLabService:
             "estimate_by_outcome": item.estimate_by_outcome,
             "safety_status": item.safety_status,
             "output_hash": item.output_hash,
+            "transformation_provenance": item.transformation_provenance,
             "provenance_tag": prov.tag.value,
             "source": prov.source_id,
             "version": prov.source_version,
@@ -318,7 +319,8 @@ class ScienceLabService:
             {"kind": "SCENARIO_RUN", "matrix_id": matrix_id,
              "scenario_id": scenario_id, "execution_id": item.execution_id,
              "status": item.status, "result_ids": list(result_ids),
-             "output_hash": item.output_hash},
+             "output_hash": item.output_hash,
+             "transformation_provenance": item.transformation_provenance},
         ))
         for result_id in result_ids:
             if result_id in self.registry.nodes:
