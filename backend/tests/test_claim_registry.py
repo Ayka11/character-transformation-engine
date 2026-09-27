@@ -6,9 +6,11 @@ def _result_graph():
     d=register_node("d","DATASET","d","DRV","1",{"values_hash":"x"})
     a=register_node("a","ANALYSIS","a","DRV","1",{"design_type":"ASSOCIATIONAL"})
     r=register_node("r","RESULT","r","DRV","1",{"qc_status":"PASS"})
-    for n in (d,a,r): g.add_node(n)
+    p=register_node("p","PROTOCOL","p","DRV","1",{"design_type":"ASSOCIATIONAL"})
+    for n in (d,a,r,p): g.add_node(n)
     g.add_edge(register_edge("ed",a,d,"ANALYZED_FROM"))
     g.add_edge(register_edge("er",a,r,"RESULTS_IN"))
+    g.add_edge(register_edge("ep",p,a,"USES_PROTOCOL"))
     return g
 
 def test_claim_registration_creates_support_edge():
