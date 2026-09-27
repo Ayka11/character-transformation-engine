@@ -125,3 +125,35 @@ def test_orchestrator_blocks_intervention_without_safety_pass():
         assert "safety gate" in str(exc)
     else:
         assert False
+
+
+def test_completion_rejects_intervention_without_validated_certificate():
+    o=OrchestratorService()
+    o.create_execution("complete-block","c",{},["SAFETY_GATE","INTERVENTION"])
+    o.start("complete-block")
+    o.advance_stage("complete-block","SAFETY_GATE","PASSED",metadata={"safety_status":"PASS"})
+    o.advance_stage("complete-block","INTERVENTION","PASSED",
+                     input_hash="before",output_hash="after",
+                     metadata={"transition_status":"EXECUTED"})
+    try:
+        o.complete("complete-block")
+    except ValueError as exc:
+        assert "VALIDATED" in str(exc)
+    else:
+        assert False
+
+
+def test_completion_rejects_validated_intervention_without_certificate():
+    o=OrchestratorService()
+    o.create_execution("complete-cert","c",{},["INTERVENTION"])
+    o.start("complete-cert")
+    o.advance_stage("complete-cert","INTERVENTION","PASSED",
+                     input_hash="before",output_hash="after",
+                     metadata={"transition_status":"VALIDATED",
+                               "before_snapshot_id":"b","after_snapshot_id":"a"})
+    try:
+        o.complete("complete-cert")
+    except ValueError as exc:
+        assert "certificate" in str(exc)
+    else:
+        assert False
