@@ -9,9 +9,9 @@ from cte.transformation_runtime import TransformationExecutor
 def test_different_requests_same_character_sequence_conflict():
     db=SQLiteRuntimeStore(":memory:")
     guard=TransformationConcurrencyGuard(db)
-    guard.acquire("c1",7,"parent-a","request-a")
+    guard.acquire("c1",1,None,"request-a")
     try:
-        guard.acquire("c1",7,"parent-b","request-b")
+        guard.acquire("c1",1,None,"request-b")
     except Exception as exc:
         assert getattr(exc,"code",None) == "VERSION_CONFLICT"
     else:
@@ -20,8 +20,8 @@ def test_different_requests_same_character_sequence_conflict():
 def test_same_request_is_idempotent_at_concurrency_guard():
     db=SQLiteRuntimeStore(":memory:")
     guard=TransformationConcurrencyGuard(db)
-    first=guard.acquire("c1",7,"parent-a","request-a")
-    second=guard.acquire("c1",7,"parent-a","request-a")
+    first=guard.acquire("c1",1,None,"request-a")
+    second=guard.acquire("c1",1,None,"request-a")
     assert first == second
 
 def test_runtime_does_not_invoke_intervention_after_version_conflict():
