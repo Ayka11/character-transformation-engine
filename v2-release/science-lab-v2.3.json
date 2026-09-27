@@ -1,0 +1,28 @@
+{
+  "name": "Character Transformation Engine — Science Lab V2.3",
+  "version": "2.3",
+  "status": "IMPLEMENTED_CI_TESTED",
+  "pipeline": ["EXPERIMENT_MATRIX","SCENARIO_DEFINITION","SCENARIO_RUN","DESCRIPTIVE_STATISTICS","REPLICATION_ASSESSMENT","GENERALIZATION_ASSESSMENT","CLAIM_VALIDATION","REPORT_BUNDLE","PROVENANCE"],
+  "invariants": [
+    "Every scenario run references one execution_id.",
+    "Scenario execution composes the V2.2 Research E2E coordinator.",
+    "Raw trial observations remain separate from derived results.",
+    "Replication requires an independent run and registered criteria.",
+    "Generalization records target population/context and transport error.",
+    "Claim validation does not silently upgrade model-derived status to empirical evidence.",
+    "Report bundles include descriptive statistics and provenance without fabricated inferential certainty."
+  ],
+  "api": [
+    "POST /science-lab/matrices",
+    "POST /science-lab/matrices/{matrix_id}/scenarios",
+    "POST /science-lab/matrices/{matrix_id}/scenarios/{scenario_id}/run",
+    "GET /science-lab/matrices/{matrix_id}/statistics",
+    "POST /science-lab/matrices/{matrix_id}/replication",
+    "POST /science-lab/matrices/{matrix_id}/generalization",
+    "GET /science-lab/matrices/{matrix_id}/claims",
+    "GET /science-lab/matrices/{matrix_id}/report",
+    "GET /science-lab/matrices/{matrix_id}"
+  ],
+  "browser_ui": "/science-lab/ui",
+  "scientific_status": "IMPLEMENTATION_BASELINE"
+}
