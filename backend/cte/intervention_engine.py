@@ -184,7 +184,7 @@ class InterventionService:
         assignment=self.assignments.get(assignment_id)
         if assignment is None: raise ValueError("assignment is not registered")
         if session_id in assignment.sessions: raise ValueError("session already registered")
-        if assignment.safety_gate_status=="BLOCK": raise ValueError("blocked assignment cannot create session")
+        if assignment.safety_gate_status!="PASS": raise ValueError("assignment is not executable: safety gate is not PASS")
         session=Session(session_id,assignment_id,dict(planned_load))
         assignment.sessions[session_id]=session
         assignment.audit.append(self._audit("SESSION_CREATED",assignment_id,{"session_id":session_id}))
