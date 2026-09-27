@@ -16,6 +16,7 @@ from .analysis import descriptive
 from .longitudinal import longitudinal_change
 from .registered_analysis import lock_manifest, paired_effect
 from .result_node import build_result, graph_node
+from .evidence_graph import register_node, register_edge
 
 app = FastAPI(title="Character Transformation Engine", version="2.1.0")
 
@@ -57,6 +58,15 @@ class SprintStartInput(BaseModel):
     target_trait: str
     supporting_bio_habit: str
     daily_action: str
+
+class GraphEdgeInput(BaseModel):
+    edge_id: str
+    from_node_id: str
+    from_node_type: str
+    to_node_id: str
+    to_node_type: str
+    edge_type: str
+    rationale: str = ""
 
 class RegisteredPairedInput(BaseModel):
     result_id: str = "result-1"
@@ -147,6 +157,12 @@ def runtime_sprint_day(p: SprintDayInput):
     sprint.supporting_bio_habit=p.supporting_bio_habit
     sprint.daily_action=p.daily_action
     return asdict(record_day(sprint,p.day,p.action_completed,p.outcome,state))
+
+@app.post("/graph/edge")
+def graph_edge(p: GraphEdgeInput):
+    source=register_node(p.from_node_id,p.from_node_type,p.from_node_id,"DRV","2.1.0",{})
+    target=register_node(p.to_node_id,p.to_node_type,p.to_node_id,"DRV","2.1.0",{})
+    return asdict(register_edge(p.edge_id,source,target,p.edge_type,rationale=p.rationale))
 
 @app.post("/validation/paired")
 def validation_paired(p: RegisteredPairedInput):
