@@ -94,11 +94,16 @@ class GraphRegistry:
             return existing
         if edge.from_node_id not in self.nodes or edge.to_node_id not in self.nodes:
             raise ValueError("edge references unknown node")
-        self.edges[edge.edge_id]=edge
         if self.store is not None:
             self.store.put_snapshot("graph.edge",edge.edge_id,{"edge_id":edge.edge_id,"from_node_id":edge.from_node_id,"to_node_id":edge.to_node_id,"edge_type":edge.edge_type,"relation_status":edge.relation_status,"input_hash":edge.input_hash,"rationale":edge.rationale},"1.4")
+        self.edges[edge.edge_id]=edge
         claim_id = edge.to_node_id if self.nodes.get(edge.to_node_id, None) and self.nodes[edge.to_node_id].node_type=="CLAIM" else (edge.from_node_id if self.nodes.get(edge.from_node_id, None) and self.nodes[edge.from_node_id].node_type=="CLAIM" else None)
-        self.audit_events.append(GraphAuditEvent("EDGE_REGISTERED",None,edge.edge_id,claim_id,edge.input_hash,"runtime"))
+        audit=GraphAuditEvent("EDGE_REGISTERED",None,edge.edge_id,claim_id,edge.input_hash,"runtime")
+        self.audit_events.append(audit)
+        if self.store is not None:
+            self.store.append_event(f"graph:edge:{edge.edge_id}","graph","EDGE_REGISTERED",
+                                    {"edge_id":edge.edge_id,"payload_hash":edge.input_hash,"claim_id":claim_id},
+                                    input_hash=edge.input_hash,provenance_record_id="1.4")
         return edge
 
 
@@ -123,6 +128,8 @@ class GraphRegistry:
                  "resolution_status":resolution_status,"resolution_note":resolution_note}
         item=ContradictionSet(contradiction_set_id,claim_id,tuple(node_ids),contradiction_type,
             resolution_status,resolution_note,"DRV","1.4",content_hash(payload))
+        if self.store is not None:
+            self.store.put_snapshot("graph.contradiction",contradiction_set_id,{"contradiction_set_id":item.contradiction_set_id,"claim_id":item.claim_id,"node_ids":list(item.node_ids),"contradiction_type":item.contradiction_type,"resolution_status":item.resolution_status,"resolution_note":item.resolution_note,"provenance_class":item.provenance_class,"version":item.version,"immutable_hash":item.immutable_hash},item.version)
         self.contradiction_sets[contradiction_set_id]=item
         for node_id in node_ids:
             self.add_edge(register_edge(f"{contradiction_set_id}:contradicts:{node_id}:{claim_id}",
@@ -139,6 +146,8 @@ class GraphRegistry:
                  "reason_code":reason_code,"rule_id":rule_id}
         item=InferenceBlock(inference_block_id,from_node_type,to_claim_level,blocked_inference,
             reason_code,rule_id,content_hash(payload))
+        if self.store is not None:
+            self.store.put_snapshot("graph.inference",inference_block_id,{"inference_block_id":item.inference_block_id,"from_node_type":item.from_node_type,"to_claim_level":item.to_claim_level,"blocked_inference":item.blocked_inference,"reason_code":item.reason_code,"rule_id":item.rule_id,"immutable_hash":item.immutable_hash},"1.4")
         self.inference_blocks[inference_block_id]=item
         return item
 
