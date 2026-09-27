@@ -78,3 +78,28 @@ def test_audit_retention_prunes_only_selected_namespace(tmp_path):
     assert result["deleted_events"]==1
     assert store.list_events("api")==[]
     assert [x["event_id"] for x in store.list_events("graph")]==["old-graph"]
+
+
+def test_restore_preflight_rejects_immutable_conflict_before_writes(tmp_path):
+    source=SQLiteRuntimeStore(str(tmp_path/"source.sqlite3"))
+    source.put_snapshot("immutable.test","one",{"value":1},"1.0")
+    source.put_snapshot("immutable.test","two",{"value":2},"1.0")
+    backup=build_backup(source)
+
+    target=SQLiteRuntimeStore(str(tmp_path/"target.sqlite3"))
+    target.put_snapshot("immutable.test","one",{"value":999},"1.0")
+    try:
+        restore_backup(target,backup)
+    except ValueError as e:
+        assert "restore preflight conflict" in str(e)
+    else:
+        assert False
+    assert target.get_snapshot("immutable.test","two") is None
+
+
+def test_audit_retention_policy_is_hash_stable(tmp_path):
+    store=SQLiteRuntimeStore(str(tmp_path/"runtime.sqlite3"))
+    policy=build_policy("stable",retention_days=30,namespace="api")
+    assert policy.immutable_hash==build_policy(
+        "stable",retention_days=30,namespace="api"
+    ).immutable_hash
