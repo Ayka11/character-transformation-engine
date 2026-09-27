@@ -147,6 +147,7 @@ class ScienceLabService:
                 p["status"], tuple(p["result_ids"]),
                 dict(p["estimate_by_outcome"]), p["safety_status"],
                 p["output_hash"], prov,
+                dict(p.get("transformation_provenance") or {}),
             )
 
     def register_matrix(
