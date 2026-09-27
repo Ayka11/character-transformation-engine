@@ -34,6 +34,10 @@ class ScenarioInput(BaseModel):
 class ScenarioRunInput(BaseModel):
     payload: dict[str, Any]
 
+class ScenarioMatrixGenerationInput(BaseModel):
+    factors: dict[str, list[Any]]
+    max_scenarios: int = Field(128, ge=1)
+    name_prefix: str = "Factorial"
 
 class ReplicationAssessmentInput(BaseModel):
     assessment_id: str
@@ -103,6 +107,20 @@ def install_science_lab_api(
             scenario_id=scenario_id,
             payload=p.payload,
         ))
+
+    @app.post("/science-lab/matrices/{matrix_id}/generate-scenarios")
+    def generate_scenarios(matrix_id: str, p: ScenarioMatrixGenerationInput):
+        return {
+            "matrix_id": matrix_id,
+            "scenarios": [
+                asdict(x) for x in service.generate_scenarios(
+                    matrix_id=matrix_id,
+                    factors=p.factors,
+                    max_scenarios=p.max_scenarios,
+                    name_prefix=p.name_prefix,
+                )
+            ],
+        }
 
     @app.post("/science-lab/matrices/{matrix_id}/replication")
     def assess_replication(matrix_id: str, p: ReplicationAssessmentInput):
