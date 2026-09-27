@@ -8,7 +8,7 @@ It does not silently upgrade model-derived outputs to empirical evidence.
 """
 from __future__ import annotations
 
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, field
 from itertools import product
 from typing import Any
 
@@ -24,6 +24,7 @@ from .replication_engine import register_run as register_replication_run
 from .replication_engine import register_spec as register_replication_spec
 from .research_e2e import ResearchE2ECoordinator
 from .research_execution import ResearchService
+from .transformation_provenance import TransformationProvenanceBinder
 
 VERSION = "2.3.0"
 
@@ -74,6 +75,7 @@ class ScenarioRun:
     safety_status: str
     output_hash: str
     provenance: Provenance
+    transformation_provenance: dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass(frozen=True)
@@ -115,6 +117,7 @@ class ScienceLabService:
         self.runs: dict[str, ScenarioRun] = {}
         self.replication_assessments: dict[str, ReplicationAssessmentRecord] = {}
         self.generalization_assessments: dict[str, GeneralizationAssessmentRecord] = {}
+        self.transformation_provenance = TransformationProvenanceBinder(store) if store is not None else None
         self._hydrate()
 
     def _put(self, namespace: str, key: str, payload: dict):
