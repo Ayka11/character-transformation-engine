@@ -174,11 +174,11 @@ class OrchestratorService:
             stage.state=state
         stage.input_hash=input_hash; stage.output_hash=output_hash; stage.module_version=module_version
         stage.provenance_record_id=provenance_record_id; stage.reason=reason; stage.metadata=md
+        if state=="BLOCKED": e.state="BLOCKED"
+        if state=="FAILED": e.state="FAILED"
         event_type=f"STAGE_{stage.state}"
         self.append_event(execution_id,event_type,input_hash or e.input_hash,output_hash,
                           provenance_record_id or f"{execution_id}:{stage_name}",{"stage":stage_name,"reason":reason,"metadata":md})
-        if state=="BLOCKED": e.state="BLOCKED"
-        if state=="FAILED": e.state="FAILED"
         return stage
 
     def pause(self,execution_id:str,reason:str)->Execution:
