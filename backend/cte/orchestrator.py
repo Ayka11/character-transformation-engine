@@ -169,8 +169,13 @@ class OrchestratorService:
     def resume(self,execution_id:str,resolved:bool)->Execution:
         e=self._get(execution_id)
         if e.state not in {"PAUSED","BLOCKED"} or not resolved: raise ValueError("resume condition is not satisfied")
+        if e.state=="BLOCKED":
+            for stage in e.stages.values():
+                if stage.state=="BLOCKED":
+                    stage.state="RUNNING"
+                    stage.reason="blocking condition resolved; stage resumed"
         e.state="RUNNING"
-        self.append_event(execution_id,"EXECUTION_RESUMED",e.input_hash,None,f"{execution_id}:resume",{})
+        self.append_event(execution_id,"EXECUTION_RESUMED",e.input_hash,None,f"{execution_id}:resume",{"resolved":True})
         return e
 
     def fail(self,execution_id:str,failure_code:str,rationale:str)->Execution:
