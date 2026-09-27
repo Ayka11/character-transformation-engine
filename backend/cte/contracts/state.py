@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import Any, Mapping
+from typing import Any
 from ..provenance import content_hash
 
 @dataclass(frozen=True)
@@ -47,5 +47,9 @@ class StateDiffEngine:
             else: changed[key]={"before":bv,"after":av}
         unexpected={k:v for k,v in changed.items() if allowed and k not in allowed}
         forbidden_changes={k:v for k,v in changed.items() if k in forbidden}
-        missing=tuple(sorted(k for k in expected if k not in changed))
+        # An expected transformation is satisfied only when the field changes
+        # to the declared target value. A changed field with the wrong value
+        # must therefore enter validation/rollback rather than being accepted.
+        missing=tuple(sorted(k for k, expected_value in expected.items()
+                              if k not in changed or after.state.get(k) != expected_value))
         return StateDiff(before.state_hash, after.state_hash, changed, unchanged, unexpected, forbidden_changes, missing)
