@@ -428,8 +428,8 @@ class ScienceLabService:
             "1.5", {"kind":"SCIENCE_LAB_REPLICATION_RUN",
                      "matrix_id":matrix_id,"source_result_id":source_result_id,
                      "independent":True,"criteria_registered":True,
-                     "assessment_status":"REGISTERED"},
-                     "transformation_provenance": self._transformation_for_result(source_result_id),
+             "target_context":target_context,
+             "transformation_provenance": self._transformation_for_result(source_result_id)},
         ))
         self.registry.add_edge(register_edge(
             f"{run.replication_run_id}:replicates:{source_result_id}",
@@ -582,7 +582,7 @@ class ScienceLabService:
                 continue
             if node.metadata.get("execution_id") in execution_ids:
                 execution_id = node.metadata.get("execution_id")
-                run = next((
+                run = next(
                     (r for r in self.runs.values()
                      if r.matrix_id == matrix_id and r.execution_id == execution_id),
                     None,
