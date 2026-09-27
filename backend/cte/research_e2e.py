@@ -149,9 +149,10 @@ class ResearchE2ECoordinator:
         participant_obj=self.research.enroll_participant(
             study_id=study_obj.study_id,**participant
         )
-        assignment_obj=self.research.assign_participant(
-            participant_id=participant_obj.participant_id,**assignment
-        )
+        assignment_payload=dict(assignment)
+        if assignment_payload.get("participant_id") != participant_obj.participant_id:
+            raise ValueError("assignment participant_id does not match enrolled participant")
+        assignment_obj=self.research.assign_participant(**assignment_payload)
         trial_obj=self.research.ingest_trial(
             experiment_id=experiment_obj.experiment_id,**trial
         )
