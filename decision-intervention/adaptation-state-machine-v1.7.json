@@ -1,0 +1,121 @@
+{
+  "version": "1.7",
+  "status": "MDL/DRV",
+  "states": [
+    "A",
+    "B",
+    "C",
+    "D",
+    "E"
+  ],
+  "decisions": [
+    {
+      "from": [
+        "A"
+      ],
+      "decision": "CONTINUE",
+      "to": [
+        "A",
+        "B"
+      ],
+      "guard": "safety_pass && capacity_stable"
+    },
+    {
+      "from": [
+        "B"
+      ],
+      "decision": "CONTINUE",
+      "to": [
+        "B",
+        "C"
+      ],
+      "guard": "safety_pass && valid_days>=7 && sustained_compliance"
+    },
+    {
+      "from": [
+        "C"
+      ],
+      "decision": "CONTINUE",
+      "to": [
+        "C",
+        "D"
+      ],
+      "guard": "safety_pass && valid_days>=7 && sustained_compliance"
+    },
+    {
+      "from": [
+        "D"
+      ],
+      "decision": "CONTINUE",
+      "to": [
+        "D",
+        "E"
+      ],
+      "guard": "safety_pass && valid_days>=7 && sustained_compliance"
+    },
+    {
+      "from": [
+        "E"
+      ],
+      "decision": "HOLD",
+      "to": [
+        "E"
+      ],
+      "guard": "integration_monitoring"
+    },
+    {
+      "from": [
+        "B",
+        "C",
+        "D",
+        "E"
+      ],
+      "decision": "DEESCALATE",
+      "to": [
+        "A",
+        "B",
+        "C",
+        "D"
+      ],
+      "guard": "safety_degradation || capacity_instability"
+    },
+    {
+      "from": [
+        "A",
+        "B",
+        "C",
+        "D",
+        "E"
+      ],
+      "decision": "STOP",
+      "to": [
+        "A"
+      ],
+      "guard": "critical_safety_block"
+    },
+    {
+      "from": [
+        "A",
+        "B",
+        "C",
+        "D",
+        "E"
+      ],
+      "decision": "INSUFFICIENT_DATA",
+      "to": [
+        "A",
+        "B",
+        "C",
+        "D",
+        "E"
+      ],
+      "guard": "required_input_unknown"
+    }
+  ],
+  "blocked_transitions": [
+    "unknown_data -> promotion",
+    "single_observation -> EVD promotion",
+    "unsafe_state -> higher_load",
+    "unsupported_rule -> intervention_assignment"
+  ]
+}
