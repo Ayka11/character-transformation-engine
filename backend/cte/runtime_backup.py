@@ -95,6 +95,59 @@ def validate_backup(backup: dict) -> None:
 
 def restore_backup(store, backup: dict, *, dry_run: bool = False) -> dict:
     validate_backup(backup)
+    planned = {"snapshots": 0, "events": 0, "immutable_conflicts": [], "event_conflicts": [], "dry_run": dry_run}
+
+    for item in backup["snapshots"]:
+        existing = store.get_snapshot(item["namespace"], item["key"])
+        if existing is None:
+            continue
+        if existing.payload_hash != item["payload_hash"] and item["namespace"] not in MUTABLE_SNAPSHOT_NAMESPACES:
+            planned["immutable_conflicts"].append(f"{item['namespace']}:{item['key']}")
+
+    for item in backup["events"]:
+        existing = store.get_event(item["event_id"])
+        if existing is None:
+            continue
+        same = (
+            existing.get("namespace") == item["namespace"]
+            and existing.get("event_type") == item["event_type"]
+            and existing.get("payload") == item["payload"]
+            and existing.get("input_hash") == item.get("input_hash")
+            and existing.get("output_hash") == item.get("output_hash")
+        )
+        if not same:
+            planned["event_conflicts"].append(item["event_id"])
+
+    if planned["immutable_conflicts"] or planned["event_conflicts"]:
+        raise ValueError(
+            "restore preflight conflict: "
+            + ",".join(planned["immutable_conflicts"] + planned["event_conflicts"])
+        )
+
+    if dry_run:
+        planned["snapshots"] = len(backup["snapshots"])
+        planned["events"] = len(backup["events"])
+        return planned
+
+    for item in backup["snapshots"]:
+        store.put_snapshot(item["namespace"], item["key"], item["payload"], item["version"])
+        planned["snapshots"] += 1
+
+    for item in backup["events"]:
+        store.append_event(
+            item["event_id"],
+            item["namespace"],
+            item["event_type"],
+            item["payload"],
+            item.get("input_hash"),
+            item.get("output_hash"),
+            item.get("provenance_record_id"),
+        )
+        planned["events"] += 1
+
+    return planned
+
+    validate_backup(backup)
     planned = {"snapshots": 0, "events": 0, "immutable_conflicts": [], "dry_run": dry_run}
     if dry_run:
         planned["snapshots"] = len(backup["snapshots"])
