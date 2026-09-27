@@ -1,3 +1,4 @@
+import json
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
@@ -62,7 +63,7 @@ def test_integrity_detects_forged_certificate_id():
     with db._connect() as conn:
         conn.execute(
             "UPDATE runtime_snapshots SET payload_json=? WHERE namespace='transformation.ledger' AND key=?",
-            (str({
+            (json.dumps({
                 "ledger_id":entry.ledger_id,
                 "execution_id":entry.execution_id,
                 "character_id":entry.character_id,
@@ -77,7 +78,7 @@ def test_integrity_detects_forged_certificate_id():
                 "certificate_id":"FORGED-CERTIFICATE",
                 "payload_hash":entry.payload_hash,
                 "request_hash":entry.request_hash,
-            }).replace("'", '"'), entry.ledger_id),
+            }), entry.ledger_id),
         )
         conn.commit()
     finding=TransformationIntegrityVerifier(snapshots,ledger).verify(entry.ledger_id)
