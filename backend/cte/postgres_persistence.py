@@ -143,26 +143,26 @@ class PostgreSQLRuntimeStore:
 
     def list_snapshot_namespaces(self) -> list[str]:
         with self._connect() as conn:
-            rows=conn.execute(
-                "SELECT DISTINCT namespace FROM runtime_snapshots ORDER BY namespace"
-            ).fetchall()
+            with conn.cursor() as cur:
+                cur.execute("SELECT DISTINCT namespace FROM runtime_snapshots ORDER BY namespace")
+                rows=cur.fetchall()
         return [row[0] for row in rows]
 
     def list_event_namespaces(self) -> list[str]:
         with self._connect() as conn:
-            rows=conn.execute(
-                "SELECT DISTINCT namespace FROM runtime_events ORDER BY namespace"
-            ).fetchall()
+            with conn.cursor() as cur:
+                cur.execute("SELECT DISTINCT namespace FROM runtime_events ORDER BY namespace")
+                rows=cur.fetchall()
         return [row[0] for row in rows]
 
     def prune_events_before(self, cutoff: str, namespace: str | None = None) -> int:
-        with self._connect() as conn:
-            if namespace is None:
-                cursor=conn.execute("DELETE FROM runtime_events WHERE created_at < ?", (cutoff,))
-            else:
-                cursor=conn.execute("DELETE FROM runtime_events WHERE created_at < ? AND namespace = ?", (cutoff, namespace))
-            conn.commit()
-            return cursor.rowcount
+        with self.transaction() as conn:
+            with conn.cursor() as cur:
+                if namespace is None:
+                    cur.execute("DELETE FROM runtime_events WHERE created_at < %s", (cutoff,))
+                else:
+                    cur.execute("DELETE FROM runtime_events WHERE created_at < %s AND namespace = %s", (cutoff, namespace))
+                return cur.rowcount
     def list_snapshots(self, namespace: str) -> list[Snapshot]:
         with self._connect() as conn:
             with conn.cursor() as cur:
