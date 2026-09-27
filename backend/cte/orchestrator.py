@@ -238,6 +238,11 @@ class OrchestratorService:
         event=OrchestratorEvent(body["event_id"],execution_id,event_type,input_hash,output_hash,
                                 provenance_record_id,payload,seq,content_hash(body))
         e.events.append(event)
+        if self.store is not None:
+            self.store.append_event(event.event_id,"orchestrator",event.event_type,event.payload,
+                                    input_hash=event.input_hash,output_hash=event.output_hash,
+                                    provenance_record_id=event.provenance_record_id)
+            self._persist_execution(e)
         return event
 
     def register_module(self,module_id,version,contract_version,status="ACTIVE"):
