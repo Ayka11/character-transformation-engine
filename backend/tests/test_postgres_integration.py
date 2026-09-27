@@ -700,3 +700,187 @@ def test_postgres_matches_sqlite_transformation_provenance_contract():
                 "AND payload_json->>'execution_id'=%s",
                 (execution_id,),
             )
+
+
+@pytest.mark.skipif(
+    not os.getenv("CTE_DATABASE_URL"),
+    reason="CTE_DATABASE_URL is required for live PostgreSQL integration",
+)
+def test_postgres_science_lab_provenance_rebind_matches_sqlite_after_restore():
+    from cte.persistence import SQLiteRuntimeStore
+    from cte.contracts.transformation import TransformationContract
+    from cte.state_snapshot_store import StateSnapshotStore
+    from cte.transformation_ledger import TransformationLedger
+    from cte.transformation_provenance import TransformationProvenanceBinder
+    from cte.transformation_runtime import TransformationExecutor
+    from cte.science_lab import ExperimentMatrix, ScenarioDefinition, ScenarioRun, ScienceLabService
+    from cte.graph_registry import GraphRegistry
+    from cte.provenance import Provenance, ProvenanceTag
+    from cte.evidence_graph import register_node
+    import copy
+
+    dsn = os.environ["CTE_DATABASE_URL"]
+    pg = PostgreSQLRuntimeStore(dsn)
+    sqlite = SQLiteRuntimeStore(":memory:")
+    suffix = os.urandom(6).hex()
+    execution_id = f"pg-sl-durable-{suffix}"
+    matrix_id = f"matrix-{suffix}"
+    scenario_id = f"scenario-{suffix}"
+    run_id = f"run-{suffix}"
+    result_id = f"result-{suffix}"
+    claim_id = f"claim-{suffix}"
+
+    def seed(store):
+        registry = GraphRegistry.empty(store)
+        execution = TransformationExecutor(
+            StateSnapshotStore(store), TransformationLedger(store)
+        ).execute(
+            execution_id, f"character-{suffix}", 1, {"tempo": 5},
+            TransformationContract("sl-parity-contract", "1", expected_changes={"tempo": 6}),
+            lambda state: {"tempo": 6},
+        )
+        tp = TransformationProvenanceBinder(store).bind_execution(execution_id)
+        matrix = ExperimentMatrix(
+            matrix_id, f"study-{suffix}", "Parity", "outcome", {},
+            (scenario_id,), "ACTIVE", "matrix-hash",
+        )
+        scenario = ScenarioDefinition(
+            scenario_id, matrix_id, "Scenario", "Parity", {},
+            ("outcome",), True, "scenario-hash",
+        )
+        service = object.__new__(ScienceLabService)
+        service.registry = registry
+        service.store = store
+        service.research = None
+        service.coordinator = None
+        service.transformation_provenance = TransformationProvenanceBinder(store)
+        service.matrices = {matrix_id: matrix}
+        service.scenarios = {scenario_id: scenario}
+        service.runs = {
+            run_id: ScenarioRun(
+                run_id, matrix_id, scenario_id, execution_id, "COMPLETED",
+                (result_id,), {"outcome": 6.0}, "PASS", "output",
+                Provenance(ProvenanceTag.EXP, "parity", "1", "input", "test"),
+                tp,
+            )
+        }
+        service.replication_assessments = {}
+        service.generalization_assessments = {}
+        service._put("science_lab.matrix", matrix_id, {
+            **matrix.__dict__, "scenario_ids": list(matrix.scenario_ids),
+        })
+        service._put("science_lab.scenario", scenario_id, {
+            **scenario.__dict__, "expected_outcomes": list(scenario.expected_outcomes),
+        })
+        service._put("science_lab.run", run_id, {
+            "run_id": run_id, "matrix_id": matrix_id, "scenario_id": scenario_id,
+            "execution_id": execution_id, "status": "COMPLETED",
+            "result_ids": [result_id], "estimate_by_outcome": {"outcome": 6.0},
+            "safety_status": "PASS", "output_hash": "output",
+            "transformation_provenance": tp, "provenance_tag": "EXP",
+            "source": "parity", "version": "1", "provenance_input_hash": "input",
+            "provenance_note": "test",
+        })
+        registry.add_node(register_node(
+            result_id, "RESULT", result_id, "EXP", "1",
+            {"qc_status": "PASS", "validated_descriptive_result": True},
+        ))
+        registry.register_claim(
+            claim_id, result_id, "HYPOTHESIS", "REGISTERED", "EXP",
+            {"execution_id": execution_id},
+        )
+        return service.report_bundle(matrix_id), tp
+
+    sqlite_before, sqlite_tp = seed(sqlite)
+    pg_before, pg_tp = seed(pg)
+
+    assert pg_before["provenance"]["input_hash"] == sqlite_before["provenance"]["input_hash"]
+    assert pg_tp["ledger_id"] == sqlite_tp["ledger_id"]
+    assert pg_tp["certificate_id"] == sqlite_tp["certificate_id"]
+
+    backup = build_backup(pg)
+    validate_backup(backup)
+
+    cleanup = PostgreSQLRuntimeStore(dsn)
+    with cleanup.transaction() as conn:
+        with conn.cursor() as cur:
+            for namespace in (
+                "science_lab.matrix", "science_lab.scenario", "science_lab.run",
+                "graph.node", "graph.edge",
+                "transformation.ledger", "transformation.certificate",
+                "state.snapshot", "transformation.lock",
+            ):
+                cur.execute(
+                    "DELETE FROM runtime_snapshots WHERE namespace=%s AND (key LIKE %s OR payload_json->>'execution_id'=%s)",
+                    (namespace, f"%{suffix}%", execution_id),
+                )
+            cur.execute(
+                "DELETE FROM runtime_events WHERE event_id LIKE %s OR payload_json->>'execution_id'=%s",
+                (f"%{suffix}%", execution_id),
+            )
+
+    restore_backup(pg, copy.deepcopy(backup))
+    restored_service = object.__new__(ScienceLabService)
+    restored_service.registry = GraphRegistry.empty(pg)
+    restored_service.store = pg
+    restored_service.research = None
+    restored_service.coordinator = None
+    restored_service.transformation_provenance = TransformationProvenanceBinder(pg)
+    restored_service.matrices = {}
+    restored_service.scenarios = {}
+    restored_service.runs = {}
+    restored_service.replication_assessments = {}
+    restored_service.generalization_assessments = {}
+    restored_service._hydrate()
+
+    pg_after = restored_service.report_bundle(matrix_id)
+    restored_tp = TransformationProvenanceBinder(pg).bind_execution(execution_id)
+
+    assert pg_after["provenance"]["input_hash"] == pg_before["provenance"]["input_hash"]
+    assert pg_after["provenance"]["input_hash"] == sqlite_before["provenance"]["input_hash"]
+    assert pg_after["claim_validation"] == pg_before["claim_validation"]
+    assert pg_after["transformation_provenance"] == pg_before["transformation_provenance"]
+    assert restored_tp["validated"] is True
+    assert restored_tp["integrity_status"] == "PASS"
+    assert restored_tp["ledger_id"] == pg_tp["ledger_id"]
+    assert restored_tp["certificate_id"] == pg_tp["certificate_id"]
+
+    tampered = pg.get_snapshot("science_lab.run", run_id)
+    assert tampered is not None
+    forged = dict(tampered.payload)
+    forged["transformation_provenance"] = {
+        "execution_id": execution_id,
+        "validated": True,
+        "integrity_status": "PASS",
+        "ledger_id": "forged-ledger",
+        "certificate_id": "forged-certificate",
+    }
+    pg.put_snapshot("science_lab.run", run_id, forged, tampered.version)
+    tampered_service = object.__new__(ScienceLabService)
+    tampered_service.registry = GraphRegistry.empty(pg)
+    tampered_service.store = pg
+    tampered_service.research = None
+    tampered_service.coordinator = None
+    tampered_service.transformation_provenance = TransformationProvenanceBinder(pg)
+    tampered_service.matrices = {}
+    tampered_service.scenarios = {}
+    tampered_service.runs = {}
+    tampered_service.replication_assessments = {}
+    tampered_service.generalization_assessments = {}
+    tampered_service._hydrate()
+
+    tampered_report = tampered_service.report_bundle(matrix_id)
+    assert tampered_report["transformation_provenance"]["runs"][0]["ledger_id"] == pg_tp["ledger_id"]
+    assert tampered_report["transformation_provenance"]["runs"][0]["certificate_id"] == pg_tp["certificate_id"]
+    assert tampered_report["transformation_provenance"]["runs"][0]["ledger_id"] != "forged-ledger"
+
+    with cleanup.transaction() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                "DELETE FROM runtime_events WHERE event_id LIKE %s OR payload_json->>'execution_id'=%s",
+                (f"%{suffix}%", execution_id),
+            )
+            cur.execute(
+                "DELETE FROM runtime_snapshots WHERE key LIKE %s OR payload_json->>'execution_id'=%s",
+                (f"%{suffix}%", execution_id),
+            )
