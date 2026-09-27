@@ -21,6 +21,9 @@ def test_claim_registration_creates_support_edge():
 
 def test_claim_transition_history_is_immutable_and_linked():
     g=_result_graph()
+    rep=register_node("rep-history","REPLICATION","rep-history","DRV","1",{"independent":True,"criteria_registered":True})
+    g.add_node(rep)
+    g.add_edge(register_edge("rep-history-edge",rep,g.nodes["r"],"REPLICATES"))
     g.register_claim("c1","r","REGISTERED","ASSOCIATIONAL_RESULT","DRV",{})
     c2=g.register_claim("c2","r","ASSOCIATIONAL_RESULT","REPLICATED_RESULT","DRV",{},previous_claim_id="c1")
     assert c2.metadata["state"]=="REPLICATED_RESULT"
@@ -37,9 +40,10 @@ def test_evidence_supported_requires_evd_and_evidence_criteria():
 
 def test_non_initial_claim_cannot_fabricate_current_state():
     g=_result_graph()
+    g.register_claim("c0",None,"HYPOTHESIS","REGISTERED","HYP",{})
     try:
-        g.register_claim("c1","r","REGISTERED","ASSOCIATIONAL_RESULT","DRV",{})
+        g.register_claim("c1","r","DESCRIPTIVE_RESULT","ASSOCIATIONAL_RESULT","DRV",{},previous_claim_id="c0")
     except ValueError as e:
-        assert "previous_claim_id" in str(e)
+        assert "current_state does not match" in str(e)
     else:
         assert False
