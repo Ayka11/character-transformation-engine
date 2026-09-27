@@ -6,6 +6,7 @@ from .capacity import compute_capacity
 from .compatibility import compatibility_v1, compatibility_v2, compatibility_v3
 from .catalog import ADAPTIVE_LEVELS, MASTER_MATRIX, MATRIX_VERSION, SPRINT_TEMPLATE
 from .assessment import build_profile
+from .state_engine import derive_daily_state
 
 app = FastAPI(title="Character Transformation Engine", version="2.1.0")
 
@@ -48,6 +49,20 @@ def matrix_catalog():
 def assessment_profile(p: AssessmentInput):
     profile = build_profile([row.model_dump() for row in p.observations], source_id=p.source_id, source_version=p.source_version)
     return {"source_id": profile.source_id, "source_version": profile.source_version, "measurements": [asdict(m) for m in profile.measurements]}
+
+@app.post("/runtime/state-capacity")
+def runtime_state_capacity(p: AssessmentInput):
+    profile = build_profile([row.model_dump() for row in p.observations], source_id=p.source_id, source_version=p.source_version)
+    derived = derive_daily_state(profile)
+    capacity = compute_capacity(derived.state)
+    return {
+        "source_id": profile.source_id,
+        "source_version": profile.source_version,
+        "state": asdict(derived.state),
+        "missing_state_inputs": list(derived.missing),
+        "capacity": asdict(capacity),
+        "adaptive_level": ADAPTIVE_LEVELS[capacity.level],
+    }
 
 @app.post("/runtime/capacity")
 def runtime_capacity(p: StateInput):
