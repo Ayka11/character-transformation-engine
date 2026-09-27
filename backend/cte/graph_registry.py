@@ -148,8 +148,6 @@ class GraphRegistry:
                 req.add("generalization_run")
             if node.node_type=="GENERALIZATION" and md.get("target_population_context"):
                 req.add("target_population_context")
-            if bool(md.get("evidence_criteria_registered",False)):
-                req.add("registered_evidence_criteria")
         if all(n.provenance_class and n.version and n.immutable_hash for n in all_nodes):
             req.add("complete_provenance")
         return req
