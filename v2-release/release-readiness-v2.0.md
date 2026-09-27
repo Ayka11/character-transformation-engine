@@ -37,11 +37,11 @@
 
 ## Gate F — Production
 - [x] Authentication/authorization (optional environment-based read/write API keys)
-- [ ] Audit retention
-- [ ] Backup/recovery
-- [ ] Rate limits
+- [x] Audit retention (operational API namespace + archive-before-purge rule)
+- [x] Backup/recovery (portable logical backup + preflight restore)
+- [x] Rate limits (configurable in-process sliding window)
 - [x] Observability (request IDs, latency header, operational audit events)
-- [ ] Migration rollback plan
+- [x] Migration rollback plan (guarded PostgreSQL down migration + documented procedure)
 
 ## Current implementation snapshot
 
@@ -55,6 +55,6 @@ As of the current V2.1 backend baseline:
 - V1.9 synthetic E2E contract coverage and the V2.2 Research E2E coordinator are executed successfully in GitHub Actions run #86.
 - Durable SQLite runtime adapters are implemented for graph, orchestration, reporting, intervention and Research/Science Lab state; a PostgreSQL production adapter and runtime migration are implemented, and live snapshot/event integration is CI-tested against postgres:16 in run #124.
 - Production deployment/rollback operations, authentication/authorization, observability, backup/recovery, rate limits and empirical validation remain open release gates.
-- GitHub CI workflow is registered; run #124 completed successfully with the main backend suite plus live PostgreSQL integration.
+- GitHub CI workflow is registered; run #168 completed successfully with the main backend suite plus live PostgreSQL integration.
 
 **Important:** a checked architecture item does not imply that the corresponding implementation, executed test status, or scientific validation exists.
