@@ -65,3 +65,31 @@ def test_blocked_execution_can_resume_stage_after_resolution():
     o.resume("x",True)
     assert o.executions["x"].state=="RUNNING"
     assert o.executions["x"].stages["SAFETY_GATE"].state=="RUNNING"
+
+
+def test_validated_transformation_transition_passes():
+    from cte.contracts.state import StateSnapshot
+    from cte.contracts.transformation import TransformationContract
+    o=OrchestratorService()
+    o.create_execution("tx","c",{},["INTERVENTION"])
+    o.start("tx")
+    before=StateSnapshot.capture("s1","c",1,{"tempo":5},source_execution_id="tx")
+    after=StateSnapshot.capture("s2","c",2,{"tempo":6},parent_snapshot_id="s1",source_execution_id="tx")
+    result=o.validate_transformation_transition("tx",TransformationContract("t1","1",expected_changes={"tempo":6}),before,after)
+    assert result.status=="VALIDATED"
+    assert result.certificate_eligible
+    assert o.executions["tx"].state=="RUNNING"
+
+def test_no_state_change_fails_execution_and_forbids_certificate():
+    from cte.contracts.state import StateSnapshot
+    from cte.contracts.transformation import TransformationContract
+    o=OrchestratorService()
+    o.create_execution("tx","c",{},["INTERVENTION"])
+    o.start("tx")
+    before=StateSnapshot.capture("s1","c",1,{"tempo":5},source_execution_id="tx")
+    after=StateSnapshot.capture("s2","c",2,{"tempo":5},parent_snapshot_id="s1",source_execution_id="tx")
+    result=o.validate_transformation_transition("tx",TransformationContract("t1","1",expected_changes={"tempo":6}),before,after)
+    assert result.status=="FAILED"
+    assert result.failure_code=="NO_STATE_CHANGE"
+    assert not result.certificate_eligible
+    assert o.executions["tx"].state=="FAILED"
