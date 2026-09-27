@@ -14,3 +14,4 @@ def test_science_lab_assets_are_served():
     response=client.get("/science-lab/assets/app.js")
     assert response.status_code==200
     assert "runScenario" in response.text
+    assert "X-CTE-API-Key" in response.text
