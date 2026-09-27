@@ -167,9 +167,12 @@ def graph_register_node(p: GraphEdgeInput):
 
 @app.post("/graph/edge")
 def graph_edge(p: GraphEdgeInput):
-    source=register_node(p.from_node_id,p.from_node_type,p.from_node_id,"DRV","2.1.0",{})
-    target=register_node(p.to_node_id,p.to_node_type,p.to_node_id,"DRV","2.1.0",{})
-    return asdict(register_edge(p.edge_id,source,target,p.edge_type,rationale=p.rationale))
+    source=GRAPH_REGISTRY.add_node(register_node(p.from_node_id,p.from_node_type,p.from_node_id,"DRV","2.1.0",{}))
+    target=GRAPH_REGISTRY.add_node(register_node(p.to_node_id,p.to_node_type,p.to_node_id,"DRV","2.1.0",{}))
+    edge=GRAPH_REGISTRY.add_edge(register_edge(p.edge_id,source,target,p.edge_type,rationale=p.rationale))
+    if target.node_type=="RESULT":
+        GRAPH_REGISTRY.require_lineage_for_result(target.node_id)
+    return asdict(edge)
 
 @app.post("/validation/paired")
 def validation_paired(p: RegisteredPairedInput):
