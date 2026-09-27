@@ -61,3 +61,71 @@ def test_postgres_snapshot_event_roundtrip():
     )
     assert retention["deleted_events"]>=1
     assert store.list_events("integration")==[]
+
+
+@pytest.mark.skipif(
+    not os.getenv("CTE_DATABASE_URL"),
+    reason="CTE_DATABASE_URL is required for live PostgreSQL integration",
+)
+def test_postgres_concurrent_immutable_snapshot_and_event_writes_are_idempotent():
+    from concurrent.futures import ThreadPoolExecutor
+
+    dsn = os.environ["CTE_DATABASE_URL"]
+    suffix = os.urandom(6).hex()
+    snapshot_key = f"concurrent-snapshot-{suffix}"
+    event_id = f"concurrent-event-{suffix}"
+
+    def write_snapshot(payload):
+        return PostgreSQLRuntimeStore(dsn).put_snapshot(
+            "integration.concurrent", snapshot_key, payload, "1.0"
+        )
+
+    def write_event(payload):
+        PostgreSQLRuntimeStore(dsn).append_event(
+            event_id,
+            "integration.concurrent",
+            "CHECK",
+            payload,
+            input_hash="same-input",
+            output_hash="same-output",
+        )
+        return PostgreSQLRuntimeStore(dsn).get_event(event_id)
+
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        snapshot_results = list(
+            pool.map(write_snapshot, [{"value": 7}, {"value": 7}])
+        )
+        event_results = list(
+            pool.map(write_event, [{"ok": True}, {"ok": True}])
+        )
+
+    assert [r.payload for r in snapshot_results] == [{"value": 7}, {"value": 7}]
+    assert all(r.payload_hash == snapshot_results[0].payload_hash for r in snapshot_results)
+    assert all(r["payload"] == {"ok": True} for r in event_results)
+
+    with pytest.raises(ValueError, match="immutable snapshot conflict"):
+        PostgreSQLRuntimeStore(dsn).put_snapshot(
+            "integration.concurrent", snapshot_key, {"value": 8}, "1.0"
+        )
+
+    with pytest.raises(ValueError, match="immutable event conflict"):
+        PostgreSQLRuntimeStore(dsn).append_event(
+            event_id,
+            "integration.concurrent",
+            "CHECK",
+            {"ok": False},
+            input_hash="same-input",
+            output_hash="same-output",
+        )
+
+    cleanup = PostgreSQLRuntimeStore(dsn)
+    with cleanup.transaction() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                "DELETE FROM runtime_events WHERE event_id=%s",
+                (event_id,),
+            )
+            cur.execute(
+                "DELETE FROM runtime_snapshots WHERE namespace=%s AND key=%s",
+                ("integration.concurrent", snapshot_key),
+            )
