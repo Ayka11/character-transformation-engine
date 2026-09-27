@@ -1,4 +1,4 @@
-"""Durable SQLite runtime store.
+""""Durable SQLite runtime store.
 
 This is a lightweight runtime persistence adapter for the executable baseline.
 It does not replace the repository's PostgreSQL persistence contracts.
@@ -34,8 +34,17 @@ def build_runtime_store(sqlite_path: str = "data/cte-runtime.sqlite3"):
 
 class SQLiteRuntimeStore:
     def __init__(self, path: str):
-        if not path or path==":memory:":
-            self.path=path
+        # The store opens a fresh connection for each operation. A normal
+        # SQLite :memory: database is therefore destroyed between connections.
+        # Use an isolated temporary file for test/runtime callers requesting
+        # in-memory semantics so all connections share the same database.
+        self._temporary_path = None
+        if not path or path == ":memory:":
+            fd, temp_path = tempfile.mkstemp(prefix="cte-runtime-", suffix=".sqlite3")
+            import os
+            os.close(fd)
+            self._temporary_path = temp_path
+            self.path = temp_path
         else:
             p=Path(path)
             p.parent.mkdir(parents=True,exist_ok=True)
@@ -133,16 +142,12 @@ class SQLiteRuntimeStore:
 
     def list_snapshot_namespaces(self) -> list[str]:
         with self._connect() as conn:
-            rows=conn.execute(
-                "SELECT DISTINCT namespace FROM runtime_snapshots ORDER BY namespace"
-            ).fetchall()
+            rows=conn.execute("SELECT DISTINCT namespace FROM runtime_snapshots ORDER BY namespace").fetchall()
         return [row[0] for row in rows]
 
     def list_event_namespaces(self) -> list[str]:
         with self._connect() as conn:
-            rows=conn.execute(
-                "SELECT DISTINCT namespace FROM runtime_events ORDER BY namespace"
-            ).fetchall()
+            rows=conn.execute("SELECT DISTINCT namespace FROM runtime_events ORDER BY namespace").fetchall()
         return [row[0] for row in rows]
 
     def prune_events_before(self, cutoff: str, namespace: str | None = None) -> int:
@@ -153,6 +158,7 @@ class SQLiteRuntimeStore:
                 cursor=conn.execute("DELETE FROM runtime_events WHERE created_at < ? AND namespace = ?", (cutoff, namespace))
             conn.commit()
             return cursor.rowcount
+
     def list_snapshots(self, namespace:str)->list[Snapshot]:
         with self._connect() as conn:
             rows=conn.execute(
