@@ -83,28 +83,28 @@ class SQLiteRuntimeStore:
 
     def put_snapshot(self, namespace:str, key:str, payload:dict, version:str)->Snapshot:
         payload_hash=content_hash(payload)
+        payload_json=json.dumps(payload,sort_keys=True,separators=(",",":"))
         with self._connect() as conn:
+            conn.execute(
+                "INSERT OR IGNORE INTO runtime_snapshots(namespace,key,version,payload_json,payload_hash) VALUES(?,?,?,?,?)",
+                (namespace,key,version,payload_json,payload_hash)
+            )
             row=conn.execute(
-                "SELECT version,payload_hash FROM runtime_snapshots WHERE namespace=? AND key=?",
+                "SELECT version,payload_json,payload_hash FROM runtime_snapshots WHERE namespace=? AND key=?",
                 (namespace,key)
             ).fetchone()
-            if row is not None:
-                if row[1] == payload_hash:
-                    return Snapshot(namespace,key,row[0],payload,payload_hash)
-                if namespace in MUTABLE_SNAPSHOT_NAMESPACES:
-                    conn.execute(
-                        "UPDATE runtime_snapshots SET version=?, payload_json=?, payload_hash=? WHERE namespace=? AND key=?",
-                        (version,json.dumps(payload,sort_keys=True,separators=(",",":")),payload_hash,namespace,key)
-                    )
-                    conn.commit()
-                    return Snapshot(namespace,key,version,payload,payload_hash)
-                raise ValueError("immutable snapshot conflict")
-            conn.execute(
-                "INSERT INTO runtime_snapshots(namespace,key,version,payload_json,payload_hash) VALUES(?,?,?,?,?)",
-                (namespace,key,version,json.dumps(payload,sort_keys=True,separators=(",",":")),payload_hash)
-            )
-            conn.commit()
-        return Snapshot(namespace,key,version,payload,payload_hash)
+            if row is None:
+                raise ValueError("snapshot disappeared during write")
+            if row[2] == payload_hash:
+                return Snapshot(namespace,key,row[0],payload,row[2])
+            if namespace in MUTABLE_SNAPSHOT_NAMESPACES:
+                conn.execute(
+                    "UPDATE runtime_snapshots SET version=?, payload_json=?, payload_hash=? WHERE namespace=? AND key=?",
+                    (version,payload_json,payload_hash,namespace,key)
+                )
+                conn.commit()
+                return Snapshot(namespace,key,version,payload,payload_hash)
+            raise ValueError("immutable snapshot conflict")
 
     def put_snapshots_atomic(self, items:list[tuple[str,str,dict,str]])->list[Snapshot]:
         """Insert immutable snapshots atomically; identical existing rows are idempotent."""
@@ -170,17 +170,25 @@ class SQLiteRuntimeStore:
     def append_event(self,event_id:str,namespace:str,event_type:str,payload:dict,
                      input_hash:str|None=None,output_hash:str|None=None,
                      provenance_record_id:str|None=None)->None:
+        payload_json=json.dumps(payload,sort_keys=True,separators=(",",":"))
         with self._connect() as conn:
-            row=conn.execute("SELECT input_hash,output_hash,payload_json FROM runtime_events WHERE event_id=?",(event_id,)).fetchone()
-            if row is not None:
-                same=(row[0]==input_hash and row[1]==output_hash and json.loads(row[2])==payload)
-                if not same:
-                    raise ValueError("immutable event conflict")
-                return
             conn.execute(
-                "INSERT INTO runtime_events(event_id,namespace,event_type,payload_json,input_hash,output_hash,provenance_record_id) VALUES(?,?,?,?,?,?,?)",
-                (event_id,namespace,event_type,json.dumps(payload,sort_keys=True,separators=(",",":")),input_hash,output_hash,provenance_record_id)
+                "INSERT OR IGNORE INTO runtime_events(event_id,namespace,event_type,payload_json,input_hash,output_hash,provenance_record_id) VALUES(?,?,?,?,?,?,?)",
+                (event_id,namespace,event_type,payload_json,input_hash,output_hash,provenance_record_id)
             )
+            row=conn.execute(
+                "SELECT namespace,event_type,payload_json,input_hash,output_hash,provenance_record_id FROM runtime_events WHERE event_id=?",
+                (event_id,)
+            ).fetchone()
+            if row is None:
+                raise ValueError("event disappeared during write")
+            same=(
+                row[0]==namespace and row[1]==event_type and
+                row[2]==payload_json and row[3]==input_hash and
+                row[4]==output_hash and row[5]==provenance_record_id
+            )
+            if not same:
+                raise ValueError("immutable event conflict")
             conn.commit()
 
     def get_event(self, event_id: str) -> dict | None:

@@ -22,3 +22,64 @@ def test_event_append_is_durable():
         store.append_event("e1","orchestrator","START",{"x":1},input_hash="i")
         reopened=SQLiteRuntimeStore(store.path)
         assert reopened.list_events("orchestrator")[0]["event_id"]=="e1"
+
+
+def test_event_identity_includes_immutable_metadata():
+    store=SQLiteRuntimeStore(":memory:")
+    store.append_event("e1","ns-a","START",{"x":1},"in","out","prov-a")
+    import pytest
+    with pytest.raises(ValueError, match="immutable event conflict"):
+        store.append_event("e1","ns-b","START",{"x":1},"in","out","prov-a")
+    with pytest.raises(ValueError, match="immutable event conflict"):
+        store.append_event("e1","ns-a","STOP",{"x":1},"in","out","prov-a")
+    with pytest.raises(ValueError, match="immutable event conflict"):
+        store.append_event("e1","ns-a","START",{"x":1},"in","out","prov-b")
+
+
+def test_concurrent_identical_snapshot_writes_are_idempotent():
+    import threading
+    store=SQLiteRuntimeStore(":memory:")
+    barrier=threading.Barrier(2)
+    errors=[]
+
+    def writer():
+        try:
+            barrier.wait(timeout=5)
+            store.put_snapshot("race.immutable","same",{"value":1},"1")
+        except Exception as exc:
+            errors.append(exc)
+
+    threads=[threading.Thread(target=writer) for _ in range(2)]
+    for thread in threads:
+        thread.start()
+    for thread in threads:
+        thread.join(timeout=10)
+
+    assert all(not thread.is_alive() for thread in threads)
+    assert errors == []
+    assert store.get_snapshot("race.immutable","same").payload == {"value":1}
+
+
+def test_concurrent_conflicting_snapshot_writes_report_contract_conflict():
+    import threading
+    store=SQLiteRuntimeStore(":memory:")
+    barrier=threading.Barrier(2)
+    errors=[]
+
+    def writer(value):
+        try:
+            barrier.wait(timeout=5)
+            store.put_snapshot("race.immutable","same",{"value":value},"1")
+        except Exception as exc:
+            errors.append(exc)
+
+    threads=[threading.Thread(target=writer,args=(1,)),threading.Thread(target=writer,args=(2,))]
+    for thread in threads:
+        thread.start()
+    for thread in threads:
+        thread.join(timeout=10)
+
+    assert all(not thread.is_alive() for thread in threads)
+    assert len(errors) == 1
+    assert isinstance(errors[0], ValueError)
+    assert str(errors[0]) == "immutable snapshot conflict"
