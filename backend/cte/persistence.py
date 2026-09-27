@@ -152,6 +152,13 @@ class SQLiteRuntimeStore:
             )
             conn.commit()
 
+    def get_event(self, event_id: str) -> dict | None:
+        with self._connect() as conn:
+            row=conn.execute("SELECT event_type,namespace,payload_json,input_hash,output_hash,provenance_record_id,created_at FROM runtime_events WHERE event_id=?", (event_id,)).fetchone()
+        if row is None:
+            return None
+        return {"event_id":event_id,"event_type":row[0],"namespace":row[1],"payload":json.loads(row[2]),"input_hash":row[3],"output_hash":row[4],"provenance_record_id":row[5],"created_at":row[6]}
+
     def list_events(self, namespace:str)->list[dict]:
         with self._connect() as conn:
             rows=conn.execute(
