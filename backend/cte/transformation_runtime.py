@@ -7,6 +7,7 @@ from .contracts.transformation import TransformationContract, TransformationResu
 from .state_snapshot_store import StateSnapshotStore
 from .transformation_ledger import TransformationLedger, TransformationLedgerEntry
 from .transformation_recovery import TransformationJournal, JournalAttempt
+from .transformation_concurrency import TransformationConcurrencyGuard
 from .provenance import content_hash
 
 @dataclass(frozen=True)
@@ -19,10 +20,11 @@ class TransformationExecution:
 
 class TransformationExecutor:
     def __init__(self, snapshot_store: StateSnapshotStore | None = None, ledger: TransformationLedger | None = None,
-                 journal: TransformationJournal | None = None):
+                 journal: TransformationJournal | None = None, concurrency_guard: TransformationConcurrencyGuard | None = None):
         self.snapshots = snapshot_store or StateSnapshotStore()
         self.ledger = ledger or TransformationLedger(self.snapshots.store)
         self.journal = journal or TransformationJournal(self.snapshots.store)
+        self.concurrency = concurrency_guard or TransformationConcurrencyGuard(self.snapshots.store)
 
     def execute(self, execution_id: str, character_id: str, sequence: int,
                 state: dict[str, Any], contract: TransformationContract,
@@ -36,6 +38,15 @@ class TransformationExecutor:
         existing=self.ledger.find_by_request_hash(request_hash)
         if existing is not None:
             return self._replay_existing(existing)
+
+        try:
+            self.concurrency.acquire(character_id, sequence, parent_snapshot_id, request_hash)
+        except Exception as exc:
+            code=getattr(exc, "code", "VERSION_CONFLICT")
+            details=getattr(exc, "details", {"error":str(exc)})
+            result=TransformationResult.failed(
+                code, details, status="FAILED", before_snapshot_id="")
+            return TransformationExecution(execution_id,"",None,result)
 
         before=StateSnapshot.capture(
             f"{execution_id}:before:{sequence}", character_id, sequence, state,
