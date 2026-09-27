@@ -40,10 +40,7 @@ def test_successful_ledger_commit_precedes_terminal_journal():
         lambda state:{"tempo":6},
     )
     assert out.result.status=="VALIDATED"
-    entry=ledger.find_by_request_hash(
-        next(a.request_hash for a in journal.attempts() if a.attempt_id=="ordered:before:1")
-    ) if False else ledger.list()[0]
-    events=journal.events(out.execution_id + ":no-such")
+    entry=ledger.list()[0]
     assert entry.status=="VALIDATED"
     attempt=next(a for a in journal.attempts() if a.execution_id=="ordered")
     assert attempt.status=="VALIDATED"
