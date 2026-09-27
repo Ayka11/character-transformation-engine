@@ -19,6 +19,7 @@ from .result_node import build_result, graph_node
 from .evidence_graph import register_node, register_edge
 from .graph_registry import build_registry
 from .claim_gate import validate_claim_transition
+from .replication import register_replication, register_generalization
 
 app = FastAPI(title="Character Transformation Engine", version="2.1.0")
 GRAPH_REGISTRY = build_registry()
@@ -76,6 +77,19 @@ class ClaimInput(BaseModel):
     provenance_class: str = "DRV"
     metadata: dict = Field(default_factory=dict)
     previous_claim_id: str | None = None
+
+class ReplicationInput(BaseModel):
+    replication_id: str
+    source_result_id: str
+    independent: bool = False
+    criteria_registered: bool = False
+    status: str = "REGISTERED"
+
+class GeneralizationInput(BaseModel):
+    generalization_id: str
+    source_result_id: str
+    run_status: str
+    target_population_context: str
 
 class NodeInput(BaseModel):
     node_id: str
@@ -183,6 +197,26 @@ def runtime_sprint_day(p: SprintDayInput):
     sprint.supporting_bio_habit=p.supporting_bio_habit
     sprint.daily_action=p.daily_action
     return asdict(record_day(sprint,p.day,p.action_completed,p.outcome,state))
+
+@app.post("/validation/replication/register")
+def validation_replication(p: ReplicationInput):
+    if p.source_result_id not in GRAPH_REGISTRY.nodes or GRAPH_REGISTRY.nodes[p.source_result_id].node_type!="RESULT":
+        raise ValueError("source_result_id must reference a registered RESULT")
+    record=register_replication(p.replication_id,p.source_result_id,independent=p.independent,criteria_registered=p.criteria_registered,status=p.status)
+    node=register_node(p.replication_id,"REPLICATION",p.replication_id,record.provenance.tag.value,"2.1.0",{"source_result_id":p.source_result_id,"independent":record.independent,"criteria_registered":record.criteria_registered,"status":record.status})
+    GRAPH_REGISTRY.add_node(node)
+    GRAPH_REGISTRY.add_edge(register_edge(f"{p.replication_id}:replicates:{p.source_result_id}",node,GRAPH_REGISTRY.nodes[p.source_result_id],"REPLICATES",rationale="registered replication record"))
+    return {"record":asdict(record),"graph_node":asdict(node)}
+
+@app.post("/validation/generalization/register")
+def validation_generalization(p: GeneralizationInput):
+    if p.source_result_id not in GRAPH_REGISTRY.nodes or GRAPH_REGISTRY.nodes[p.source_result_id].node_type!="RESULT":
+        raise ValueError("source_result_id must reference a registered RESULT")
+    record=register_generalization(p.generalization_id,p.source_result_id,run_status=p.run_status,target_population_context=p.target_population_context)
+    node=register_node(p.generalization_id,"GENERALIZATION",p.generalization_id,record.provenance.tag.value,"2.1.0",{"source_result_id":p.source_result_id,"run_status":record.run_status,"target_population_context":record.target_population_context})
+    GRAPH_REGISTRY.add_node(node)
+    GRAPH_REGISTRY.add_edge(register_edge(f"{p.generalization_id}:generalizes:{p.source_result_id}",node,GRAPH_REGISTRY.nodes[p.source_result_id],"GENERALIZES",rationale="registered generalization record"))
+    return {"record":asdict(record),"graph_node":asdict(node)}
 
 @app.post("/graph/claim-gate")
 def graph_claim_gate(p: ClaimGateInput):
