@@ -38,3 +38,9 @@ def test_safety_block_forces_stop_adaptation():
     s.assign("a","u","r","P3",{"capacity":4},"C","PASS","PASS")
     x=s.adapt("a","ad1","C","IMPROVED","BLOCK",{"capacity":4})
     assert x.decision=="STOP" and x.next_level=="A"
+
+def test_contraindication_blocks_assignment():
+    s=_service()
+    s.register_rule_from_fields("r","Rule","MDL","1.0",["P3"],["blocked_state"],["capacity"],{}, {},status="ACTIVE")
+    a=s.assign("a","u","r","P3",{"capacity":4},"C","PASS","PASS",context_flags={"blocked_state"})
+    assert a.safety_gate_status=="BLOCK"
