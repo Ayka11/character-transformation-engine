@@ -56,7 +56,10 @@ const samplePayload = (executionId) => ({
 });
 
 const api = async (url, options={}) => {
-  const res = await fetch(url, {headers:{"Content-Type":"application/json"}, ...options});
+  const headers = {"Content-Type":"application/json", ...(options.headers || {})};
+  const key = localStorage.getItem("CTE_API_KEY") || "";
+  if (key) headers["X-CTE-API-Key"] = key;
+  const res = await fetch(url, {...options, headers});
   const data = await res.json();
   if (!res.ok) throw new Error(JSON.stringify(data));
   return data;
@@ -67,6 +70,9 @@ const out = (value) => {
 };
 
 async function boot(){
+  const apiKeyInput = $("apiKey");
+  apiKeyInput.value = localStorage.getItem("CTE_API_KEY") || "";
+  apiKeyInput.addEventListener("change", () => localStorage.setItem("CTE_API_KEY", apiKeyInput.value));
   try{
     await api("/science-lab/matrices/nonexistent");
   }catch(e){
