@@ -218,6 +218,14 @@ def test_transformation_provenance_survives_science_lab_reload_and_report_hash()
     service2.scenarios={"scenario":scenario}
     service2.replication_assessments={}
     service2.generalization_assessments={}
+    service2._put("science_lab.run","reload-run",{
+        "run_id":"reload-run","matrix_id":"reload-matrix","scenario_id":"scenario",
+        "execution_id":"reload-1","status":"COMPLETED","result_ids":["result-reload"],
+        "estimate_by_outcome":{"outcome":6.0},"safety_status":"PASS","output_hash":"output",
+        "transformation_provenance":tp,"provenance_tag":prov.tag.value,"source":prov.source_id,
+        "version":prov.source_version,"provenance_input_hash":prov.input_hash,
+        "provenance_note":prov.note,
+    })
     service2.runs={}
     service2._hydrate()
     bundle2=service2.report_bundle("reload-matrix")
