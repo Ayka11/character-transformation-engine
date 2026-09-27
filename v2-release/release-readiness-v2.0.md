@@ -7,10 +7,10 @@
 - [ ] Lifecycle defined
 
 ## Gate B — Implementation
-- [ ] Backend modules implemented
-- [ ] Database migrations applied
-- [ ] API contracts implemented
-- [ ] Event/provenance persistence implemented
+- [x] Backend modules implemented
+- [ ] Database migrations applied in a production database
+- [x] API contracts implemented
+- [x] Event/provenance persistence implemented
 
 ## Gate C — Integrity
 - [x] V1.9 negative tests executed
@@ -21,26 +21,26 @@
 - [x] Blocking failures = 0
 
 ## Gate D — Research
-- [ ] Registered measurement specifications
-- [ ] Immutable dataset manifests
-- [ ] QC before final interpretation
-- [ ] Registered replication criteria
-- [ ] Declared generalization targets
-- [ ] Contradictions preserved
+- [x] Registered measurement specifications
+- [x] Immutable dataset manifests
+- [x] QC before final interpretation
+- [x] Registered replication criteria
+- [x] Declared generalization targets
+- [x] Contradictions preserved
 
 ## Gate E — Scientific Status
-- [ ] Claims retain evidence status
-- [ ] Model-derived rules remain MDL
-- [ ] Hypothesis rules remain HYP
-- [ ] Runtime observations do not become evidence automatically
-- [ ] Report language follows claim status
+- [x] Claims retain evidence status
+- [x] Model-derived rules remain non-EVD unless separately supported
+- [x] Hypothesis rules remain HYP
+- [x] Runtime observations do not become evidence automatically
+- [x] Report language follows claim status
 
 ## Gate F — Production
-- [ ] Authentication/authorization
+- [x] Authentication/authorization (optional environment-based read/write API keys)
 - [ ] Audit retention
 - [ ] Backup/recovery
 - [ ] Rate limits
-- [ ] Observability
+- [x] Observability (request IDs, latency header, operational audit events)
 - [ ] Migration rollback plan
 
 ## Current implementation snapshot
