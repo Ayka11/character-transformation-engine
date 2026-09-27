@@ -20,7 +20,8 @@ Implemented runtime layers:
 - Scientific Reporting V1.6 snapshot, QC, publication and supersession runtime
 - Decision & Intervention V1.7 safety-first runtime and research bridge
 - Integrated Platform Orchestrator V1.8 execution state machine and immutable event lineage
-- V1.9 synthetic end-to-end contract fixture
+- V1.9 synthetic end-to-end contract fixture and executable integrity runner
+- shared SQLite durable runtime persistence for graph, orchestration, reporting and intervention state
 - FastAPI endpoints exposing the executable baseline
 
 Not yet implemented:
