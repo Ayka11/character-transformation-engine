@@ -27,6 +27,7 @@ from .evidence_engine import register_criteria
 from .reporting_api import install_reporting_api
 from .intervention_api import install_intervention_api
 from .orchestrator_api import install_orchestrator_api
+from .integrity_runner import run_v19_integrity_suite
 from .persistence import SQLiteRuntimeStore
 
 app = FastAPI(title="Character Transformation Engine", version="2.1.0")
@@ -537,3 +538,8 @@ INTERVENTION_SERVICE = install_intervention_api(app, GRAPH_REGISTRY)
 
 
 ORCHESTRATOR_SERVICE = install_orchestrator_api(app, RUNTIME_STORE)
+
+
+@app.post("/integrity/v1.9/run")
+def integrity_v19_run():
+    return run_v19_integrity_suite()
