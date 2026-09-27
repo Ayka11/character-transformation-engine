@@ -115,6 +115,8 @@ class GraphRegistry:
                        previous_claim_id: str | None = None) -> GraphNode:
         if claim_id in self.nodes:
             raise ValueError("claim node already registered")
+        if current_state != "HYPOTHESIS" and previous_claim_id is None:
+            raise ValueError("previous_claim_id is required for non-initial claim transitions")
         if previous_claim_id is not None:
             previous=self.nodes.get(previous_claim_id)
             if previous is None or previous.node_type!="CLAIM":
