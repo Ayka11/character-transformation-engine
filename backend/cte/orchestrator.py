@@ -79,6 +79,33 @@ class OrchestratorService:
         self.rules:dict[str,RuleRegistration]={}
         self._hydrate()
 
+    def _hydrate(self):
+        if self.store is None:
+            return
+        for snap in self.store.list_snapshots("orchestrator.execution"):
+            p=snap.payload
+            stages={k:StageRecord(**v) for k,v in p.get("stages",{}).items()}
+            events=[OrchestratorEvent(**e) for e in p.get("events",[])]
+            self.executions[p["execution_id"]]=Execution(
+                p["execution_id"],p["correlation_id"],p["state"],tuple(p["required_stages"]),
+                stages,events,p.get("input_hash",""),p.get("output_hash")
+            )
+
+    def _persist_execution(self,e:Execution):
+        if self.store is None:
+            return
+        payload={
+            "execution_id":e.execution_id,"correlation_id":e.correlation_id,"state":e.state,
+            "required_stages":list(e.required_stages),"input_hash":e.input_hash,"output_hash":e.output_hash,
+            "stages":{k:{
+                "stage_name":v.stage_name,"state":v.state,"input_hash":v.input_hash,
+                "output_hash":v.output_hash,"module_version":v.module_version,
+                "provenance_record_id":v.provenance_record_id,"reason":v.reason,"metadata":v.metadata
+            } for k,v in e.stages.items()},
+            "events":[asdict_event(event) for event in e.events]
+        }
+        self.store.put_snapshot("orchestrator.execution",e.execution_id,payload,"1.8")
+
     def create_execution(self,execution_id:str,correlation_id:str,input_payload:dict,
                          required_stages:list[str]|None=None)->Execution:
         if execution_id in self.executions: raise ValueError("execution already registered")
