@@ -60,7 +60,11 @@ class TransformationJournal:
             grouped.setdefault(event["payload"]["attempt_id"], []).append(event)
         result = []
         for attempt_id, events in grouped.items():
-            last = events[-1]["payload"]
+            # SQLite timestamps have one-second resolution, so event ordering
+            # cannot be used as the lifecycle clock. A terminal event always
+            # dominates an earlier non-terminal event.
+            terminal_events = [e for e in events if e["payload"].get("status") in TERMINAL]
+            last = terminal_events[-1]["payload"] if terminal_events else events[-1]["payload"]
             result.append(JournalAttempt(
                 attempt_id=attempt_id, execution_id=last["execution_id"],
                 character_id=last["character_id"], sequence=last["sequence"],
