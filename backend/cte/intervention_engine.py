@@ -73,6 +73,57 @@ class InterventionService:
         self.assignments:dict[str,Assignment]={}
         self._hydrate()
 
+    def _hydrate(self):
+        if self.store is None:
+            return
+        for snap in self.store.list_snapshots("intervention.rule"):
+            p=snap.payload
+            self.rules[p["rule_id"]]=InterventionRule(
+                p["rule_id"],p["rule_name"],p["provenance_class"],p["rule_version"],
+                tuple(p["eligible_domains"]),tuple(p["contraindications"]),tuple(p["required_inputs"]),
+                p["decision_logic"],p["evidence_scope"],p["status"],p["immutable_hash"])
+        for snap in self.store.list_snapshots("intervention.assignment"):
+            p=snap.payload
+            sessions={k:Session(v["session_id"],v["assignment_id"],v["planned_load"],v["completion_status"],
+                v.get("executed_load"),v.get("stop_reason"),v.get("measurements",{}),v.get("response"))
+                for k,v in p.get("sessions",{}).items()}
+            adaptations=[AdaptationDecision(**a) for a in p.get("adaptations",[])]
+            self.assignments[p["assignment_id"]]=Assignment(
+                p["assignment_id"],p["user_id"],p["rule_id"],p["rule_version"],p["selected_level"],
+                p.get("source_assessment_id"),tuple(p.get("source_claim_ids",())),
+                p["selection_reason"],p["safety_gate_status"],p.get("status","ASSIGNED"),
+                sessions,adaptations,p.get("audit",[]),p.get("links",[])
+            )
+
+    def _persist_rule(self,rule:InterventionRule):
+        if self.store is None:
+            return
+        self.store.put_snapshot("intervention.rule",rule.rule_id,{
+            "rule_id":rule.rule_id,"rule_name":rule.rule_name,"provenance_class":rule.provenance_class,
+            "rule_version":rule.rule_version,"eligible_domains":list(rule.eligible_domains),
+            "contraindications":list(rule.contraindications),"required_inputs":list(rule.required_inputs),
+            "decision_logic":rule.decision_logic,"evidence_scope":rule.evidence_scope,
+            "status":rule.status,"immutable_hash":rule.immutable_hash},rule.rule_version)
+
+    def _persist_assignment(self,assignment:Assignment):
+        if self.store is None:
+            return
+        payload={
+            "assignment_id":assignment.assignment_id,"user_id":assignment.user_id,"rule_id":assignment.rule_id,
+            "rule_version":assignment.rule_version,"selected_level":assignment.selected_level,
+            "source_assessment_id":assignment.source_assessment_id,"source_claim_ids":list(assignment.source_claim_ids),
+            "selection_reason":assignment.selection_reason,"safety_gate_status":assignment.safety_gate_status,
+            "status":assignment.status,
+            "sessions":{k:{
+                "session_id":v.session_id,"assignment_id":v.assignment_id,"planned_load":v.planned_load,
+                "completion_status":v.completion_status,"executed_load":v.executed_load,
+                "stop_reason":v.stop_reason,"measurements":v.measurements,"response":v.response
+            } for k,v in assignment.sessions.items()},
+            "adaptations":[asdict_adaptation(a) for a in assignment.adaptations],
+            "audit":assignment.audit,"links":assignment.links
+        }
+        self.store.put_snapshot("intervention.assignment",assignment.assignment_id,payload,"1.7")
+
     def register_rule(self,rule:InterventionRule)->InterventionRule:
         if rule.rule_id in self.rules: raise ValueError("intervention rule already registered")
         if rule.status not in RULE_STATUSES: raise ValueError("unsupported intervention rule status")
