@@ -30,6 +30,7 @@ from .intervention_api import install_intervention_api
 from .orchestrator_api import install_orchestrator_api
 from .integrity_runner import run_v19_integrity_suite
 from .research_api import install_research_api
+from .science_lab_api import install_science_lab_api
 from .persistence import SQLiteRuntimeStore
 
 app = FastAPI(title="Character Transformation Engine", version="2.1.0")
@@ -618,6 +619,7 @@ INTERVENTION_SERVICE = install_intervention_api(app, GRAPH_REGISTRY, RUNTIME_STO
 ORCHESTRATOR_SERVICE = install_orchestrator_api(app, RUNTIME_STORE)
 
 RESEARCH_SERVICE = install_research_api(app, GRAPH_REGISTRY, RUNTIME_STORE, ORCHESTRATOR_SERVICE)
+SCIENCE_LAB_SERVICE = install_science_lab_api(app, GRAPH_REGISTRY, RUNTIME_STORE, RESEARCH_SERVICE.e2e_coordinator)
 
 
 @app.post("/integrity/v1.9/run")
