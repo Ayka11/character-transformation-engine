@@ -300,6 +300,48 @@ class OrchestratorService:
                           {"module_id":module_id,"module_version":module.version,"stage":stage_name})
         return {"execution_id":execution_id,"module_id":module_id,"module_version":module.version,"stage":stage_name}
 
+    def execute_transformation(self, execution_id: str, character_id: str, sequence: int,
+                               state: dict, contract: TransformationContract, intervention,
+                               *, parent_snapshot_id: str | None = None):
+        """Execute the INTERVENTION boundary through the validated transition runtime."""
+        e=self._get(execution_id)
+        if e.state != "RUNNING":
+            raise ValueError("execution must be RUNNING")
+        if "SAFETY_GATE" in e.required_stages:
+            safety=e.stages["SAFETY_GATE"]
+            if safety.state != "PASSED" or safety.metadata.get("safety_status") != "PASS":
+                raise ValueError("transformation requires a passed safety gate")
+        if "INTERVENTION" not in e.required_stages:
+            raise ValueError("execution does not declare INTERVENTION as a required stage")
+        from .transformation_runtime import TransformationExecutor
+        runtime=TransformationExecutor()
+        stage=self.advance_stage(execution_id,"INTERVENTION","RUNNING",
+                                 input_hash=content_hash(state),module_version=contract.version,
+                                 provenance_record_id=f"{execution_id}:INTERVENTION")
+        result=runtime.execute(execution_id,character_id,sequence,state,contract,intervention,
+                               parent_snapshot_id=parent_snapshot_id)
+        if result.result.status == "VALIDATED":
+            self.advance_stage(execution_id,"INTERVENTION","PASSED",
+                               input_hash=result.result.before_hash,output_hash=result.result.after_hash,
+                               module_version=contract.version,
+                               provenance_record_id=f"{execution_id}:INTERVENTION:validated",
+                               metadata={"transition_status":"VALIDATED",
+                                         "certificate_id":result.certificate.certificate_id if result.certificate else None,
+                                         "before_snapshot_id":result.before_snapshot_id,
+                                         "after_snapshot_id":result.after_snapshot_id})
+        else:
+            self.advance_stage(execution_id,"INTERVENTION","FAILED",
+                               input_hash=result.result.before_hash or content_hash(state),
+                               output_hash=result.result.after_hash or None,
+                               module_version=contract.version,
+                               provenance_record_id=f"{execution_id}:INTERVENTION:failed",
+                               reason=result.result.failure_code or "TRANSFORMATION_FAILED",
+                               metadata={"failure_code":result.result.failure_code,
+                                         "transition_status":"FAILED",
+                                         "before_snapshot_id":result.before_snapshot_id,
+                                         "after_snapshot_id":result.after_snapshot_id})
+        return result
+
     def validate_transformation_transition(self, execution_id: str, contract: TransformationContract,
                                         before: StateSnapshot, after: StateSnapshot) -> TransformationResult:
         """Validate an executed intervention against immutable before/after snapshots.
