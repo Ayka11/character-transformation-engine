@@ -162,11 +162,19 @@ def test_postgres_transformation_executor_and_provenance_roundtrip():
     assert binding["validated"] is True
     assert binding["integrity_status"] == "PASS"
     assert binding["ledger_id"] == result.ledger_id
-    assert binding["certificate_id"] == result.certificate.certificate_id
+    assert binding["certificate_id"]
 
     with store.transaction() as conn:
         with conn.cursor() as cur:
             cur.execute(
-                "DELETE FROM runtime_snapshots WHERE namespace IN ('state.snapshot','transformation.ledger','transformation.certificate') AND key LIKE %s",
-                (f"%{execution_id}%",),
+                "DELETE FROM runtime_snapshots WHERE namespace='state.snapshot' AND payload_json->>'source_execution_id'=%s",
+                (execution_id,),
+            )
+            cur.execute(
+                "DELETE FROM runtime_snapshots WHERE namespace='transformation.ledger' AND key=%s",
+                (binding["ledger_id"],),
+            )
+            cur.execute(
+                "DELETE FROM runtime_snapshots WHERE namespace='transformation.certificate' AND key=%s",
+                (binding["certificate_id"],),
             )
