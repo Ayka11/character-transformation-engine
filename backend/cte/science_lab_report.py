@@ -49,6 +49,7 @@ pre{{padding:14px;overflow:auto}}
 <table><thead><tr><th>Scenario</th><th>Conditions</th><th>Status</th><th>Estimate</th></tr></thead><tbody>{table}</tbody></table>
 <h2>Replication / Generalization</h2><pre>{rg}</pre>
 <h2>Claim validation</h2><pre>{claims}</pre>
+<h2>Transformation provenance</h2><pre>{transformation_provenance}</pre>
 <h2>Provenance</h2><pre>{provenance}</pre>
 </body></html>""".format(
         title=escape(str(matrix["name"])),
@@ -58,5 +59,6 @@ pre{{padding:14px;overflow:auto}}
         table=table,
         rg=escape(json.dumps({"replication":bundle["replication_assessments"],"generalization":bundle["generalization_assessments"]},indent=2,sort_keys=True)),
         claims=escape(json.dumps(bundle["claim_validation"],indent=2,sort_keys=True)),
+        transformation_provenance=escape(json.dumps(bundle.get("transformation_provenance", {}),indent=2,sort_keys=True)),
         provenance=escape(json.dumps(bundle["provenance"],indent=2,sort_keys=True)),
     )
