@@ -349,7 +349,7 @@ def runtime_sprint_day(p: SprintDayInput):
     sprint.status=p.status
     sprint.supporting_bio_habit=p.supporting_bio_habit
     sprint.daily_action=p.daily_action
-    return asdict(record_day(sprint,p.day,p.action_completed,p.outcome,state))
+    return asdict(record_day(sprint,p.day,p.action_completed,p.outcome,state,p.recovery_indices or None))
 
 @app.post("/replication/specs")
 def replication_spec_register(p: ReplicationSpecInput):
