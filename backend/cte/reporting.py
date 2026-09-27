@@ -102,6 +102,12 @@ class ReportRun:
     superseded_by:str|None=None
 
 def claim_language(claim_status:str)->tuple[str,str]:
+    if claim_status=="HYPOTHESIS":
+        return "HYPOTHESIS_STATUS","Registered hypothesis; the report does not imply that a result has been established."
+    if claim_status=="REGISTERED":
+        return "REGISTERED_STATUS","Registered claim; the report does not imply a stronger result status."
+    if claim_status=="UNSUPPORTED":
+        return "UNSUPPORTED_STATUS","Claim is currently unsupported under the registered evidence graph."
     if claim_status=="ASSOCIATIONAL_RESULT":
         return "ASSOCIATIONAL_STATUS","Registered associational result; this status does not by itself establish causality."
     if claim_status=="INTERVENTION_RESULT":
