@@ -9,6 +9,7 @@ It does not silently upgrade model-derived outputs to empirical evidence.
 from __future__ import annotations
 
 from dataclasses import asdict, dataclass
+from itertools import product
 from typing import Any
 
 from .evidence_graph import register_edge, register_node
@@ -218,6 +219,41 @@ class ScienceLabService:
         ))
         return item
 
+    def generate_scenarios(
+        self, *, matrix_id: str, factors: dict[str, list[Any]],
+        max_scenarios: int = 128, name_prefix: str = "Factorial"
+    ) -> list[ScenarioDefinition]:
+        if matrix_id not in self.matrices:
+            raise ValueError("experiment matrix is not registered")
+        if not factors:
+            raise ValueError("at least one factor is required")
+        if max_scenarios < 1:
+            raise ValueError("max_scenarios must be >= 1")
+        normalized: dict[str, list[Any]] = {}
+        for factor, values in sorted(factors.items()):
+            if not factor or not isinstance(values, list) or not values:
+                raise ValueError("each factor requires a non-empty list of values")
+            if len(values) != len({repr(v) for v in values}):
+                raise ValueError(f"factor {factor} contains duplicate values")
+            normalized[factor] = values
+        count = 1
+        for values in normalized.values():
+            count *= len(values)
+        if count > max_scenarios:
+            raise ValueError(f"factorial matrix would create {count} scenarios; max is {max_scenarios}")
+        generated = []
+        keys = list(normalized)
+        for index, combination in enumerate(product(*(normalized[k] for k in keys)), start=1):
+            conditions = {key: value for key, value in zip(keys, combination)}
+            scenario_id = f"{matrix_id}:scenario:{index:03d}"
+            generated.append(self.register_scenario(
+                scenario_id=scenario_id, matrix_id=matrix_id,
+                name=f"{name_prefix} {index:03d}",
+                description="Deterministically generated factorial scenario",
+                conditions=conditions, expected_outcomes=[self.matrices[matrix_id].primary_outcome],
+                independent=False,
+            ))
+        return generated
     def run_scenario(self, *, matrix_id: str, scenario_id: str, payload: dict) -> ScenarioRun:
         matrix = self.matrices.get(matrix_id)
         scenario = self.scenarios.get(scenario_id)
