@@ -1,0 +1,125 @@
+{
+  "name": "Character Transformation Engine — Validation & Analytics API",
+  "version": "1.3",
+  "status": "MDL/DRV design specification",
+  "principles": [
+    "No statistical result is automatically Evidence (EVD).",
+    "Every analysis references an immutable dataset manifest.",
+    "Every derived result records algorithm version, input hash, and provenance.",
+    "QC and missing-data assessment precede final interpretation.",
+    "Effect sizes and confidence intervals accompany point estimates where estimable.",
+    "Replication is assessed independently from the original analysis.",
+    "Generalization is recorded separately from replication.",
+    "Claims are constrained by source provenance and allowed claim level."
+  ],
+  "endpoints": [
+    [
+      "POST",
+      "/validation/specs",
+      "Register a versioned validation specification."
+    ],
+    [
+      "POST",
+      "/validation/runs",
+      "Register and execute a validation run against an immutable dataset manifest."
+    ],
+    [
+      "GET",
+      "/validation/runs/{validation_run_id}",
+      "Return validation status, QC, missingness, and result summary."
+    ],
+    [
+      "GET",
+      "/validation/runs/{validation_run_id}/results",
+      "Return outcome and longitudinal results."
+    ],
+    [
+      "POST",
+      "/validation/runs/{validation_run_id}/sensitivity",
+      "Run registered sensitivity scenarios."
+    ],
+    [
+      "POST",
+      "/validation/runs/{validation_run_id}/claim-derivation",
+      "Create a provenance-constrained claim derivation record."
+    ],
+    [
+      "POST",
+      "/replication/{replication_run_id}/assess",
+      "Assess registered replication criteria."
+    ],
+    [
+      "GET",
+      "/claims/{claim_id}/evidence-graph",
+      "Return evidence, replication, generalization, and derivation edges."
+    ]
+  ],
+  "outcome_methods": {
+    "continuous_pre_post": "paired difference or longitudinal model",
+    "continuous_between_groups": "adjusted mean difference or regression contrast",
+    "binary_outcome": "risk difference, risk ratio, or odds ratio with CI",
+    "count_outcome": "Poisson/negative-binomial family when assumptions support it",
+    "repeated_measure": "mixed-effects or equivalent longitudinal model",
+    "time_to_event": "survival model only when event/time structure is present",
+    "association": "correlation/regression with explicit confounding limitations"
+  },
+  "effect_sizes": {
+    "continuous": [
+      "mean_difference",
+      "standardized_mean_difference",
+      "standardized_change"
+    ],
+    "binary": [
+      "risk_difference",
+      "risk_ratio",
+      "odds_ratio"
+    ],
+    "count": [
+      "rate_ratio"
+    ],
+    "time_to_event": [
+      "hazard_ratio"
+    ]
+  },
+  "missing_data": {
+    "required_steps": [
+      "quantify missingness",
+      "identify variable and time-pattern",
+      "record handling rule",
+      "flag sensitivity analysis when material",
+      "never silently impute"
+    ],
+    "default_status_when_not_estimable": "NOT_ESTIMABLE"
+  },
+  "multiplicity": {
+    "default": "pre-specify primary outcome; identify secondary/exploratory outcomes",
+    "allowed_methods": [
+      "Holm",
+      "Benjamini-Hochberg",
+      "none_when_pre-specified_single_primary"
+    ]
+  },
+  "replication": {
+    "separate_run_required": true,
+    "criteria_examples": [
+      "same_direction",
+      "effect_magnitude_compatible",
+      "confidence_interval_compatibility_or_predefined_equivalence_rule",
+      "measurement_and_protocol_fidelity"
+    ],
+    "note": "These are configurable criteria, not empirical standards."
+  },
+  "claim_levels": [
+    "DESCRIPTIVE_RESULT",
+    "ASSOCIATIONAL_RESULT",
+    "INTERVENTION_RESULT",
+    "REPLICATED_RESULT",
+    "GENERALIZED_RESULT"
+  ],
+  "prohibited_inference_examples": [
+    "correlation_does_not_become_causation",
+    "single_study_does_not_become_replicated",
+    "statistical_significance_does_not_establish_practical_importance",
+    "model_output_does_not_become_EVD_without_registered_evidence"
+  ]
+}
