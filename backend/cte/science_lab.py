@@ -121,10 +121,24 @@ class ScienceLabService:
         self._hydrate()
 
     def _transformation_for_result(self, result_id: str) -> dict[str, Any]:
-        """Resolve the transformation provenance attached to a Science Lab result."""
+        """Resolve trusted transformation provenance from the durable transformation ledger.
+
+        The Science Lab run payload is mutable and therefore cannot be the source of
+        truth for transformation validation.  The binder re-derives provenance from
+        the immutable transformation ledger/certificate/snapshots.
+        """
         for run in self.runs.values():
-            if result_id in run.result_ids:
-                return dict(run.transformation_provenance or {})
+            if result_id not in run.result_ids:
+                continue
+            if self.transformation_provenance is None:
+                return {
+                    "execution_id": run.execution_id,
+                    "status": "UNAVAILABLE",
+                    "validated": False,
+                    "integrity_status": "FAIL",
+                    "issues": ["TRANSFORMATION_PROVENANCE_BINDER_UNAVAILABLE"],
+                }
+            return self.transformation_provenance.bind_execution(run.execution_id)
         return {}
 
     def _put(self, namespace: str, key: str, payload: dict):
@@ -587,7 +601,16 @@ class ScienceLabService:
                      if r.matrix_id == matrix_id and r.execution_id == execution_id),
                     None,
                 )
-                tp = dict(run.transformation_provenance) if run else {}
+                tp = (
+                    self.transformation_provenance.bind_execution(execution_id)
+                    if self.transformation_provenance is not None
+                    else {
+                        "execution_id": execution_id,
+                        "validated": False,
+                        "integrity_status": "FAIL",
+                        "issues": ["TRANSFORMATION_PROVENANCE_BINDER_UNAVAILABLE"],
+                    }
+                )
                 transformation_supported = bool(
                     tp.get("validated") and tp.get("integrity_status") == "PASS"
                 )
