@@ -10,6 +10,8 @@ from datetime import datetime, timedelta, timezone
 
 from .provenance import content_hash
 
+PROTECTED_EVENT_NAMESPACES = frozenset({"transformation.journal"})
+
 
 @dataclass(frozen=True)
 class RetentionPolicy:
@@ -49,6 +51,8 @@ def apply_retention(
     archive_manifest_hash: str | None,
     now: datetime | None = None,
 ) -> dict:
+    if policy.namespace in PROTECTED_EVENT_NAMESPACES:
+        raise ValueError(f"retention purge is forbidden for protected namespace: {policy.namespace}")
     if policy.archive_required and not archive_manifest_hash:
         raise ValueError("audit archive backup manifest is required before retention purge")
     cutoff = retention_cutoff(policy, now)
