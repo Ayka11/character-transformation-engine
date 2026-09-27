@@ -53,3 +53,21 @@ Question → Hypothesis → Study → Protocol → Experiment
 - Configurable request rate limiting.
 - Protected operational API for backup, restore and retention.
 - Guarded PostgreSQL rollback migration and documented rollback procedure.
+
+
+## V2.6 Production Hardening / RC
+
+The v2.6 release candidate gate is maintained in
+v2-release/V2.6_PRODUCTION_READINESS.md.
+
+Current release policy:
+- historical CI success does not substitute for current RC verification;
+- immutable persistence requires race-safe/idempotent writes and conflict detection;
+- transformation contracts enforce declared preconditions and postconditions;
+- crash recovery must preserve the distinction between execution, validation,
+  certification and completion;
+- backup/restore and evidence lineage must survive adversarial integrity checks;
+- v2.6.0-rc1 is not tagged until the exact RC commit has a green CI gate.
+
+Scientific status remains IMPLEMENTATION_BASELINE; software execution alone is
+not empirical validation.
