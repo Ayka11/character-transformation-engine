@@ -56,3 +56,12 @@ def test_downstream_stage_cannot_start_before_required_upstream():
         assert "upstream" in str(e)
     else:
         assert False
+
+def test_blocked_execution_can_resume_stage_after_resolution():
+    o=OrchestratorService()
+    o.create_execution("x","c",{},["SAFETY_GATE"])
+    o.start("x")
+    o.advance_stage("x","SAFETY_GATE","BLOCKED",reason="temporary",metadata={})
+    o.resume("x",True)
+    assert o.executions["x"].state=="RUNNING"
+    assert o.executions["x"].stages["SAFETY_GATE"].state=="RUNNING"
