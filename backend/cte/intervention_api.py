@@ -4,6 +4,7 @@ from dataclasses import asdict
 from fastapi import HTTPException
 from pydantic import BaseModel, Field
 from .intervention_engine import InterventionService
+from .persistence import SQLiteRuntimeStore
 
 class InterventionRuleInput(BaseModel):
     rule_id:str
@@ -58,8 +59,8 @@ class ResearchLinkInput(BaseModel):
     result_node_id:str|None=None
     claim_id:str|None=None
 
-def install_intervention_api(app, graph_registry):
-    service=InterventionService(graph_registry)
+def install_intervention_api(app, graph_registry, store:SQLiteRuntimeStore|None=None):
+    service=InterventionService(graph_registry,store)
 
     @app.post("/interventions/rules")
     def create_rule(p:InterventionRuleInput):
