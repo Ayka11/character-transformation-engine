@@ -29,3 +29,14 @@ def test_nonsequential_day_rejected():
         assert False
     except ValueError:
         assert True
+
+
+def test_three_day_low_recovery_pauses_sprint_for_bio_reset():
+    s=start_sprint("s1","P3.pause_capacity","sleep routine","pause")
+    r=record_day(
+        s,1,True,7.0,state(),
+        recovery_indices=[3.5,3.2,3.0],
+    )
+    assert r.status=="PAUSED_BIO_RESET"
+    assert r.safety_block
+    assert r.next_action=="bio_reset"
