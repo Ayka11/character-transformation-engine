@@ -49,6 +49,8 @@ if FRONTEND_DIR.exists():
 
 RUNTIME_DB_PATH = os.getenv("CTE_RUNTIME_DB", "data/cte-runtime.sqlite3")
 RUNTIME_STORE = build_runtime_store(RUNTIME_DB_PATH)
+configure_logging()
+app.add_middleware(SecurityObservabilityMiddleware, store=RUNTIME_STORE)
 GRAPH_REGISTRY = build_registry(RUNTIME_STORE)
 REPLICATION_SPECS = {}
 REPLICATION_RUNS = {}
