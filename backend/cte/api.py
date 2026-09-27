@@ -4,7 +4,8 @@ from fastapi import FastAPI
 from pydantic import BaseModel, Field
 from .models import DailyState
 from .capacity import compute_capacity
-from .compatibility import compatibility_v1, compatibility_v2, compatibility_v3
+from .compatibility import compatibility_report
+from .recovery import evaluate_recovery_gate, evaluate_bio_reset, build_recovery_plan, isolate_compromised_state_from_traits
 from .catalog import ADAPTIVE_LEVELS, MASTER_MATRIX, MATRIX_VERSION, SPRINT_TEMPLATE
 from .assessment import build_profile
 from .state_engine import derive_daily_state
@@ -93,6 +94,19 @@ class CompatibilityInput(BaseModel):
     roles_a: list[str] = Field(default_factory=list)
     roles_b: list[str] = Field(default_factory=list)
     synergy: dict[str, float] = Field(default_factory=dict)
+
+class RecoveryWindowInput(BaseModel):
+    recovery_indices: list[float | None]
+    threshold: float = Field(4.0, ge=0)
+    streak_days: int = Field(3, ge=1)
+
+class RecoveryPlanInput(BaseModel):
+    state: StateInput
+    bio_reset_triggered: bool = False
+
+class StateTraitIsolationInput(BaseModel):
+    current_state: str = "compromised"
+    trait_values_untouched: bool = True
 
 class ObservationInput(BaseModel):
     item_id: str
@@ -564,8 +578,33 @@ def runtime_capacity(p: StateInput):
 
 @app.post("/compatibility")
 def compatibility(p: CompatibilityInput):
-    s={(k.split("|")[0],k.split("|")[1]):v for k,v in p.synergy.items() if "|" in k}
-    return {"v1":compatibility_v1(p.bio_a,p.bio_b),"v2":compatibility_v2(p.values_a,p.values_b),"v3":compatibility_v3(set(p.roles_a),set(p.roles_b),s),"authoritative_scalar":False}
+    role_overrides={(k.split("|")[0],k.split("|")[1]):v for k,v in p.synergy.items() if "|" in k}
+    return compatibility_report(
+        p.bio_a,p.bio_b,p.values_a,p.values_b,
+        set(p.roles_a),set(p.roles_b),role_overrides
+    )
+
+@app.post("/runtime/recovery-gate")
+def runtime_recovery_gate(p: StateInput):
+    state=DailyState(**p.model_dump())
+    return asdict(evaluate_recovery_gate(state))
+
+@app.post("/runtime/bio-reset")
+def runtime_bio_reset(p: RecoveryWindowInput):
+    return asdict(evaluate_bio_reset(
+        p.recovery_indices,threshold=p.threshold,streak_days=p.streak_days
+    ))
+
+@app.post("/runtime/recovery-plan")
+def runtime_recovery_plan(p: RecoveryPlanInput):
+    state=DailyState(**p.state.model_dump())
+    return asdict(build_recovery_plan(state,bio_reset_triggered=p.bio_reset_triggered))
+
+@app.post("/runtime/state-trait-isolation")
+def runtime_state_trait_isolation(p: StateTraitIsolationInput):
+    return asdict(isolate_compromised_state_from_traits(
+        p.current_state,trait_values_untouched=p.trait_values_untouched
+    ))
 
 
 REPORT_SERVICE = install_reporting_api(app, GRAPH_REGISTRY)
