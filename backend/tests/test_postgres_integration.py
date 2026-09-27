@@ -716,7 +716,7 @@ def test_postgres_science_lab_provenance_rebind_matches_sqlite_after_restore():
     from cte.science_lab import ExperimentMatrix, ScenarioDefinition, ScenarioRun, ScienceLabService
     from cte.graph_registry import GraphRegistry
     from cte.provenance import Provenance, ProvenanceTag
-    from cte.evidence_graph import register_node
+    from cte.evidence_graph import register_node, register_edge
     import copy
 
     dsn = os.environ["CTE_DATABASE_URL"]
@@ -784,6 +784,26 @@ def test_postgres_science_lab_provenance_rebind_matches_sqlite_after_restore():
         registry.add_node(register_node(
             result_id, "RESULT", result_id, "EXP", "1",
             {"qc_status": "PASS", "validated_descriptive_result": True},
+        ))
+        registry.add_node(register_node(
+            f"analysis-{suffix}", "ANALYSIS", f"analysis-{suffix}", "EXP", "1",
+            {"execution_id": execution_id},
+        ))
+        registry.add_node(register_node(
+            f"transform-{suffix}", "TRANSFORMATION", execution_id, "EXP", "1",
+            {"execution_id": execution_id, "ledger_id": tp["ledger_id"], "certificate_id": tp["certificate_id"]},
+        ))
+        registry.add_edge(register_edge(
+            f"analysis-{suffix}:result", registry.nodes[f"analysis-{suffix}"],
+            registry.nodes[result_id], "RESULTS_IN",
+        ))
+        registry.add_edge(register_edge(
+            f"run-{suffix}:result", registry.nodes[f"analysis-{suffix}"],
+            registry.nodes[result_id], "DERIVED_FROM",
+        ))
+        registry.add_edge(register_edge(
+            f"run-{suffix}:transform", registry.nodes[f"analysis-{suffix}"],
+            registry.nodes[f"transform-{suffix}"], "DERIVED_FROM",
         ))
         registry.register_claim(
             claim_id, result_id, "HYPOTHESIS", "REGISTERED", "EXP",
