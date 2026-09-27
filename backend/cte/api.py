@@ -17,8 +17,10 @@ from .longitudinal import longitudinal_change
 from .registered_analysis import lock_manifest, paired_effect
 from .result_node import build_result, graph_node
 from .evidence_graph import register_node, register_edge
+from .graph_registry import build_registry
 
 app = FastAPI(title="Character Transformation Engine", version="2.1.0")
+GRAPH_REGISTRY = build_registry()
 
 class StateInput(BaseModel):
     sleep_quality: float | None = Field(None, ge=0, le=10)
@@ -157,6 +159,11 @@ def runtime_sprint_day(p: SprintDayInput):
     sprint.supporting_bio_habit=p.supporting_bio_habit
     sprint.daily_action=p.daily_action
     return asdict(record_day(sprint,p.day,p.action_completed,p.outcome,state))
+
+@app.post("/graph/register-node")
+def graph_register_node(p: GraphEdgeInput):
+    node=register_node(p.from_node_id,p.from_node_type,p.from_node_id,"DRV","2.1.0",{})
+    return asdict(GRAPH_REGISTRY.add_node(node))
 
 @app.post("/graph/edge")
 def graph_edge(p: GraphEdgeInput):
