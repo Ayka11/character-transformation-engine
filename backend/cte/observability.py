@@ -7,12 +7,35 @@ import os
 import re
 import time
 import uuid
+from collections import defaultdict, deque
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
 from starlette.responses import JSONResponse
 
 LOGGER = logging.getLogger("cte.api")
 SAFE_REQUEST_ID = re.compile(r"^[A-Za-z0-9._:-]{1,80}$")
+
+class SlidingWindowRateLimiter:
+    def __init__(self, max_requests: int, window_seconds: int = 60):
+        if max_requests < 1:
+            raise ValueError("max_requests must be >= 1")
+        if window_seconds < 1:
+            raise ValueError("window_seconds must be >= 1")
+        self.max_requests = max_requests
+        self.window_seconds = window_seconds
+        self._buckets = defaultdict(deque)
+
+    def allow(self, key: str, now: float | None = None) -> tuple[bool, int]:
+        current = time.monotonic() if now is None else now
+        bucket = self._buckets[key]
+        cutoff = current - self.window_seconds
+        while bucket and bucket[0] <= cutoff:
+            bucket.popleft()
+        if len(bucket) >= self.max_requests:
+            retry_after = max(1, int(bucket[0] + self.window_seconds - current + 0.999))
+            return False, retry_after
+        bucket.append(current)
+        return True, 0
 
 PUBLIC_PATHS = {
     "/health",
