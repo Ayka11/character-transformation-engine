@@ -23,6 +23,7 @@ from .replication import register_replication, register_generalization
 from .replication_engine import ReplicationRun as EngineReplicationRun, register_spec as register_replication_spec, register_run as register_replication_run, evaluate_outcome as evaluate_replication_outcome
 from .generalization_engine import register_spec as register_generalization_spec, register_run as register_generalization_run, evaluate as evaluate_generalization
 from .evidence_engine import register_criteria
+from .reporting_api import install_reporting_api
 
 app = FastAPI(title="Character Transformation Engine", version="2.1.0")
 GRAPH_REGISTRY = build_registry()
@@ -521,3 +522,6 @@ def runtime_capacity(p: StateInput):
 def compatibility(p: CompatibilityInput):
     s={(k.split("|")[0],k.split("|")[1]):v for k,v in p.synergy.items() if "|" in k}
     return {"v1":compatibility_v1(p.bio_a,p.bio_b),"v2":compatibility_v2(p.values_a,p.values_b),"v3":compatibility_v3(set(p.roles_a),set(p.roles_b),s),"authoritative_scalar":False}
+
+
+REPORT_SERVICE = install_reporting_api(app, GRAPH_REGISTRY)
