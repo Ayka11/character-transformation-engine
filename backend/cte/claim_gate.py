@@ -46,6 +46,7 @@ def _normalize_legacy_requirements(original: set[str]) -> set[str]:
     normalized=set()
     if "RESULT" in original:
         normalized.add("valid_result")
+        normalized.add("validated_descriptive_result")
     if "PROTOCOL" in original:
         normalized.add("registered_intervention")
     if "REPLICATION" in original:
