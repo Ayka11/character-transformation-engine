@@ -118,3 +118,51 @@ def test_science_lab_report_exposes_transformation_provenance_without_promotion(
     bundle=service.report_bundle("m1")
     assert bundle["transformation_provenance"]["run_count"] == 0
     assert bundle["transformation_provenance"]["all_runs_validated"] is False
+
+
+def test_corrupted_transformation_provenance_cannot_support_claim():
+    from cte.graph_registry import GraphRegistry
+    from cte.science_lab import ScienceLabService, ScenarioRun
+
+    db=SQLiteRuntimeStore(":memory:")
+    registry=GraphRegistry(db)
+    service=object.__new__(ScienceLabService)
+    service.store=db
+    service.registry=registry
+    service.matrices={}
+    service.scenarios={}
+    service.runs={}
+    service.replication_assessments={}
+    service.generalization_assessments={}
+
+    from cte.provenance import Provenance, ProvenanceTag
+    run=ScenarioRun(
+        "run-corrupt","m1","s1","exec-corrupt","COMPLETED",("result-corrupt",),
+        {"outcome":1.0},"PASS","hash",
+        Provenance(ProvenanceTag.EXP,"test","1","hash","test"),
+        {
+            "execution_id":"exec-corrupt",
+            "validated":True,
+            "integrity_status":"FAIL",
+            "ledger_id":"forged-ledger",
+            "certificate_id":"forged-cert",
+            "issues":["CERTIFICATE_HASH_MISMATCH"],
+        },
+    )
+    service.runs[run.run_id]=run
+    registry.add_node(__import__("cte.evidence_graph",fromlist=["register_node"]).register_node(
+        "result-corrupt","RESULT","result-corrupt","EXP","1",{}
+    ))
+    registry.register_claim(
+        "claim-corrupt","result-corrupt","REGISTERED","DESCRIPTIVE_RESULT","EXP",
+        {"execution_id":"exec-corrupt"}
+    )
+    service.matrices["m1"]=__import__("cte.science_lab",fromlist=["ExperimentMatrix"]).ExperimentMatrix(
+        "m1","study","Matrix","outcome",{},("s1",),"ACTIVE","hash"
+    )
+    service.scenarios["s1"]=__import__("cte.science_lab",fromlist=["ScenarioDefinition"]).ScenarioDefinition(
+        "s1","m1","Scenario","desc",{},("outcome",),True,"hash"
+    )
+    claims=service.claim_validation("m1")
+    assert claims["claims"][0]["transformation_support"]["status"]=="NOT_VALIDATED"
+    assert claims["claims"][0]["transformation_support"]["integrity_status"]=="FAIL"
