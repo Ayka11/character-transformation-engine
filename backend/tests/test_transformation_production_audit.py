@@ -106,3 +106,32 @@ def test_transformation_provenance_api_exposes_validated_binding():
     assert body["validated"] is True
     assert body["integrity_status"]=="PASS"
     assert body["certificate_id"]
+
+
+def test_science_lab_matrix_provenance_endpoint_exposes_integrity():
+    from fastapi import FastAPI
+    from fastapi.testclient import TestClient
+    from cte.graph_registry import GraphRegistry
+    from cte.science_lab_api import install_science_lab_api
+    from cte.persistence import SQLiteRuntimeStore
+
+    db=SQLiteRuntimeStore(":memory:")
+    registry=GraphRegistry(db)
+
+    class DummyResearch:
+        pass
+    class DummyCoordinator:
+        research=DummyResearch()
+
+    app=FastAPI()
+    service=install_science_lab_api(app,registry,db,DummyCoordinator())
+    service.register_matrix(
+        matrix_id="api-matrix",study_id="study",name="API Matrix",
+        primary_outcome="outcome",design={},status="ACTIVE"
+    )
+    response=TestClient(app).get("/science-lab/matrices/api-matrix/provenance")
+    assert response.status_code == 200
+    body=response.json()
+    assert body["matrix_id"]=="api-matrix"
+    assert body["transformation_provenance"]["run_count"] == 0
+    assert body["scientific_status"] == "IMPLEMENTATION_BASELINE"
