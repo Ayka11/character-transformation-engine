@@ -2,13 +2,16 @@
 from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
+from types import SimpleNamespace
 from .persistence import build_runtime_store
 from .provenance import content_hash
+from .contracts.state import StateDiffEngine
+from .contracts.transformation import validate_transition, TransformationCertificate
 from .state_snapshot_store import StateSnapshotStore
-from .transformation_ledger import TransformationLedger
+from .transformation_ledger import TransformationLedger, TransformationLedgerEntry
 
 NAMESPACE = "transformation.journal"
-TERMINAL = {"COMMITTED", "FAILED", "RECOVERED", "ROLLED_BACK", "ROLLBACK_FAILED"}
+TERMINAL = {"VALIDATED", "FAILED", "PARTIAL", "ROLLED_BACK", "ROLLBACK_FAILED", "RECOVERED"}
 
 @dataclass(frozen=True)
 class JournalAttempt:
@@ -59,17 +62,12 @@ class TransformationJournal:
         for attempt_id, events in grouped.items():
             last = events[-1]["payload"]
             result.append(JournalAttempt(
-                attempt_id=attempt_id,
-                execution_id=last["execution_id"],
-                character_id=last["character_id"],
-                sequence=last["sequence"],
-                request_hash=last["request_hash"],
-                contract_id=last["contract_id"],
-                contract_version=last["contract_version"],
-                status=last["status"],
+                attempt_id=attempt_id, execution_id=last["execution_id"],
+                character_id=last["character_id"], sequence=last["sequence"],
+                request_hash=last["request_hash"], contract_id=last["contract_id"],
+                contract_version=last["contract_version"], status=last["status"],
                 before_snapshot_id=last["before_snapshot_id"],
-                after_snapshot_id=last.get("after_snapshot_id"),
-                error=last.get("error"),
+                after_snapshot_id=last.get("after_snapshot_id"), error=last.get("error"),
             ))
         return result
 
@@ -77,12 +75,12 @@ class TransformationRecoveryService:
     def __init__(self, snapshots=None, ledger=None, journal=None):
         self.snapshots = snapshots or StateSnapshotStore()
         self.ledger = ledger or TransformationLedger(self.snapshots.store)
-        self.journal = journal or TransformationJournal(self.snapshots.store.store)
+        self.journal = journal or TransformationJournal(self.snapshots.store)
 
     def scan(self) -> list[JournalAttempt]:
         return [a for a in self.journal.attempts() if a.status not in TERMINAL]
 
-    def recover(self, attempt_id: str) -> JournalAttempt:
+    def recover(self, attempt_id: str, contract) -> JournalAttempt:
         attempt = next((a for a in self.journal.attempts() if a.attempt_id == attempt_id), None)
         if attempt is None:
             raise ValueError("journal attempt not found")
@@ -92,17 +90,25 @@ class TransformationRecoveryService:
                                           "after_snapshot_id": existing.after_snapshot_id})
             self.journal.record(recovered, "RECOVERED", ledger_id=existing.ledger_id)
             return recovered
-
         after = self.snapshots.get(attempt.after_snapshot_id) if attempt.after_snapshot_id else None
         before = self.snapshots.get(attempt.before_snapshot_id)
-        if after is None:
-            raise ValueError("recovery requires a durable after snapshot")
-        if before is None:
-            raise ValueError("recovery requires a durable before snapshot")
-        # Recovery never re-runs the intervention. It only closes an already
-        # captured transformation attempt after verifying immutable snapshots.
+        if after is None or before is None:
+            raise ValueError("recovery requires durable before and after snapshots")
         if not self.snapshots.verify(before.snapshot_id) or not self.snapshots.verify(after.snapshot_id):
             raise ValueError("snapshot integrity verification failed")
+        diff = StateDiffEngine.compare(
+            before, after, expected=contract.expected_changes,
+            allowed=set(contract.allowed_changes), forbidden=set(contract.forbidden_changes))
+        result = validate_transition(contract, diff,
+            before_snapshot_id=before.snapshot_id, after_snapshot_id=after.snapshot_id)
+        certificate = None
+        if result.status == "VALIDATED" and result.certificate_eligible:
+            certificate = TransformationCertificate.issue(attempt.execution_id, contract, result)
+        execution = SimpleNamespace(execution_id=attempt.execution_id, result=result, certificate=certificate)
+        entry = TransformationLedgerEntry.from_execution(
+            execution, attempt.character_id, contract, request_hash=attempt.request_hash)
+        self.ledger.append(entry)
         recovered = JournalAttempt(**{**attempt.__dict__, "status": "RECOVERED"})
-        self.journal.record(recovered, "RECOVERED", recovery_only=True)
+        self.journal.record(recovered, "RECOVERED",
+                            recovered_status=result.status, ledger_id=entry.ledger_id)
         return recovered
