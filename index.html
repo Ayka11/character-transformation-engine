@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="en"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="description" content="Character Transformation & Social Compatibility Engine — browser Science Lab">
+<title>CPE — Static Science Lab</title><link rel="stylesheet" href="./styles.css">
+</head><body><main class="shell">
+<header class="hero"><div><div class="eyebrow">CHARACTER TRANSFORMATION & SOCIAL COMPATIBILITY ENGINE</div>
+<h1>Science Lab</h1><p class="muted">Browser-native Experiment Matrix → Scenario Runs → Statistics → Replication → Generalization → Claim / Provenance Trace</p></div>
+<div class="status-stack"><div class="status online">STATIC ENGINE: READY</div><div class="small">No Python backend or API key required</div></div></header>
+<section class="notice"><strong>Static research sandbox.</strong> This Space executes a deterministic browser implementation of the CPE Science Lab contracts. It is intended for demonstration and reproducible synthetic runs; numerical output is not empirical validation.</section>
+<section class="grid">
+<article class="card"><div class="step">01</div><h2>Experiment Matrix</h2>
+<label>Matrix ID<input id="matrixId" value="demo-matrix"></label><label>Study ID<input id="studyId" value="demo-study"></label>
+<label>Name<input id="matrixName" value="CPE Static Science Lab"></label><label>Primary outcome<input id="primaryOutcome" value="value"></label>
+<button id="createMatrix">Create / reset matrix</button></article>
+<article class="card"><div class="step">02</div><h2>Scenario Design</h2>
+<label>Scenario ID<input id="scenarioId" value="baseline"></label><label>Name<input id="scenarioName" value="Baseline"></label>
+<label>Description<input id="scenarioDescription" value="Baseline synthetic scenario"></label><label>Conditions JSON<textarea id="conditions">{}</textarea></label>
+<button id="createScenario">Create scenario</button><label>Factorial factors JSON<textarea id="factors">{"dose":[0,1],"tempo":["slow","fast"]}</textarea></label>
+<button id="generateScenarios">Generate factorial scenarios</button></article>
+<article class="card span2"><div class="step">03</div><h2>Scenario Run</h2><div class="two-col">
+<label>Execution ID<input id="executionId" value="demo-run-001"></label><label>Replications<input id="replications" type="number" min="1" max="100" value="5"></label></div>
+<label>Run payload JSON<textarea id="runPayload"></textarea></label><button class="primary" id="runScenario">Run scenario</button></article>
+<article class="card"><div class="step">04</div><h2>Statistics</h2><button id="loadStats">Refresh statistics</button><pre id="stats">{}</pre></article>
+<article class="card"><div class="step">05</div><h2>Replication & Generalization</h2><button id="runReplication">Run replication analysis</button><pre id="replication">{}</pre></article>
+<article class="card"><div class="step">06</div><h2>Claims & Evidence</h2><button id="loadClaims">Validate claim</button><pre id="claims">{}</pre></article>
+<article class="card span2"><div class="step">07</div><h2>Scientific Report Bundle</h2><div class="row-actions">
+<button id="loadReport">Generate report</button><button id="exportReport">Export JSON</button><button id="clearData">Clear browser data</button></div><pre id="report">{}</pre></article>
+</section>
+<section class="card"><h2>Matrix Overview</h2><div class="metrics" id="metrics">
+<div><span>Scenarios</span><strong>0</strong></div><div><span>Runs</span><strong>0</strong></div><div><span>Completed</span><strong>0</strong></div><div><span>Blocked</span><strong>0</strong></div><div><span>Primary estimate</span><strong>—</strong></div></div>
+<div class="table-wrap"><table id="scenarioTable"><thead><tr><th>Scenario</th><th>Conditions</th><th>Status</th><th>Estimate</th></tr></thead><tbody><tr><td colspan="4">Create a matrix to begin.</td></tr></tbody></table></div></section>
+<section class="card"><h2>Runtime / Provenance</h2><pre id="output">Ready.</pre></section>
+<footer><span>CPE Static Space · implementation baseline</span><span>Trait ≠ State · UNKNOWN ≠ default · QC before interpretation</span></footer>
+</main><script src="./app.js"></script></body></html>
