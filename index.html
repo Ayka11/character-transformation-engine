@@ -1,35 +1,103 @@
 <!doctype html>
-<html lang="en"><head>
-<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<meta name="description" content="Character Transformation & Social Compatibility Engine — browser Science Lab">
-<title>CPE — Static Science Lab</title><link rel="stylesheet" href="./styles.css">
-</head><body><main class="shell">
-<header class="hero"><div><div class="eyebrow">CHARACTER TRANSFORMATION & SOCIAL COMPATIBILITY ENGINE</div>
-<h1>Science Lab</h1><p class="muted">Browser-native Experiment Matrix → Scenario Runs → Statistics → Replication → Generalization → Claim / Provenance Trace</p></div>
-<div class="status-stack"><div class="status online">STATIC ENGINE: READY</div><div class="small">No Python backend or API key required</div></div></header>
-<section class="notice"><strong>Static research sandbox.</strong> This Space executes a deterministic browser implementation of the CPE Science Lab contracts. It is intended for demonstration and reproducible synthetic runs; numerical output is not empirical validation.</section>
-<section class="grid">
-<article class="card"><div class="step">01</div><h2>Experiment Matrix</h2>
-<label>Matrix ID<input id="matrixId" value="demo-matrix"></label><label>Study ID<input id="studyId" value="demo-study"></label>
-<label>Name<input id="matrixName" value="CPE Static Science Lab"></label><label>Primary outcome<input id="primaryOutcome" value="value"></label>
-<button id="createMatrix">Create / reset matrix</button></article>
-<article class="card"><div class="step">02</div><h2>Scenario Design</h2>
-<label>Scenario ID<input id="scenarioId" value="baseline"></label><label>Name<input id="scenarioName" value="Baseline"></label>
-<label>Description<input id="scenarioDescription" value="Baseline synthetic scenario"></label><label>Conditions JSON<textarea id="conditions">{}</textarea></label>
-<button id="createScenario">Create scenario</button><label>Factorial factors JSON<textarea id="factors">{"dose":[0,1],"tempo":["slow","fast"]}</textarea></label>
-<button id="generateScenarios">Generate factorial scenarios</button></article>
-<article class="card span2"><div class="step">03</div><h2>Scenario Run</h2><div class="two-col">
-<label>Execution ID<input id="executionId" value="demo-run-001"></label><label>Replications<input id="replications" type="number" min="1" max="100" value="5"></label></div>
-<label>Run payload JSON<textarea id="runPayload"></textarea></label><button class="primary" id="runScenario">Run scenario</button></article>
-<article class="card"><div class="step">04</div><h2>Statistics</h2><button id="loadStats">Refresh statistics</button><pre id="stats">{}</pre></article>
-<article class="card"><div class="step">05</div><h2>Replication & Generalization</h2><button id="runReplication">Run replication analysis</button><pre id="replication">{}</pre></article>
-<article class="card"><div class="step">06</div><h2>Claims & Evidence</h2><button id="loadClaims">Validate claim</button><pre id="claims">{}</pre></article>
-<article class="card span2"><div class="step">07</div><h2>Scientific Report Bundle</h2><div class="row-actions">
-<button id="loadReport">Generate report</button><button id="exportReport">Export JSON</button><button id="clearData">Clear browser data</button></div><pre id="report">{}</pre></article>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="description" content="CPE Interactive Scientific Computing Demonstrator">
+<title>CPE — Interactive Scientific Computing Demonstrator</title>
+<link rel="stylesheet" href="./styles.css">
+</head>
+<body>
+<div class="app-shell">
+<header class="topbar">
+  <div class="brand"><div class="brand-mark">CPE</div><div><strong>Character Transformation Engine</strong><span>Interactive Scientific Computing Demonstrator</span></div></div>
+  <div class="top-status"><span class="pill green">STATIC RUNTIME</span><span class="pill amber">SYNTHETIC / DEMO</span></div>
+</header>
+
+<div class="layout">
+<aside class="sidebar">
+  <button class="nav active" data-view="overview">⌂ <span>Command Center</span></button>
+  <button class="nav" data-view="matrix">▦ <span>Master Matrix</span></button>
+  <button class="nav" data-view="character">◎ <span>Character Model</span></button>
+  <button class="nav" data-view="transform">↗ <span>Transformation</span></button>
+  <button class="nav" data-view="compatibility">⇄ <span>Compatibility</span></button>
+  <button class="nav" data-view="science">◈ <span>Science Lab</span></button>
+  <button class="nav" data-view="evidence">◇ <span>Evidence & Claims</span></button>
+  <button class="nav" data-view="provenance">⌁ <span>Provenance</span></button>
+  <button class="nav" data-view="report">▤ <span>Scientific Report</span></button>
+  <button class="nav" data-view="development">◆ <span>Development</span></button>
+  <div class="sidebar-foot"><b>CPE-STATIC-2.0</b><span>Implementation baseline</span><span>Empirical validation: not established</span></div>
+</aside>
+
+<main class="content">
+<section class="view active" id="view-overview">
+  <div class="page-head"><div><span class="eyebrow">SYSTEM OVERVIEW</span><h1>CPE Command Center</h1><p>Executable browser model of the CPE architecture: ontology → character state → transformation → compatibility → experiment → evidence → claim → report.</p></div><button class="primary large" id="fullDemo">▶ Run Full CPE Demonstration</button></div>
+  <div class="notice"><b>Scientific status.</b> This Space demonstrates implementation logic with deterministic synthetic data. It does not establish clinical validity, empirical character prediction, or real-world compatibility.</div>
+  <div class="kpis" id="overviewKpis"></div>
+  <div class="pipeline" id="pipeline"></div>
+  <div class="grid2">
+    <article class="panel"><div class="panel-title"><span>Architecture</span><button class="ghost" data-go="matrix">Open Matrix →</button></div><div class="architecture" id="architecture"></div></article>
+    <article class="panel"><div class="panel-title"><span>Runtime health</span></div><div id="health"></div></article>
+  </div>
 </section>
-<section class="card"><h2>Matrix Overview</h2><div class="metrics" id="metrics">
-<div><span>Scenarios</span><strong>0</strong></div><div><span>Runs</span><strong>0</strong></div><div><span>Completed</span><strong>0</strong></div><div><span>Blocked</span><strong>0</strong></div><div><span>Primary estimate</span><strong>—</strong></div></div>
-<div class="table-wrap"><table id="scenarioTable"><thead><tr><th>Scenario</th><th>Conditions</th><th>Status</th><th>Estimate</th></tr></thead><tbody><tr><td colspan="4">Create a matrix to begin.</td></tr></tbody></table></div></section>
-<section class="card"><h2>Runtime / Provenance</h2><pre id="output">Ready.</pre></section>
-<footer><span>CPE Static Space · implementation baseline</span><span>Trait ≠ State · UNKNOWN ≠ default · QC before interpretation</span></footer>
-</main><script src="./app.js"></script></body></html>
+
+<section class="view" id="view-matrix">
+  <div class="page-head"><div><span class="eyebrow">ONTOLOGY</span><h1>Master Matrix Explorer</h1><p>Canonical P1–P5 character structure with measurement, evidence and transformation metadata.</p></div></div>
+  <div class="matrix-layout"><div class="panel domain-list" id="domainList"></div><div class="panel" id="traitInspector"></div></div>
+</section>
+
+<section class="view" id="view-character">
+  <div class="page-head"><div><span class="eyebrow">RUNTIME</span><h1>Character Model</h1><p>Trait and current STATE are separate layers. UNKNOWN remains unknown and reduces confidence rather than becoming a default score.</p></div></div>
+  <div class="grid2"><article class="panel"><div class="panel-title"><span>Profile</span><button class="ghost" id="resetProfile">Reset</button></div><div id="profileBars"></div></article><article class="panel"><div class="panel-title"><span>State controls</span></div><div id="stateControls"></div></article></div>
+  <div class="grid3" id="characterMetrics"></div>
+  <article class="panel"><div class="panel-title"><span>Trait / State decomposition</span></div><div id="decomposition"></div></article>
+</section>
+
+<section class="view" id="view-transform">
+  <div class="page-head"><div><span class="eyebrow">CHANGE MODEL</span><h1>Transformation Engine</h1><p>Root cause → target → intervention → behavioral event → adaptation → reassessment.</p></div><button class="primary" id="runTransformation">Run 21-Day Simulation</button></div>
+  <div class="transformation-flow" id="transformationFlow"></div>
+  <div class="grid2"><article class="panel"><div class="panel-title"><span>21-day trajectory</span></div><div id="trajectory"></div></article><article class="panel"><div class="panel-title"><span>Intervention protocol</span></div><div id="intervention"></div></article></div>
+</section>
+
+<section class="view" id="view-compatibility">
+  <div class="page-head"><div><span class="eyebrow">SOCIAL ENGINE</span><h1>Compatibility Lab</h1><p>Compatibility is represented as multiple vectors with context sensitivity, data quality and unknowns—not a single authoritative percentage.</p></div><button class="primary" id="stressTest">Run Stress Scenarios</button></div>
+  <div class="grid2"><article class="panel"><div class="panel-title"><span>Person A</span></div><div id="personA"></div></article><article class="panel"><div class="panel-title"><span>Person B</span></div><div id="personB"></div></article></div>
+  <div class="compat-grid" id="compatibilityVectors"></div>
+  <article class="panel"><div class="panel-title"><span>Context stress test</span></div><div id="stressResults"></div></article>
+</section>
+
+<section class="view" id="view-science">
+  <div class="page-head"><div><span class="eyebrow">RESEARCH EXECUTION</span><h1>Science Lab</h1><p>Question → hypothesis → scenario matrix → trial data → QC → statistics → replication → generalization.</p></div><button class="primary" id="runExperiment">Run Experiment</button></div>
+  <div class="science-steps" id="scienceSteps"></div>
+  <div class="grid2"><article class="panel"><div class="panel-title"><span>Experiment Matrix</span><button class="ghost" id="factorial">Generate Factorial</button></div><div id="experimentMatrix"></div></article><article class="panel"><div class="panel-title"><span>Data QC</span></div><div id="qc"></div></article></div>
+  <article class="panel"><div class="panel-title"><span>Trial-level dataset</span><button class="ghost" id="replicate">Replicate</button></div><div class="table-wrap"><table id="trialTable"></table></div></article>
+  <div class="grid2"><article class="panel"><div class="panel-title"><span>Statistics</span></div><div id="statistics"></div></article><article class="panel"><div class="panel-title"><span>Replication & generalization</span></div><div id="replication"></div></article></div>
+</section>
+
+<section class="view" id="view-evidence">
+  <div class="page-head"><div><span class="eyebrow">EVIDENCE GRAPH</span><h1>Evidence & Claims</h1><p>Claims remain linked to observations, analyses, replications and their provenance.</p></div><button class="primary" id="validateClaims">Validate Claims</button></div>
+  <div class="evidence-graph" id="evidenceGraph"></div>
+  <div class="grid2"><article class="panel"><div class="panel-title"><span>Claims</span></div><div id="claims"></div></article><article class="panel"><div class="panel-title"><span>Scientific status gates</span></div><div id="claimGates"></div></article></div>
+</section>
+
+<section class="view" id="view-provenance">
+  <div class="page-head"><div><span class="eyebrow">AUDITABILITY</span><h1>Provenance Inspector</h1><p>Every derived object carries algorithm, input and output hashes plus lineage metadata.</p></div><button class="ghost" id="clearData">Clear demo state</button></div>
+  <article class="panel"><div class="panel-title"><span>Lineage</span><span class="small" id="provCount"></span></div><div id="provenanceTimeline"></div></article>
+</section>
+
+<section class="view" id="view-report">
+  <div class="page-head"><div><span class="eyebrow">PUBLICATION LAYER</span><h1>Scientific Report</h1><p>Generate a reproducible implementation report containing methods, data, QC, statistics, replication, claims and provenance.</p></div><div><button class="primary" id="generateReport">Generate</button><button class="ghost" id="exportReport">Export JSON</button></div></div>
+  <article class="panel"><div id="reportView"></div></article>
+</section>
+
+<section class="view" id="view-development">
+  <div class="page-head"><div><span class="eyebrow">ENGINEERING HISTORY</span><h1>CPE Development</h1><p>Evolution of the architecture from ontology and runtime contracts into a research execution platform.</p></div></div>
+  <div class="timeline" id="developmentTimeline"></div>
+</section>
+</main>
+</div>
+<footer class="footer">CPE Static Demonstrator · Trait ≠ State · UNKNOWN ≠ default · QC before interpretation · synthetic output ≠ empirical evidence</footer>
+</div>
+<script src="./app.js"></script>
+</body>
+</html>
