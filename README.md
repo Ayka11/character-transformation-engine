@@ -8,45 +8,64 @@ app_file: index.html
 pinned: false
 ---
 
-# Character Transformation & Social Compatibility Engine — Static Science Lab
+# CPE — Interactive Scientific Computing Demonstrator
 
-A browser-native static version of the Character Transformation & Social Compatibility Engine (CPE).
+A browser-native demonstrator of the Character Transformation & Social Compatibility Engine (CPE). The public Static Space exposes the architecture as an executable synthetic research environment rather than a static mockup.
 
-## What this Space does
+## Demonstrator modules
 
-Experiment Matrix → Scenario Design → Scenario Runs → Statistics → Replication → Generalization → Claim Validation → Provenance Report
+- Command Center — end-to-end CPE pipeline and runtime health.
+- Master Matrix — P1–P5 ontology, traits, metrics, evidence requirements and state interaction.
+- Character Model — trait/state separation, capacity, confidence and UNKNOWN handling.
+- Transformation Engine — root-cause navigation, intervention protocol and 21-day synthetic trajectory.
+- Compatibility Lab — three compatibility vectors plus context stress scenarios.
+- Science Lab — hypothesis, factorial scenarios, trial-level data, QC, descriptive statistics, replication and generalization status.
+- Evidence & Claims — evidence lineage and claim gates.
+- Provenance Inspector — algorithm version, input/output hashes and event lineage.
+- Scientific Report — reproducible implementation report and JSON export.
+- Development — visible evolution of the CPE architecture.
 
-This Space provides a self-contained Science Lab without a Python server. It implements a deterministic synthetic execution layer in JavaScript and stores the current laboratory state in browser localStorage.
+## Full demonstration
+
+Use Run Full CPE Demonstration to execute:
+
+Question → Hypothesis → Character Model → Transformation → Compatibility → Experiment → Trials → QC → Analysis → Replication → Claims → Provenance → Report.
+
+All generated data is deterministic/synthetic and stored locally in browser localStorage.
 
 ## Scientific status
 
 **IMPLEMENTATION_BASELINE**
 
-This Space is a browser demonstration and synthetic research sandbox. Numerical output generated here is not empirical validation of MDL/HYP elements, clinical evidence, or real-world compatibility.
+The Static Space demonstrates software/model execution. It does not establish empirical validity, clinical evidence, causal efficacy, or real-world compatibility prediction.
 
-The implementation preserves the CPE invariants:
+The demonstrator explicitly preserves these CPE invariants:
 
-1. TRAIT and daily STATE remain separate.
-2. Missing measurements are UNKNOWN, not perfect/default values.
-3. Derived decisions carry algorithm and input/output hashes.
+1. TRAIT and daily STATE are separate.
+2. Missing measurements remain UNKNOWN rather than becoming default/perfect scores.
+3. Derived outputs carry algorithm and input/output hashes.
 4. Safety degradation has priority over promotion.
-5. Compatibility is represented through vectors and data-quality metadata rather than one authoritative percentage.
-6. QC precedes final interpretation.
-7. Replication is a separate run/study concept.
-8. Generalization records target population/context and transport-error status.
+5. Compatibility is represented through multiple vectors and context/data-quality metadata, not one authoritative percentage.
+6. QC precedes interpretation.
+7. Replication is represented separately from the original execution.
+8. Generalization records target context and transport-error status.
 9. Claims distinguish implementation evidence from empirical evidence.
 
-## Relationship to the full CPE
+## Architecture relationship
 
-This is the static presentation/execution branch of:
+The public Static Space is the browser execution/presentation layer of the full repository:
 
 https://github.com/Ayka11/character-transformation-engine
 
-The full repository remains the source for the Python/FastAPI executable backend and deeper runtime contracts. This branch intentionally avoids requiring Python, FastAPI, PostgreSQL, or an external API so it can run in a free Hugging Face Static Space.
+The repository's Python/FastAPI implementation remains the deeper executable backend and contract source. The Static branch intentionally avoids Python, FastAPI, PostgreSQL and external API dependencies so it can run as a free Hugging Face Static Space.
 
 ## Branch
 
 hf-static-space
+
+## Local execution
+
+Open index.html in a modern browser or serve the repository directory with any static HTTP server.
 
 ## License
 
