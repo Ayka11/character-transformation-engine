@@ -1,73 +1,53 @@
-# Character Transformation & Social Compatibility Engine
+---
+title: Character Transformation & Social Compatibility Engine
+emoji: 🧬
+colorFrom: indigo
+colorTo: purple
+sdk: static
+app_file: index.html
+pinned: false
+---
 
-A provenance-aware architecture for measurement, adaptive behavioral intervention, compatibility analysis, reproducible research execution, and a browser-accessible Science Lab.
+# Character Transformation & Social Compatibility Engine — Static Science Lab
 
-## Architecture
+A browser-native static version of the Character Transformation & Social Compatibility Engine (CPE).
 
-- **Master Matrix V1.0** — canonical ontology, domains P1–P5, traits/subtraits, metrics, questions, behavioral tests, load levels, sprint templates, compatibility vectors, claims and validation protocols.
-- **Runtime V1.1** — user profiles, immutable trait snapshots, daily state, capacity engine, root-cause navigation, sprint runtime, behavioral events, adaptation decisions, compatibility runtime, provenance and claim graph.
-- **Research Execution V1.2** — study/protocol/experiment/arm/participant/trial execution, QC, immutable dataset manifests and descriptive analysis.
+## What this Space does
+
+Experiment Matrix → Scenario Design → Scenario Runs → Statistics → Replication → Generalization → Claim Validation → Provenance Report
+
+This Space provides a self-contained Science Lab without a Python server. It implements a deterministic synthetic execution layer in JavaScript and stores the current laboratory state in browser localStorage.
 
 ## Scientific status
 
-This repository is an implementation architecture and model specification. `MDL` and `HYP` elements are not treated as empirically established merely because the software produces numerical outputs.
+**IMPLEMENTATION_BASELINE**
 
-## Core invariants
+This Space is a browser demonstration and synthetic research sandbox. Numerical output generated here is not empirical validation of MDL/HYP elements, clinical evidence, or real-world compatibility.
+
+The implementation preserves the CPE invariants:
 
 1. TRAIT and daily STATE remain separate.
-2. Missing measurements are `UNKNOWN`, never a perfect/default score.
-3. Every derived decision records its rule/algorithm version and input/output hashes.
+2. Missing measurements are UNKNOWN, not perfect/default values.
+3. Derived decisions carry algorithm and input/output hashes.
 4. Safety degradation has priority over promotion.
-5. Compatibility is represented as V1/V2/V3 vectors plus data-quality metadata, not as one authoritative percentage.
-6. QC precedes final statistical interpretation.
-7. Replication is a separate study/run, not a renamed re-analysis of the same dataset.
-8. Generalization records target population/context and transport error.
-9. Claims require explicit evidence and replication provenance before evidence-supported status.
+5. Compatibility is represented through vectors and data-quality metadata rather than one authoritative percentage.
+6. QC precedes final interpretation.
+7. Replication is a separate run/study concept.
+8. Generalization records target population/context and transport-error status.
+9. Claims distinguish implementation evidence from empirical evidence.
 
-## Pipeline
+## Relationship to the full CPE
 
-```text
-Question → Hypothesis → Study → Protocol → Experiment
-→ Participant → Trial Data → QC → Dataset Manifest
-→ Analysis → Result → Claim → Replication → Generalization → Report
-```
+This is the static presentation/execution branch of:
 
-## Versioning
+https://github.com/Ayka11/character-transformation-engine
 
-- V1.0 — canonical Master Matrix seed
-- V1.1 — executable Runtime layer
-- V1.2 — Research Execution layer
+The full repository remains the source for the Python/FastAPI executable backend and deeper runtime contracts. This branch intentionally avoids requiring Python, FastAPI, PostgreSQL, or an external API so it can run in a free Hugging Face Static Space.
 
+## Branch
 
-## V2.2–V2.3
+hf-static-space
 
-- **V2.2 Research E2E** composes profile, assessment, state, capacity, safety, research execution, QC, analysis, claim and audit under one execution ID.
-- **Science Lab V2.3** adds Experiment Matrix, scenario definitions/runs, descriptive statistics, replication/generalization assessment, claim validation, provenance report bundle and a static browser UI at `/science-lab/ui`.
-- Current CI baseline: GitHub Actions run #106, 140 backend tests passing.
+## License
 
-
-## V2.4 Operations
-
-- Portable logical backup/restore with checksum validation and restore preflight.
-- Audit retention policy requiring an archive manifest before purge.
-- Configurable request rate limiting.
-- Protected operational API for backup, restore and retention.
-- Guarded PostgreSQL rollback migration and documented rollback procedure.
-
-
-## V2.6 Production Hardening / RC
-
-The v2.6 release candidate gate is maintained in
-v2-release/V2.6_PRODUCTION_READINESS.md.
-
-Current release policy:
-- historical CI success does not substitute for current RC verification;
-- immutable persistence requires race-safe/idempotent writes and conflict detection;
-- transformation contracts enforce declared preconditions and postconditions;
-- crash recovery must preserve the distinction between execution, validation,
-  certification and completion;
-- backup/restore and evidence lineage must survive adversarial integrity checks;
-- v2.6.0-rc1 is not tagged until the exact RC commit has a green CI gate.
-
-Scientific status remains IMPLEMENTATION_BASELINE; software execution alone is
-not empirical validation.
+Apache-2.0.
