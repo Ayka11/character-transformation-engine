@@ -8,15 +8,15 @@ app_file: index.html
 pinned: false
 ---
 
-# CPE — Interactive Scientific Computing Demonstrator
+# CPE — Interactive Scientific Computing Demonstrator · Release A
 
-A browser-native demonstrator of the Character Transformation & Social Compatibility Engine (CPE). The public Static Space exposes the architecture as an executable synthetic research environment rather than a static mockup.
+A browser-native demonstrator of the Character Transformation & Social Compatibility Engine (CPE). The current public branch is being developed incrementally through Release A (Foundation), while the deeper Python/FastAPI implementation remains on the canonical backend branch. The public Static Space exposes the architecture as an executable synthetic research environment rather than a static mockup.
 
 ## Demonstrator modules
 
 - Command Center — end-to-end CPE pipeline and runtime health.
 - Master Matrix — P1–P5 ontology, traits, metrics, evidence requirements and state interaction.
-- Character Model — trait/state separation, capacity, confidence and UNKNOWN handling.
+- Character Model — editable Profile Builder, trait/state separation, capacity, confidence, evidence states and UNKNOWN handling.
 - Transformation Engine — root-cause navigation, intervention protocol and 21-day synthetic trajectory.
 - Compatibility Lab — three compatibility vectors plus context stress scenarios.
 - Science Lab — hypothesis, factorial scenarios, trial-level data, QC, descriptive statistics, replication and generalization status.
@@ -70,3 +70,27 @@ Open index.html in a modern browser or serve the repository directory with any s
 ## License
 
 Apache-2.0.
+
+
+## Current development release
+
+**Release A — Foundation (CPE-STATIC-2.1)**
+
+Implemented in this branch:
+- Command Center baseline and executable pipeline.
+- Master Matrix P1–P5 explorer.
+- Editable synthetic Profile Builder for P1–P5.
+- Trait/state separation with contextual state controls.
+- Explicit UNKNOWN/PARTIAL evidence states.
+- Capacity calculation with visible context contributors.
+- Provenance events for profile changes.
+- Science Lab remains available as the underlying research execution layer.
+
+Next planned releases:
+- **Release B — Transformation:** root-cause model, intervention controls, 21-day adaptation simulator.
+- **Release C — Social:** editable participant profiles, compatibility vectors and stress scenarios.
+- **Release D — Scientific Computing:** study/experiment builder, trial dataset, QC and statistics expansion.
+- **Release E — Validation Infrastructure:** replication, generalization, evidence graph, claim graph and provenance tracing.
+- **Release F — Publication/Demonstration:** scientific report, architecture viewer, development timeline and full end-to-end demo.
+
+The branch remains a **synthetic browser demonstrator**. Implementation status is not empirical validation.
