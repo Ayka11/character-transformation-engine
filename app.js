@@ -97,3 +97,6 @@ function releaseAStatus(){
 }
 const _renderAllFoundation=renderAll;
 renderAll=function(){_renderAllFoundation();releaseAStatus();releaseAFoundation();};
+
+releaseAFoundation();
+releaseAStatus();
