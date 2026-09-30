@@ -1,4 +1,4 @@
-const CPE={version:"CPE-STATIC-2.0",store:"cpe-static-v2",seed:42};
+const CPE={version:"CPE-STATIC-2.1",store:"cpe-static-v2",seed:42};
 const $=s=>document.querySelector(s),$$=s=>[...document.querySelectorAll(s)];
 const hash=t=>{let h=2166136261;for(let i=0;i<String(t).length;i++){h^=String(t).charCodeAt(i);h=Math.imul(h,16777619)}return("00000000"+(h>>>0).toString(16)).slice(-8)};
 const iso=()=>new Date().toISOString(),clamp=(x,a=0,b=1)=>Math.max(a,Math.min(b,x)),pct=x=>Math.round(x*100),num=(x,d=3)=>Number(Number(x).toFixed(d));
@@ -41,3 +41,59 @@ function renderAll(){renderOverview();renderMatrix();renderCharacter();renderTra
 function exportReport(){if(!state.report)buildReport();const b=new Blob([JSON.stringify(state.report,null,2)],{type:"application/json"}),a=document.createElement("a");a.href=URL.createObjectURL(b);a.download="cpe-static-scientific-report.json";a.click();setTimeout(()=>URL.revokeObjectURL(a.href),500)}
 $("#fullDemo").onclick=fullDemo;$("#runTransformation").onclick=runTransformationAndSave;$("#stressTest").onclick=runStress;$("#factorial").onclick=factorial;$("#runExperiment").onclick=runExperiment;$("#replicate").onclick=replicate;$("#validateClaims").onclick=validateClaims;$("#generateReport").onclick=buildReport;$("#exportReport").onclick=exportReport;$("#resetProfile").onclick=()=>{state.profile={P1:.68,P2:.71,P3:.76,P4:.82,P5:.59};renderCharacter();save()};$("#clearData").onclick=()=>{localStorage.removeItem(CPE.store);location.reload()};
 load();event("STATIC_RUNTIME_READY",{version:CPE.version});save();renderAll();
+
+/* Release A — Foundation upgrade: editable profile, explicit UNKNOWN/evidence model, and capacity decomposition. */
+function releaseAFoundation(){
+  const char=document.querySelector("#view-character");
+  if(char && !document.querySelector("#profileBuilder")){
+    const panel=document.createElement("article");
+    panel.className="panel";
+    panel.id="profileBuilder";
+    panel.innerHTML='<div class="panel-title"><span>Profile Builder</span><span class="small">synthetic participant</span></div><div id="profileControls"></div>';
+    const metrics=document.querySelector("#characterMetrics");
+    metrics ? metrics.parentNode.insertBefore(panel,metrics) : char.appendChild(panel);
+  }
+  if(char && !document.querySelector("#unknownInspector")){
+    const panel=document.createElement("article");
+    panel.className="panel";
+    panel.id="unknownInspector";
+    panel.innerHTML='<div class="panel-title"><span>Evidence / UNKNOWN Inspector</span><span class="small">no artificial precision</span></div><div id="unknownGrid"></div>';
+    char.appendChild(panel);
+  }
+  renderProfileFoundation();
+}
+function renderProfileFoundation(){
+  const pc=document.querySelector("#profileControls");
+  if(pc){
+    pc.innerHTML=domains.map(d=>'<div class="control"><label><span>'+d.id+' · '+esc(d.name)+'</span><b>'+pct(state.profile[d.id])+'</b></label><input type="range" min="0" max="100" value="'+pct(state.profile[d.id])+'" data-profile="'+d.id+'"></div>').join("");
+    $$("#profileControls [data-profile]").forEach(i=>i.oninput=()=>{
+      state.profile[i.dataset.profile]=Number(i.value)/100;
+      event("PROFILE_UPDATED",{domain:i.dataset.profile,value:state.profile[i.dataset.profile]});
+      renderCharacter(); renderProfileFoundation(); save();
+    });
+  }
+  const unknown=[
+    ["P1.4","Sleep Quality","UNKNOWN","No direct measurement in demo profile"],
+    ["P2.4","Social Orientation","PARTIAL","Synthetic trait estimate only"],
+    ["P5.4","Context Management","UNKNOWN","Context-specific evidence absent"]
+  ];
+  const ug=document.querySelector("#unknownGrid");
+  if(ug) ug.innerHTML='<div class="table-wrap"><table><tr><th>Trait</th><th>Evidence state</th><th>Confidence impact</th><th>Reason</th></tr>'+unknown.map(x=>'<tr><td>'+x[0]+' · '+x[1]+'</td><td><span class="tag">'+x[2]+'</span></td><td>reduced</td><td>'+x[3]+'</td></tr>').join("")+'</table></div>';
+}
+const _renderCharacterFoundation=renderCharacter;
+renderCharacter=function(){_renderCharacterFoundation();releaseAFoundation();};
+const _renderMatrixFoundation=renderMatrix;
+renderMatrix=function(){
+  _renderMatrixFoundation();
+  const s=domains.find(d=>d.id===state.selectedDomain);
+  const note=document.querySelector("#traitInspector .inspector");
+  if(note && s){
+    note.insertAdjacentHTML("beforeend",'<div class="fact"><label>Evidence state</label><strong>Measurement required · UNKNOWN preserved when absent</strong></div><div class="fact"><label>Transformation link</label><strong>Eligible target / state interaction contract</strong></div>');
+  }
+};
+function releaseAStatus(){
+  const foot=document.querySelector(".sidebar-foot");
+  if(foot) foot.innerHTML='<b>'+CPE.version+'</b><span>Release A — Foundation</span><span>Implementation baseline · synthetic</span><span>Empirical validation: not established</span>';
+}
+const _renderAllFoundation=renderAll;
+renderAll=function(){_renderAllFoundation();releaseAStatus();releaseAFoundation();};
