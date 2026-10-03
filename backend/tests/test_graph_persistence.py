@@ -777,3 +777,54 @@ def test_graph_recovery_rejects_tampered_contradiction_envelope_metadata():
 
         with pytest.raises(ValueError, match="evidence graph contradiction snapshot envelope failure: envelope-contradiction"):
             build_registry(SQLiteRuntimeStore(path))
+
+
+def test_claim_registration_retry_preserves_in_memory_claim_after_edge_failure(monkeypatch):
+    with TemporaryDirectory() as d:
+        store = SQLiteRuntimeStore(str(Path(d) / "runtime.sqlite3"))
+        graph = build_registry(store)
+        dataset = register_node("claim-retry-dataset", "DATASET", "dataset", "DRV", "1", {})
+        analysis = register_node("claim-retry-analysis", "ANALYSIS", "analysis", "DRV", "1", {})
+        result = register_node(
+            "claim-retry-result", "RESULT", "result", "DRV", "1",
+            {"qc_status": "PASS", "validated_descriptive_result": True},
+        )
+        for node in (dataset, analysis, result):
+            graph.add_node(node)
+        graph.add_edge(register_edge("claim-retry-analyzed-from", analysis, dataset, "ANALYZED_FROM"))
+        graph.add_edge(register_edge("claim-retry-results-in", analysis, result, "RESULTS_IN"))
+
+        original_add_edge = graph.add_edge
+        failed = {"once": False}
+
+        def fail_first_edge(edge):
+            if not failed["once"]:
+                failed["once"] = True
+                raise OSError("simulated derived-edge failure")
+            return original_add_edge(edge)
+
+        monkeypatch.setattr(graph, "add_edge", fail_first_edge)
+        try:
+            graph.register_claim(
+                "claim-retry-claim", "claim-retry-result",
+                "REGISTERED", "DESCRIPTIVE_RESULT", "DRV", {},
+            )
+        except OSError:
+            pass
+        else:
+            raise AssertionError("first derived-edge write should fail")
+
+        # The claim snapshot/event may already be durable. Keep the in-memory
+        # node so an immediate retry can repair its missing derived edge.
+        assert "claim-retry-claim" in graph.nodes
+        assert store.get_snapshot("graph.node", "claim-retry-claim") is not None
+
+        claim = graph.register_claim(
+            "claim-retry-claim", "claim-retry-result",
+            "REGISTERED", "DESCRIPTIVE_RESULT", "DRV", {},
+        )
+        assert claim.node_id == "claim-retry-claim"
+        assert "claim-retry-claim:supports:claim-retry-result" in graph.edges
+        assert store.get_snapshot(
+            "graph.edge", "claim-retry-claim:supports:claim-retry-result"
+        ) is not None
