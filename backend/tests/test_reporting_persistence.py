@@ -63,3 +63,40 @@ def test_report_service_rejects_tampered_persisted_run_snapshot():
 
         with pytest.raises(ValueError, match="report snapshot integrity failure: report.run/rr-tampered"):
             ReportService(build_registry(SQLiteRuntimeStore(path)), SQLiteRuntimeStore(path))
+
+
+def test_recovery_rejects_section_tampering_even_if_snapshot_hash_is_recomputed():
+    import json
+    import sqlite3
+    import pytest
+    from cte.provenance import content_hash
+
+    with TemporaryDirectory() as d:
+        path = str(Path(d) / "runtime.sqlite3")
+        store = SQLiteRuntimeStore(path)
+        graph = _graph(store)
+        service = ReportService(graph, store)
+        service.register_spec(register_spec("rs", "Integrity"))
+        service.create("rr-section-tampered", "rs", "study", ["r"])
+        for ordinal, code in enumerate(SECTION_CODES):
+            service.add_section("rr-section-tampered", code, {"section": code}, ["r"], ordinal)
+        service.bind_claim("rr-section-tampered", "c")
+        assert service.qc_run("rr-section-tampered")["status"] == "QC_PASSED"
+        service.publish("rr-section-tampered")
+
+        with sqlite3.connect(path) as conn:
+            row = conn.execute(
+                "SELECT payload_json FROM runtime_snapshots WHERE namespace=? AND key=?",
+                ("report.run", "rr-section-tampered"),
+            ).fetchone()
+            payload = json.loads(row[0])
+            payload["sections"]["EXECUTIVE_SUMMARY"]["content"]["section"] = "tampered"
+            serialized = json.dumps(payload, sort_keys=True, separators=(",", ":"))
+            conn.execute(
+                "UPDATE runtime_snapshots SET payload_json=?, payload_hash=? WHERE namespace=? AND key=?",
+                (serialized, content_hash(payload), "report.run", "rr-section-tampered"),
+            )
+            conn.commit()
+
+        with pytest.raises(ValueError, match="section/EXECUTIVE_SUMMARY"):
+            ReportService(build_registry(SQLiteRuntimeStore(path)), SQLiteRuntimeStore(path))
