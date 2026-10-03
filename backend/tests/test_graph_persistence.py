@@ -97,3 +97,38 @@ def test_graph_recovery_rejects_edge_with_missing_endpoint():
         assert restored.integrity_errors == [
             "evidence graph edge references missing node: integrity-edge"
         ]
+
+
+def test_result_lineage_fails_closed_when_analysis_node_is_missing():
+    from dataclasses import replace
+    import pytest
+
+    graph = build_registry()
+    result = register_node("lineage-result", "RESULT", "result", "DRV", "1", {})
+    analysis = register_node("lineage-analysis", "ANALYSIS", "analysis", "DRV", "1", {})
+    graph.add_node(result)
+    edge = register_edge("lineage-result-edge", analysis, result, "RESULTS_IN")
+    graph.edges[edge.edge_id] = replace(edge, from_node_id="missing-analysis")
+
+    with pytest.raises(ValueError, match="RESULT lineage references missing ANALYSIS node"):
+        graph.require_lineage_for_result("lineage-result")
+
+
+def test_result_lineage_fails_closed_when_dataset_node_is_missing():
+    from dataclasses import replace
+    import pytest
+
+    graph = build_registry()
+    dataset = register_node("lineage-dataset", "DATASET", "dataset", "DRV", "1", {})
+    analysis = register_node("lineage-analysis", "ANALYSIS", "analysis", "DRV", "1", {})
+    result = register_node("lineage-result", "RESULT", "result", "DRV", "1", {})
+    for node in (analysis, result):
+        graph.add_node(node)
+    result_edge = register_edge("lineage-result-edge", analysis, result, "RESULTS_IN")
+    dataset_edge = register_edge("lineage-dataset-edge", analysis, dataset, "ANALYZED_FROM")
+    graph.add_edge(result_edge)
+    graph.edges[dataset_edge.edge_id] = replace(dataset_edge, to_node_id="missing-dataset")
+
+    with pytest.raises(ValueError, match="ANALYSIS lineage references missing source node"):
+        graph.require_lineage_for_result("lineage-result")
+
