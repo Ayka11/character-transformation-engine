@@ -18,7 +18,7 @@ except ImportError:  # pragma: no cover - dependency is optional outside install
     Jsonb = None
 
 from .persistence import MUTABLE_SNAPSHOT_NAMESPACES
-from .provenance import content_hash
+from .provenance import content_hash, json_safe
 
 
 @dataclass(frozen=True)
@@ -94,6 +94,7 @@ class PostgreSQLRuntimeStore:
                 )
 
     def put_snapshot(self, namespace: str, key: str, payload: dict, version: str) -> Snapshot:
+        payload=json_safe(payload)
         payload_hash = content_hash(payload)
         with self.transaction() as conn:
             with conn.cursor() as cur:
