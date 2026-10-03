@@ -98,7 +98,16 @@ class SQLiteRuntimeStore:
             if row is None:
                 raise ValueError("snapshot disappeared during write")
             if row[2] == payload_hash:
-                return Snapshot(namespace,key,row[0],payload,row[2])
+                if row[0] == version:
+                    return Snapshot(namespace,key,row[0],payload,row[2])
+                if namespace in MUTABLE_SNAPSHOT_NAMESPACES:
+                    conn.execute(
+                        "UPDATE runtime_snapshots SET version=? WHERE namespace=? AND key=?",
+                        (version,namespace,key)
+                    )
+                    conn.commit()
+                    return Snapshot(namespace,key,version,payload,payload_hash)
+                raise ValueError("immutable snapshot conflict")
             if namespace in MUTABLE_SNAPSHOT_NAMESPACES:
                 conn.execute(
                     "UPDATE runtime_snapshots SET version=?, payload_json=?, payload_hash=? WHERE namespace=? AND key=?",
@@ -121,6 +130,8 @@ class SQLiteRuntimeStore:
                         if row[1] != payload_hash:
                             if namespace in MUTABLE_SNAPSHOT_NAMESPACES:
                                 raise ValueError("atomic mutation of existing mutable snapshot is not supported")
+                            raise ValueError("immutable snapshot conflict")
+                        if row[0] != version:
                             raise ValueError("immutable snapshot conflict")
                         results.append(Snapshot(namespace,key,row[0],payload,payload_hash)); continue
                     conn.execute("INSERT INTO runtime_snapshots(namespace,key,version,payload_json,payload_hash) VALUES(?,?,?,?,?)",
