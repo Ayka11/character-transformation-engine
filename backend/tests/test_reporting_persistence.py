@@ -599,3 +599,41 @@ def test_recovery_rejects_report_children_owned_by_another_run():
 
             with pytest.raises(ValueError, match=error_fragment):
                 ReportService(build_registry(SQLiteRuntimeStore(path)), SQLiteRuntimeStore(path))
+
+
+def test_recovery_rejects_duplicate_sections_in_report_spec_even_with_recomputed_hashes():
+    import json
+    import sqlite3
+    import pytest
+    from cte.provenance import content_hash
+
+    with TemporaryDirectory() as d:
+        path = str(Path(d) / "runtime.sqlite3")
+        store = SQLiteRuntimeStore(path)
+        service = ReportService(_graph(store), store)
+        service.register_spec(register_spec("rs-duplicate-recovery", "Duplicate recovery"))
+        with sqlite3.connect(path) as conn:
+            row = conn.execute(
+                "SELECT payload_json FROM runtime_snapshots WHERE namespace=? AND key=?",
+                ("report.spec", "rs-duplicate-recovery"),
+            ).fetchone()
+            payload = json.loads(row[0])
+            payload["section_order"].append(SECTION_CODES[0])
+            immutable_payload = {
+                "report_spec_id": payload["report_spec_id"],
+                "name": payload["name"],
+                "version": payload["version"],
+                "section_order": tuple(payload["section_order"]),
+                "rendering_rules": payload["rendering_rules"],
+                "claim_language_rules": payload["claim_language_rules"],
+            }
+            payload["immutable_hash"] = content_hash(immutable_payload)
+            conn.execute(
+                "UPDATE runtime_snapshots SET payload_json=?, payload_hash=? WHERE namespace=? AND key=?",
+                (json.dumps(payload, sort_keys=True, separators=(",", ":")), content_hash(payload),
+                 "report.spec", "rs-duplicate-recovery"),
+            )
+            conn.commit()
+
+        with pytest.raises(ValueError, match="report.spec/rs-duplicate-recovery section order invalid"):
+            ReportService(build_registry(SQLiteRuntimeStore(path)), SQLiteRuntimeStore(path))
