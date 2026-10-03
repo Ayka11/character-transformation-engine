@@ -24,6 +24,7 @@ class TransformationProvenanceBinder:
                 "execution_id": execution_id,
                 "status": "MISSING",
                 "validated": False,
+                "integrity_status": "FAIL",
                 "ledger_id": None,
                 "certificate_id": None,
                 "issues": ["TRANSFORMATION_LEDGER_ENTRY_MISSING"],
