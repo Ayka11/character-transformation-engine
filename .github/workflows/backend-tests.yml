@@ -115,6 +115,9 @@ jobs:
                   conn.execute(down)
               except psycopg.Error as exc:
                   assert "Refusing destructive rollback" in str(exc), str(exc)
+                  # The down migration opens an explicit transaction; clear its
+                  # aborted transaction before checking that the sentinel survived.
+                  conn.execute("ROLLBACK")
               else:
                   raise AssertionError("down migration unexpectedly accepted populated runtime tables")
 
