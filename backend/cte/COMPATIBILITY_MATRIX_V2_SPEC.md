@@ -58,3 +58,16 @@ compatibility estimate.
 Context labels are currently annotations only. They are returned for traceability but do
 not alter rule outcomes; context-specific calibration is not implemented. This explicit
 boundary prevents consumers from mistaking context metadata for context-aware inference.
+
+
+## Heuristic rule catalog
+
+Responses expose `rule_catalog` keyed by stable rule IDs. Each entry states its rule kind,
+domain, evidence class, validation status, whether human review is required, whether
+context-specific behavior is implemented, and intended use. Every current heuristic is
+marked `UNVALIDATED_HEURISTIC`, requires human review, is not context-sensitive, and is
+intended only as a prompt for review—not as a recommendation or prediction. Rows with no
+registered rule remain `UNKNOWN` and have no fabricated rule ID.
+
+The catalog makes implementation status auditable; it is not empirical evidence and does
+not turn heuristics into validated findings.
