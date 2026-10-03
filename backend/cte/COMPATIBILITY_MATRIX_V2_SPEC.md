@@ -1,70 +1,34 @@
-# Compatibility Matrix V2 — implementation specification
+# Canonical Master Matrix adapter — P1–P5 rollout
 
-**Version:** 2.0  
-**Status:** implementation baseline; heuristic rules are not empirically validated.
+**Status:** implementation baseline. No empirical predictive validity is claimed.
 
-## Purpose
+## Input contract
 
-Provide an explainable, versioned pairwise compatibility layer without reducing a
-person or relationship to a single authoritative score. This additive module leaves
-the existing V1/V2/V3 compatibility APIs unchanged.
+The adapter accepts registered Master Matrix V1.0 item IDs only. Each value must be
+finite numeric data (booleans and strings are rejected) and lie within the scale
+declared by that item. Missing values are never imputed.
 
-## Canonical domains
+- P1 state/resource measurements keep canonical IDs.
+- P2 trait measurements keep canonical IDs.
+- P3 modeled self-regulation/cognition measurements keep canonical IDs.
+- P4 value measurements map to registered display names only after canonical ID
+  validation, so existing V2 value-tension rules remain usable.
+- P5 behavior measurements keep canonical IDs.
 
-| Domain | Scope | Guardrail |
-|---|---|---|
-| P1 | State and resources | State-dependent observations are not stable personality traits. |
-| P2 | Stable traits | Use documented instruments/scales; do not infer missing values. |
-| P3 | Self-regulation and cognition | Distinguish self-reports from observed behavior. |
-| P4 | Values and priorities | Priority gaps are hypotheses for discussion, not verdicts. |
-| P5 | Behavior and social roles | Role labels are context-specific and may change. |
+## Provenance
 
-## Row contract
+Results include each input's canonical ID, domain, measurement kind, scale, direction,
+and provenance tag. This metadata describes the catalog contract; it does not
+independently verify the source or quality of a value.
 
-Every row includes kind, pair, status, rule_id, evidence_class, explanation, and
-contexts. Numeric trait rows include observed values and an absolute gap where both
-measurements exist. Role/value heuristics require human review. Unregistered pairs
-remain UNKNOWN; missing values are never imputed.
+## Interpretation
 
-## Status semantics
+Same-item gaps are descriptive only. Registered P4 and role interactions remain
+heuristic and require human review. Unregistered pairs and missing measurements remain
+UNKNOWN. No authoritative scalar, compatibility percentage, ranking, or empirical
+prediction is introduced.
 
-- OBSERVED_ALIGNMENT: both measurements exist; only a descriptive gap is asserted.
-- CONDITIONAL: a registered heuristic may be relevant; context and human review required.
-- UNKNOWN: no rule or adequate data is available.
-- PARTIAL: aggregate result includes unknown rows.
-- ESTIMATED: all produced rows have a current descriptive/heuristic interpretation;
-  this does not mean scientifically validated.
+## API rollout
 
-BLOCKED is intentionally not emitted by V2. Hard blocks require a separately approved
-safety policy with explicit authority, evidence and review requirements.
-
-## Canonical Master Matrix adapter
-
-compatibility_matrix_adapter.py accepts canonical P4 IDs such as P4.value_autonomy,
-not arbitrary labels. It checks that each ID is registered in Master Matrix V1.0,
-belongs to P4, and has a finite numeric value within the declared 0–10 scale. It
-translates IDs to the evaluator's registered labels only after validation. Unknown
-IDs, other domains, non-finite values, booleans and out-of-range values fail closed.
-Missing values remain unknown; no values are imputed.
-
-This adapter currently covers P4 value profiles only. It does not yet normalize P1,
-P2, P3 or P5 into compatibility inputs, and it does not change the existing
-POST /compatibility contract.
-
-## Current rule coverage
-
-- Value tension heuristics: Order/Autonomy, Security/Freedom, Achievement/Compassion.
-- Role heuristics: Leader/Strategist, Organizer/Mediator, Strategist/Organizer,
-  Leader/Mediator, plus same-role competition for Leader, Organizer, Strategist and Mediator.
-- Other pairs remain UNKNOWN unless measured descriptively or a rule is registered.
-
-These rules preserve existing CTE heuristic vocabulary. They are not claims that
-these combinations reliably predict relationship outcomes.
-
-## Validation and rollout
-
-1. Unit-test missing data, invalid values, rule coverage and uncertainty semantics.
-2. Add pairwise fixtures only when each rule has a documented rationale and owner.
-3. Validate against pre-registered, consented empirical data before predictive claims.
-4. Keep V1/V2/V3 APIs stable while callers migrate deliberately.
-5. Do not expose an overall percentage or rank people/relationships from this module.
+The helper is additive and does not change the existing POST /compatibility route.
+API integration should follow separately after adapter tests and CI pass.
