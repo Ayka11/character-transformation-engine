@@ -5,7 +5,7 @@ from math import isfinite
 from typing import Any, Mapping, Sequence
 
 from .compatibility_matrix import evaluate_compatibility_matrix
-from .master_matrix import MATRIX_VERSION, get_matrix_item
+from .master_matrix import MASTER_MATRIX, MATRIX_VERSION, get_matrix_item
 
 
 def _validated_item_value(item_id: str, raw_value: Any, *, person: str):
@@ -63,6 +63,40 @@ def _provenance(profile: Mapping[str, Any]) -> list[dict[str, str]]:
     return records
 
 
+def _catalog_coverage(profile_a: Mapping[str, Any], profile_b: Mapping[str, Any]) -> dict[str, Any]:
+    """Expose catalog measurement coverage without treating missing data as incompatibility."""
+    ids_a, ids_b = set(profile_a), set(profile_b)
+    all_items = {item.id: item for item in MASTER_MATRIX}
+    domains: dict[str, Any] = {}
+    for domain in ("P1", "P2", "P3", "P4", "P5"):
+        catalog_ids = sorted(item_id for item_id, item in all_items.items() if item.domain == domain)
+        present_a = sorted(ids_a.intersection(catalog_ids))
+        present_b = sorted(ids_b.intersection(catalog_ids))
+        shared = sorted(set(present_a).intersection(present_b))
+        domains[domain] = {
+            "catalog_item_count": len(catalog_ids),
+            "profile_a_present": present_a,
+            "profile_b_present": present_b,
+            "shared_present": shared,
+            "missing_from_a": sorted(set(catalog_ids) - ids_a),
+            "missing_from_b": sorted(set(catalog_ids) - ids_b),
+            "missing_from_both": sorted(set(catalog_ids) - (ids_a | ids_b)),
+        }
+    return {
+        "matrix_version": MATRIX_VERSION,
+        "domains": domains,
+        "complete_for_both_profiles": all(
+            len(domains[domain]["profile_a_present"]) == domains[domain]["catalog_item_count"]
+            and len(domains[domain]["profile_b_present"]) == domains[domain]["catalog_item_count"]
+            for domain in domains
+        ),
+        "interpretation": (
+            "Coverage describes supplied measurements only. Missing measurements are unknown, "
+            "not evidence of compatibility or incompatibility."
+        ),
+    }
+
+
 def evaluate_canonical_value_compatibility(profile_a: Mapping[str, Any], profile_b: Mapping[str, Any], *, contexts: Sequence[str] = ()) -> dict[str, Any]:
     """Evaluate P4 values without inferring missing data."""
     a = canonical_value_profile(profile_a, person="profile_a")
@@ -90,4 +124,5 @@ def evaluate_canonical_compatibility(profile_a: Mapping[str, Any], profile_b: Ma
         "profile_a_provenance": _provenance(profile_a),
         "profile_b_provenance": _provenance(profile_b),
     }
+    result["catalog_coverage"] = _catalog_coverage(profile_a, profile_b)
     return result
