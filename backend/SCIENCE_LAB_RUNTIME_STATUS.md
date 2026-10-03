@@ -29,7 +29,7 @@ GitHub Actions run **#397** passed the current main backend suite and live Postg
 
 ## Next open layers
 
-- production PostgreSQL transactions/migration;
+- production deployment approval and environment-specific PostgreSQL operations;
 - authentication/authorization;
 - observability and operational audit retention;
 - richer inferential statistics where contractually registered;
