@@ -563,3 +563,37 @@ def test_graph_recovery_recreates_missing_contradiction_edges_after_restart(monk
                     if event["event_type"] == "EDGE_REGISTERED"
                     and event["payload"].get("edge_id") == edge_id]) == 1
         assert len([event for event in recovered.audit_events if event.edge_id == edge_id]) == 1
+
+
+
+def test_graph_recovery_rejects_tampered_edge_relation_status_even_with_rehashed_snapshot():
+    import json
+    import pytest
+    from cte.provenance import content_hash
+
+    with TemporaryDirectory() as d:
+        path = str(Path(d) / "runtime.sqlite3")
+        store = SQLiteRuntimeStore(path)
+        graph = build_registry(store)
+        source = register_node("tamper-status-source", "ANALYSIS", "source", "DRV", "1", {})
+        target = register_node("tamper-status-target", "RESULT", "target", "DRV", "1", {})
+        graph.add_node(source)
+        graph.add_node(target)
+        graph.add_edge(register_edge("tamper-status-edge", source, target, "RESULTS_IN"))
+
+        with store._connect() as conn:
+            row = conn.execute(
+                "SELECT payload_json FROM runtime_snapshots WHERE namespace=? AND key=?",
+                ("graph.edge", "tamper-status-edge"),
+            ).fetchone()
+            payload = json.loads(row[0])
+            payload["relation_status"] = "RETRACTED"
+            payload_json = json.dumps(payload, sort_keys=True, separators=(",", ":"))
+            conn.execute(
+                "UPDATE runtime_snapshots SET payload_json=?, payload_hash=? WHERE namespace=? AND key=?",
+                (payload_json, content_hash(payload), "graph.edge", "tamper-status-edge"),
+            )
+            conn.commit()
+
+        with pytest.raises(ValueError, match="evidence graph edge integrity failure: tamper-status-edge"):
+            build_registry(SQLiteRuntimeStore(path))
