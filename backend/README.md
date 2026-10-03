@@ -44,6 +44,6 @@ Important status boundary:
 - SPECIFIED contracts are not automatically IMPLEMENTED.
 - Runtime acceptance is CI-TESTED: GitHub Actions run #397 completed successfully with 251 tests passed and 12 skipped, including Research Execution V1.2, V2.2 E2E, Science Lab, transformation hardening, backup/recovery, PostgreSQL integration, migration rehearsal, and UI syntax checks. This is not scientific/empirical validation.
 - Model-derived rules remain model-derived unless separately supported by empirical evidence.
-- Production PostgreSQL, authentication/authorization, observability, and empirical validation remain open work.
+- Production deployment-specific IAM/secrets, encrypted off-site backup, distributed rate limiting, operational alerting and empirical scientific validation remain environment-dependent open work.
 
 Platform status: IMPLEMENTATION_BASELINE.
