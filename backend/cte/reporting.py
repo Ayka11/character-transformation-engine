@@ -410,13 +410,22 @@ class ReportService:
         current_qc=self.qc_run(run_id)
         if current_qc["status"]!="QC_PASSED":
             raise ValueError("report cannot publish because current-state QC failed")
+        previous_status=run.status
+        previous_hash=run.report_output_hash
+        previous_hash_version=run.report_output_hash_version
         run.report_output_hash_version=2
         run.report_output_hash=content_hash({"run_id":run.report_run_id,
             "sections":[run.sections[k].immutable_hash for k in sorted(run.sections)],
             "bindings":[run.bindings[k].immutable_hash for k in sorted(run.bindings)],
             "qc":[run.qc[k].immutable_hash for k in sorted(run.qc)]})
         run.status="PUBLISHED"
-        self._persist_run(run)
+        try:
+            self._persist_run(run)
+        except Exception:
+            run.status=previous_status
+            run.report_output_hash=previous_hash
+            run.report_output_hash_version=previous_hash_version
+            raise
         return run
 
     def supersede(self,old_id:str,new_id:str)->ReportRun:
@@ -425,8 +434,14 @@ class ReportService:
         if old_id==new_id: raise ValueError("a report cannot supersede itself")
         if old.status!="PUBLISHED": raise ValueError("only published reports can be superseded")
         if new.status!="PUBLISHED": raise ValueError("a report can only be superseded by a published report")
+        previous_status=old.status
+        previous_successor=old.superseded_by
         old.superseded_by=new_id
         old.status="SUPERSEDED"
-        self._persist_run(old)
-        self._persist_run(new)
+        try:
+            self._persist_run(old)
+        except Exception:
+            old.status=previous_status
+            old.superseded_by=previous_successor
+            raise
         return new
