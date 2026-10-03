@@ -132,6 +132,7 @@ class SecurityObservabilityMiddleware(BaseHTTPMiddleware):
         duration = (time.perf_counter() - started) * 1000
         response.headers["X-Request-ID"] = request_id
         response.headers["X-Process-Time-Ms"] = f"{duration:.2f}"
+        METRICS.observe_request(request.method, request.url.path, response.status_code, duration)
         self._audit(request, request_id, response.status_code, started, "complete", auth_mode)
         return response
 
