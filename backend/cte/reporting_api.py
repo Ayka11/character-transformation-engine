@@ -120,23 +120,38 @@ def install_reporting_api(app, graph_registry, store:SQLiteRuntimeStore|None=Non
                 "sections":{k:list(v.source_artifacts) for k,v in run.sections.items()},
                 "claim_bindings":{k:list(v.supporting_nodes)+list(v.limiting_nodes)+list(v.contradiction_nodes) for k,v in run.bindings.items()}}
 
+    def _sync_published_report_graph(run):
+        if run.status not in {"PUBLISHED", "SUPERSEDED"}:
+            raise ValueError("only a published report can be synchronized to the evidence graph")
+        report_node=register_node(
+            run.report_run_id,"REPORT",run.report_run_id,"DRV",
+            service.specs[run.report_spec_id].version,
+            {"status":run.status,"source_manifest_hash":run.source_manifest_hash,
+             "report_output_hash":run.report_output_hash,"study_id":run.study_id},
+        )
+        graph_registry.add_node(report_node)
+        for artifact_id in run.source_artifacts:
+            source_node=graph_registry.nodes.get(artifact_id)
+            if source_node is None:
+                raise ValueError(f"published report source artifact is missing from graph: {artifact_id}")
+            graph_registry.add_edge(register_edge(
+                f"{run.report_run_id}:documents:{artifact_id}",
+                report_node,source_node,"DOCUMENTS",
+                rationale="published V1.6 report source artifact",
+            ))
+        return report_node
+
     @app.post("/reports/{report_id}/publish")
     def publish_report(report_id:str):
         try:
-            run=service.publish(report_id)
-            report_node=register_node(
-                run.report_run_id,"REPORT",run.report_run_id,"DRV",
-                service.specs[run.report_spec_id].version,
-                {"status":run.status,"source_manifest_hash":run.source_manifest_hash,
-                 "report_output_hash":run.report_output_hash,"study_id":run.study_id},
-            )
-            graph_registry.add_node(report_node)
-            for artifact_id in run.source_artifacts:
-                graph_registry.add_edge(register_edge(
-                    f"{run.report_run_id}:documents:{artifact_id}",
-                    report_node,graph_registry.nodes[artifact_id],"DOCUMENTS",
-                    rationale="published V1.6 report source artifact",
-                ))
+            run=service.runs.get(report_id)
+            if run is None:
+                raise ValueError("report is not registered")
+            # A retry after partial graph persistence must repair graph lineage
+            # without trying to publish an already immutable report again.
+            if run.status != "PUBLISHED":
+                run=service.publish(report_id)
+            report_node=_sync_published_report_graph(run)
             return {"report":asdict(run),"graph_node":asdict(report_node)}
         except SnapshotConflictError as e:
             raise HTTPException(409,str(e))
