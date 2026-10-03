@@ -176,12 +176,105 @@ class GraphRegistry:
                     if node_id in registry.nodes
                 },
             }
+            expected_event_payloads = {
+                **{
+                    f"graph:node:{node.node_id}": {
+                        "node_id": node.node_id,
+                        "payload_hash": node.immutable_hash,
+                        "claim_id": node.node_id if node.node_type == "CLAIM" else None,
+                    }
+                    for node in registry.nodes.values()
+                },
+                **{
+                    f"graph:edge:{edge.edge_id}": {
+                        "edge_id": edge.edge_id,
+                        "payload_hash": edge.input_hash,
+                        "claim_id": (
+                            edge.to_node_id if registry.nodes[edge.to_node_id].node_type == "CLAIM"
+                            else edge.from_node_id if registry.nodes[edge.from_node_id].node_type == "CLAIM"
+                            else None
+                        ),
+                    }
+                    for edge in registry.edges.values()
+                    if edge.from_node_id in registry.nodes and edge.to_node_id in registry.nodes
+                },
+                **{
+                    f"graph:contradiction:{item.contradiction_set_id}": {
+                        "contradiction_set_id": item.contradiction_set_id,
+                        "claim_id": item.claim_id,
+                        "payload_hash": item.immutable_hash,
+                    }
+                    for item in registry.contradiction_sets.values()
+                },
+                **{
+                    f"graph:inference:{item.inference_block_id}": {
+                        "inference_block_id": item.inference_block_id,
+                        "payload_hash": item.immutable_hash,
+                    }
+                    for item in registry.inference_blocks.values()
+                },
+            }
+            expected_event_envelopes = {
+                **{
+                    f"graph:node:{node.node_id}": (None, None, node.version)
+                    for node in registry.nodes.values()
+                },
+                **{
+                    f"graph:edge:{edge.edge_id}": (edge.input_hash, None, "1.4")
+                    for edge in registry.edges.values()
+                },
+                **{
+                    f"graph:contradiction:{item.contradiction_set_id}": (None, None, item.version)
+                    for item in registry.contradiction_sets.values()
+                },
+                **{
+                    f"graph:inference:{item.inference_block_id}": (None, None, "1.4")
+                    for item in registry.inference_blocks.values()
+                },
+            }
+            # Also validate events for deterministic edges implied by a valid
+            # contradiction set, even when their snapshots are missing.
+            for item in registry.contradiction_sets.values():
+                claim = registry.nodes.get(item.claim_id)
+                if claim is None or claim.node_type != "CLAIM":
+                    continue
+                for node_id in item.node_ids:
+                    node = registry.nodes.get(node_id)
+                    if node is None:
+                        continue
+                    edge = register_edge(
+                        f"{item.contradiction_set_id}:contradicts:{node_id}:{item.claim_id}",
+                        node, claim, "CONTRADICTS", rationale=item.contradiction_type,
+                    )
+                    existing = registry.edges.get(edge.edge_id)
+                    if existing is not None and existing != edge:
+                        raise ValueError(f"evidence graph derived edge integrity failure: {edge.edge_id}")
+                    event_id = f"graph:edge:{edge.edge_id}"
+                    expected_event_payloads[event_id] = {
+                        "edge_id": edge.edge_id,
+                        "payload_hash": edge.input_hash,
+                        "claim_id": item.claim_id,
+                    }
+                    expected_event_envelopes[event_id] = (edge.input_hash, None, "1.4")
             for event in store.list_events("graph"):
-                expected_type = expected_event_types.get(event["event_id"])
+                event_id = event["event_id"]
+                expected_type = expected_event_types.get(event_id)
                 if expected_type is None:
-                    raise ValueError(f"orphan graph audit event: {event['event_id']}")
+                    raise ValueError(f"orphan graph audit event: {event_id}")
                 if event["event_type"] != expected_type:
-                    raise ValueError(f"graph audit event type mismatch: {event['event_id']}")
+                    raise ValueError(f"graph audit event type mismatch: {event_id}")
+                expected_payload = expected_event_payloads.get(event_id)
+                expected_envelope = expected_event_envelopes.get(event_id)
+                if (
+                    expected_payload is None
+                    or event["payload"] != expected_payload
+                    or expected_envelope is None
+                    or (
+                        event["input_hash"], event["output_hash"],
+                        event["provenance_record_id"],
+                    ) != expected_envelope
+                ):
+                    raise ValueError(f"graph audit event content mismatch: {event_id}")
 
             # Contradiction sets imply one CONTRADICTS edge per referenced node.
             # Recreate missing edges on startup so a crash between the rule
