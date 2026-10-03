@@ -66,3 +66,18 @@ def test_canonical_endpoint_exposes_result_semantics_and_context_boundary():
     assert semantics["context_semantics"] == "ANNOTATION_ONLY"
     assert semantics["descriptive_row_count"] == 1
     assert semantics["heuristic_row_count"] == 0
+
+
+
+def test_canonical_endpoint_exposes_heuristic_rule_catalog():
+    response = client.post("/compatibility/v2/canonical", json={
+        "profile_a": {"P4.value_order": 8, "P4.value_autonomy": 3},
+        "profile_b": {"P4.value_order": 7, "P4.value_autonomy": 4},
+    })
+    assert response.status_code == 200
+    payload = response.json()
+    tension = next(row for row in payload["rows"] if row["kind"] == "VALUE_TENSION")
+    rule = payload["rule_catalog"][tension["rule_id"]]
+    assert rule["validation_status"] == "UNVALIDATED_HEURISTIC"
+    assert rule["requires_human_review"] is True
+    assert rule["context_sensitive"] is False
