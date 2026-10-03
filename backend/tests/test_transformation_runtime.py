@@ -73,7 +73,7 @@ def test_validation_failure_with_changed_state_is_partial_without_rollback():
     ss=StateSnapshotStore(db)
     ledger=__import__("cte.transformation_ledger",fromlist=["TransformationLedger"]).TransformationLedger(db)
     runtime=TransformationExecutor(ss,ledger)
-    out=runtime.execute("partial","c1",5,{"tempo":5},
+    out=runtime.execute("partial","c1",1,{"tempo":5},
         TransformationContract("t1","1",expected_changes={"tempo":6},allowed_changes=("tempo",)),
         lambda state:{**state,"tempo":7,"unplanned":1})
     assert out.result.status=="PARTIAL"
@@ -89,7 +89,7 @@ def test_validation_failure_can_be_rolled_back_to_exact_before_state():
     contract=TransformationContract(
         "t1","1",expected_changes={"tempo":6},allowed_changes=("tempo",),
         rollback=lambda after,before: dict(before))
-    out=runtime.execute("rollback","c1",6,{"tempo":5},
+    out=runtime.execute("rollback","c1",1,{"tempo":5},
         contract,lambda state:{**state,"tempo":7})
     assert out.result.status=="ROLLED_BACK"
     assert out.result.details["rollback_status"]=="ROLLED_BACK"
@@ -105,7 +105,7 @@ def test_failed_rollback_is_distinct_from_partial():
     runtime=TransformationExecutor(ss)
     contract=TransformationContract(
         "t1","1",expected_changes={"tempo":6},rollback=lambda after,before: {**after,"tempo":99})
-    out=runtime.execute("rollback-fail","c1",7,{"tempo":5},
+    out=runtime.execute("rollback-fail","c1",1,{"tempo":5},
         contract,lambda state:{**state,"tempo":7})
     assert out.result.status=="ROLLBACK_FAILED"
     assert out.result.failure_code=="ROLLBACK_FAILED"
