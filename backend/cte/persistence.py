@@ -8,6 +8,7 @@ import json
 import sqlite3
 import tempfile
 import weakref
+from datetime import datetime, timezone
 from dataclasses import dataclass
 from pathlib import Path
 from .provenance import content_hash, json_safe
@@ -232,10 +233,14 @@ class SQLiteRuntimeStore:
                      input_hash:str|None=None,output_hash:str|None=None,
                      provenance_record_id:str|None=None)->None:
         payload_json=json.dumps(payload,sort_keys=True,separators=(",",":"))
+        # SQLite CURRENT_TIMESTAMP has only second precision. Capture a
+        # microsecond timestamp so audit records created in a burst retain
+        # chronological order rather than falling back to event-ID sorting.
+        created_at = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S.%f")
         with self._connect() as conn:
             conn.execute(
-                "INSERT OR IGNORE INTO runtime_events(event_id,namespace,event_type,payload_json,input_hash,output_hash,provenance_record_id) VALUES(?,?,?,?,?,?,?)",
-                (event_id,namespace,event_type,payload_json,input_hash,output_hash,provenance_record_id)
+                "INSERT OR IGNORE INTO runtime_events(event_id,namespace,event_type,payload_json,input_hash,output_hash,provenance_record_id,created_at) VALUES(?,?,?,?,?,?,?,?)",
+                (event_id,namespace,event_type,payload_json,input_hash,output_hash,provenance_record_id,created_at)
             )
             row=conn.execute(
                 "SELECT namespace,event_type,payload_json,input_hash,output_hash,provenance_record_id FROM runtime_events WHERE event_id=?",
@@ -295,7 +300,7 @@ class SQLiteRuntimeStore:
     def list_events(self, namespace:str)->list[dict]:
         with self._connect() as conn:
             rows=conn.execute(
-                "SELECT event_id,event_type,payload_json,input_hash,output_hash,provenance_record_id,created_at FROM runtime_events WHERE namespace=? ORDER BY created_at,event_id",
+                "SELECT event_id,event_type,payload_json,input_hash,output_hash,provenance_record_id,created_at FROM runtime_events WHERE namespace=? ORDER BY created_at,rowid,event_id",
                 (namespace,)
             ).fetchall()
         return [{"event_id":r[0],"event_type":r[1],"payload":json.loads(r[2]),
