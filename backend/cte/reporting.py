@@ -178,6 +178,7 @@ class ReportService:
             )
             run=self.runs[p["report_run_id"]]
             self._validate_recovered_run(run)
+            self._persisted_runs[run.report_run_id]=deepcopy(run)
 
         self._validate_supersession_lineage()
 
