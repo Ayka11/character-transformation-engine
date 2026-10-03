@@ -144,6 +144,7 @@ class ReportService:
         self.specs={}
         self.runs={}
         self._run_snapshot_hashes={}
+        self._persisted_runs={}
         self._hydrate()
 
     def _hydrate(self):
