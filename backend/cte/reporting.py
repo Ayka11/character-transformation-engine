@@ -288,7 +288,16 @@ class ReportService:
         except ValueError: manifest=None
         add("SOURCE_MANIFEST","PASS" if manifest==run.source_manifest_hash else "FAIL",
             {"current":manifest},"registered source manifest hash","source manifest must match")
-        provenance_ok=all(bool(n.provenance_class and n.version and n.immutable_hash) for s in run.sections.values() for aid in s.source_artifacts for n in [self.registry.nodes[aid]])
+        # Missing source nodes are a report-QC failure, not a KeyError that
+        # aborts the whole report lifecycle after graph damage or retention.
+        provenance_ok=all(
+            aid in self.registry.nodes
+            and bool(self.registry.nodes[aid].provenance_class
+                     and self.registry.nodes[aid].version
+                     and self.registry.nodes[aid].immutable_hash)
+            for section in run.sections.values()
+            for aid in section.source_artifacts
+        )
         add("PROVENANCE","PASS" if provenance_ok else "FAIL",{"complete":provenance_ok},{"complete":True},"source provenance completeness")
         has_rep=any(n.node_type=="REPLICATION" for n in self.registry.nodes.values())
         has_gen=any(n.node_type=="GENERALIZATION" for n in self.registry.nodes.values())
