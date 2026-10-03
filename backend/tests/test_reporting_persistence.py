@@ -226,3 +226,82 @@ def test_supersede_rolls_back_in_memory_state_when_persistence_fails():
         old = service.runs["rr-old-fail"]
         assert old.status == "PUBLISHED"
         assert old.superseded_by is None
+
+
+def test_recovery_rejects_missing_supersession_successor():
+    import json
+    import sqlite3
+    import pytest
+    from cte.provenance import content_hash
+
+    with TemporaryDirectory() as d:
+        path = str(Path(d) / "runtime.sqlite3")
+        store = SQLiteRuntimeStore(path)
+        graph = _graph(store)
+        service = ReportService(graph, store)
+        service.register_spec(register_spec("rs", "Supersession integrity"))
+        for run_id in ("rr-lineage-old", "rr-lineage-new"):
+            service.create(run_id, "rs", "study", ["r"])
+            for ordinal, code in enumerate(SECTION_CODES):
+                service.add_section(run_id, code, {"section": code}, ["r"], ordinal)
+            service.bind_claim(run_id, "c")
+            assert service.qc_run(run_id)["status"] == "QC_PASSED"
+            service.publish(run_id)
+        service.supersede("rr-lineage-old", "rr-lineage-new")
+
+        with sqlite3.connect(path) as conn:
+            row = conn.execute(
+                "SELECT payload_json FROM runtime_snapshots WHERE namespace=? AND key=?",
+                ("report.run", "rr-lineage-old"),
+            ).fetchone()
+            payload = json.loads(row[0])
+            payload["superseded_by"] = "rr-does-not-exist"
+            conn.execute(
+                "UPDATE runtime_snapshots SET payload_json=?, payload_hash=? WHERE namespace=? AND key=?",
+                (json.dumps(payload, sort_keys=True, separators=(",", ":")), content_hash(payload),
+                 "report.run", "rr-lineage-old"),
+            )
+            conn.commit()
+
+        with pytest.raises(ValueError, match="references missing successor rr-does-not-exist"):
+            ReportService(build_registry(SQLiteRuntimeStore(path)), SQLiteRuntimeStore(path))
+
+
+def test_recovery_rejects_supersession_cycle():
+    import json
+    import sqlite3
+    import pytest
+    from cte.provenance import content_hash
+
+    with TemporaryDirectory() as d:
+        path = str(Path(d) / "runtime.sqlite3")
+        store = SQLiteRuntimeStore(path)
+        graph = _graph(store)
+        service = ReportService(graph, store)
+        service.register_spec(register_spec("rs", "Supersession cycle"))
+        for run_id in ("rr-cycle-a", "rr-cycle-b"):
+            service.create(run_id, "rs", "study", ["r"])
+            for ordinal, code in enumerate(SECTION_CODES):
+                service.add_section(run_id, code, {"section": code}, ["r"], ordinal)
+            service.bind_claim(run_id, "c")
+            assert service.qc_run(run_id)["status"] == "QC_PASSED"
+            service.publish(run_id)
+        service.supersede("rr-cycle-a", "rr-cycle-b")
+
+        with sqlite3.connect(path) as conn:
+            row = conn.execute(
+                "SELECT payload_json FROM runtime_snapshots WHERE namespace=? AND key=?",
+                ("report.run", "rr-cycle-b"),
+            ).fetchone()
+            payload = json.loads(row[0])
+            payload["status"] = "SUPERSEDED"
+            payload["superseded_by"] = "rr-cycle-a"
+            conn.execute(
+                "UPDATE runtime_snapshots SET payload_json=?, payload_hash=? WHERE namespace=? AND key=?",
+                (json.dumps(payload, sort_keys=True, separators=(",", ":")), content_hash(payload),
+                 "report.run", "rr-cycle-b"),
+            )
+            conn.commit()
+
+        with pytest.raises(ValueError, match="supersession cycle"):
+            ReportService(build_registry(SQLiteRuntimeStore(path)), SQLiteRuntimeStore(path))
