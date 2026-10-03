@@ -421,8 +421,6 @@ class GraphRegistry:
     def register_claim(self, claim_id: str, result_id: str | None, current_state: str,
                        target_state: str, provenance_class: str, metadata: dict,
                        previous_claim_id: str | None = None) -> GraphNode:
-        if claim_id in self.nodes:
-            raise ValueError("claim node already registered")
         # A prior claim is recorded when supplied. Older API callers may still
         # submit a transition without a prior node; the transition is validated
         # from the declared current state and current result lineage.
@@ -467,6 +465,31 @@ class GraphRegistry:
         payload=dict(metadata)
         payload.update({"current_state":current_state,"state":target_state,"result_id":result_id})
         claim=register_node(claim_id,"CLAIM",claim_id,provenance_class,"2.1.0",payload)
+        existing_claim = self.nodes.get(claim_id)
+        if existing_claim is not None:
+            if existing_claim != claim:
+                raise ValueError("immutable claim conflict")
+            # A previous call may have persisted the claim before a derived
+            # support/history edge failed. Replaying the same claim repairs
+            # those links instead of treating a recoverable partial write as
+            # a duplicate-registration error.
+            if result_id:
+                self.add_edge(register_edge(
+                    f"{claim_id}:supports:{result_id}",
+                    self.nodes[result_id],
+                    existing_claim,
+                    "SUPPORTS",
+                    rationale=f"claim transition {current_state} -> {target_state}",
+                ))
+            if previous_claim_id:
+                self.add_edge(register_edge(
+                    f"{claim_id}:derived-from:{previous_claim_id}",
+                    existing_claim,
+                    self.nodes[previous_claim_id],
+                    "DERIVED_FROM",
+                    rationale=f"claim state history {current_state} -> {target_state}",
+                ))
+            return existing_claim
         self.add_node(claim)
         try:
             if result_id:
