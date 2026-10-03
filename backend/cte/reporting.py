@@ -175,6 +175,30 @@ class ReportService:
             run=self.runs[p["report_run_id"]]
             self._validate_recovered_run(run)
 
+        self._validate_supersession_lineage()
+
+    def _validate_supersession_lineage(self):
+        for run in self.runs.values():
+            if run.status == "SUPERSEDED":
+                if not run.superseded_by:
+                    raise ValueError(f"report snapshot integrity failure: report.run/{run.report_run_id} missing successor")
+                successor = self.runs.get(run.superseded_by)
+                if successor is None:
+                    raise ValueError(f"report snapshot integrity failure: report.run/{run.report_run_id} references missing successor {run.superseded_by}")
+                if successor.status not in {"PUBLISHED", "SUPERSEDED"}:
+                    raise ValueError(f"report snapshot integrity failure: report.run/{run.report_run_id} successor is not published")
+            elif run.superseded_by is not None:
+                raise ValueError(f"report snapshot integrity failure: report.run/{run.report_run_id} has successor but is not superseded")
+
+        for run in self.runs.values():
+            seen = set()
+            current = run
+            while current.superseded_by is not None:
+                if current.report_run_id in seen:
+                    raise ValueError(f"report snapshot integrity failure: report.run/{run.report_run_id} supersession cycle")
+                seen.add(current.report_run_id)
+                current = self.runs[current.superseded_by]
+
     def _validate_recovered_run(self,run:ReportRun):
         spec=self.specs.get(run.report_spec_id)
         if spec is None:
