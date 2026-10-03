@@ -223,6 +223,7 @@ def test_postgres_concurrent_transformation_guard_rejects_competing_request():
     reason="CTE_DATABASE_URL is required for live PostgreSQL integration",
 )
 def test_postgres_recovery_closes_after_ledger_commit_without_rerun():
+    from cte.transformation_ledger import TransformationLedgerEntry
     from cte.contracts.transformation import TransformationContract
     from cte.state_snapshot_store import StateSnapshotStore
     from cte.transformation_ledger import TransformationLedger
