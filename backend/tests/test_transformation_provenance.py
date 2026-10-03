@@ -143,6 +143,7 @@ def test_corrupted_transformation_provenance_cannot_support_claim():
     service.scenarios={}
     service.runs={}
     service.replication_assessments={}
+    service.transformation_provenance=TransformationProvenanceBinder(db)
     service.generalization_assessments={}
 
     from cte.provenance import Provenance, ProvenanceTag
