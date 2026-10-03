@@ -313,7 +313,21 @@ def test_science_lab_does_not_trust_tampered_run_transformation_provenance():
         "analysis", "ANALYSIS", "analysis", "EXP", "1", {"kind": "ANALYSIS", "execution_id": "tamper-source"},
     ))
     registry.add_node(register_node(
+        "transformation:tamper-source", "TRANSFORMATION", "tamper-source", "EXP", "2.3.0", {
+            "execution_id": "tamper-source",
+            "validated": True,
+            "integrity_status": "PASS",
+            "ledger_id": trusted["ledger_id"],
+            "certificate_id": trusted["certificate_id"],
+        },
+    ))
+    registry.add_node(register_node(
         "dataset", "DATASET", "dataset", "EXP", "1", {"kind": "DATASET"},
+    ))
+    registry.add_edge(register_edge(
+        "analysis:transformation", registry.nodes["analysis"],
+        registry.nodes["transformation:tamper-source"], "DERIVED_FROM",
+        rationale="test transformation lineage",
     ))
     registry.add_edge(register_edge(
         "analysis:dataset", registry.nodes["dataset"], registry.nodes["analysis"],
