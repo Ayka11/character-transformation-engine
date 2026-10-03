@@ -740,3 +740,40 @@ def test_graph_recovery_rejects_snapshot_storage_hash_mismatch():
 
         with pytest.raises(ValueError, match="evidence graph node storage hash failure: storage-hash-node"):
             build_registry(SQLiteRuntimeStore(path))
+
+
+
+def test_graph_recovery_rejects_tampered_contradiction_envelope_metadata():
+    import json
+    import pytest
+    from cte.provenance import content_hash
+
+    with TemporaryDirectory() as d:
+        path = str(Path(d) / "runtime.sqlite3")
+        store = SQLiteRuntimeStore(path)
+        graph = build_registry(store)
+        claim = register_node("envelope-contradiction-claim", "CLAIM", "claim", "DRV", "1", {})
+        evidence = register_node("envelope-contradiction-evidence", "DATASET", "evidence", "DRV", "1", {})
+        graph.add_node(claim)
+        graph.add_node(evidence)
+        graph.register_contradiction_set(
+            "envelope-contradiction", claim.node_id, [evidence.node_id], "CONFLICT",
+        )
+
+        with store._connect() as conn:
+            row = conn.execute(
+                "SELECT payload_json FROM runtime_snapshots WHERE namespace=? AND key=?",
+                ("graph.contradiction", "envelope-contradiction"),
+            ).fetchone()
+            payload = json.loads(row[0])
+            payload["version"] = "9"
+            payload["provenance_class"] = "OBS"
+            payload_json = json.dumps(payload, sort_keys=True, separators=(",", ":"))
+            conn.execute(
+                "UPDATE runtime_snapshots SET version=?, payload_json=?, payload_hash=? WHERE namespace=? AND key=?",
+                ("9", payload_json, content_hash(payload), "graph.contradiction", "envelope-contradiction"),
+            )
+            conn.commit()
+
+        with pytest.raises(ValueError, match="evidence graph contradiction snapshot envelope failure: envelope-contradiction"):
+            build_registry(SQLiteRuntimeStore(path))
