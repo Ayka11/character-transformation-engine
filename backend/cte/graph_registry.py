@@ -150,16 +150,21 @@ class GraphRegistry:
             if audit not in self.audit_events:
                 self.audit_events.append(audit)
             return existing
+        claim_id = node.node_id if node.node_type == "CLAIM" else None
         if self.store is not None:
             self.store.put_snapshot("graph.node",node.node_id,{"node_id":node.node_id,"node_type":node.node_type,"entity_id":node.entity_id,"provenance_class":node.provenance_class,"version":node.version,"immutable_hash":node.immutable_hash,"metadata":node.metadata},node.version)
+            # Persist the audit event before publishing the object into the
+            # in-memory registry. If event persistence fails, callers must not
+            # observe a registered node with a misleading in-memory audit trail.
+            self.store.append_event(
+                f"graph:node:{node.node_id}", "graph", "NODE_REGISTERED",
+                {"node_id":node.node_id,"payload_hash":node.immutable_hash,
+                 "claim_id":claim_id}, provenance_record_id=node.version,
+            )
         self.nodes[node.node_id]=node
         audit=GraphAuditEvent("NODE_REGISTERED",node.node_id,None,
-            node.node_id if node.node_type=="CLAIM" else None,node.immutable_hash,"runtime")
+            claim_id,node.immutable_hash,"runtime")
         self.audit_events.append(audit)
-        if self.store is not None:
-            self.store.append_event(f"graph:node:{node.node_id}","graph","NODE_REGISTERED",
-                                     {"node_id":node.node_id,"payload_hash":node.immutable_hash,
-                                      "claim_id":audit.claim_id},provenance_record_id=node.version)
         return node
 
     def add_edge(self, edge: GraphEdge) -> GraphEdge:
@@ -186,16 +191,19 @@ class GraphRegistry:
             return existing
         if edge.from_node_id not in self.nodes or edge.to_node_id not in self.nodes:
             raise ValueError("edge references unknown node")
+        claim_id = edge.to_node_id if self.nodes.get(edge.to_node_id, None) and self.nodes[edge.to_node_id].node_type=="CLAIM" else (edge.from_node_id if self.nodes.get(edge.from_node_id, None) and self.nodes[edge.from_node_id].node_type=="CLAIM" else None)
         if self.store is not None:
             self.store.put_snapshot("graph.edge",edge.edge_id,{"edge_id":edge.edge_id,"from_node_id":edge.from_node_id,"to_node_id":edge.to_node_id,"edge_type":edge.edge_type,"relation_status":edge.relation_status,"input_hash":edge.input_hash,"rationale":edge.rationale},"1.4")
+            # Keep memory and audit_events unchanged unless the durable event
+            # write succeeds; recovery can reconcile a snapshot left by failure.
+            self.store.append_event(
+                f"graph:edge:{edge.edge_id}", "graph", "EDGE_REGISTERED",
+                {"edge_id":edge.edge_id,"payload_hash":edge.input_hash,"claim_id":claim_id},
+                input_hash=edge.input_hash, provenance_record_id="1.4",
+            )
         self.edges[edge.edge_id]=edge
-        claim_id = edge.to_node_id if self.nodes.get(edge.to_node_id, None) and self.nodes[edge.to_node_id].node_type=="CLAIM" else (edge.from_node_id if self.nodes.get(edge.from_node_id, None) and self.nodes[edge.from_node_id].node_type=="CLAIM" else None)
         audit=GraphAuditEvent("EDGE_REGISTERED",None,edge.edge_id,claim_id,edge.input_hash,"runtime")
         self.audit_events.append(audit)
-        if self.store is not None:
-            self.store.append_event(f"graph:edge:{edge.edge_id}","graph","EDGE_REGISTERED",
-                                    {"edge_id":edge.edge_id,"payload_hash":edge.input_hash,"claim_id":claim_id},
-                                    input_hash=edge.input_hash,provenance_record_id="1.4")
         return edge
 
 
