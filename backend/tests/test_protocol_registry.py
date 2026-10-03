@@ -74,6 +74,7 @@ def test_unknown_protocol_version_and_missing_actor_are_rejected(registry):
 
 def test_same_lifecycle_event_is_idempotent(registry):
     registry.register(definition(), actor_id="reviewer-1")
+    registry.record_review("regulation.pause", "1.0", reviewer_id="reviewer-2", outcome="APPROVED", reason="independent review")
     registry.transition("regulation.pause", "1.0", target_status="ACTIVE",
                         actor_id="approver-1", reason="approved")
     repeated = registry.transition("regulation.pause", "1.0", target_status="SUSPENDED",
