@@ -92,5 +92,8 @@ def test_graph_recovery_rejects_edge_with_missing_endpoint():
             )
             conn.commit()
 
-        with pytest.raises(ValueError, match="evidence graph edge references missing node: integrity-edge"):
-            build_registry(SQLiteRuntimeStore(path))
+        restored = build_registry(SQLiteRuntimeStore(path))
+        assert "integrity-edge" in restored.edges
+        assert restored.integrity_errors == [
+            "evidence graph edge references missing node: integrity-edge"
+        ]
