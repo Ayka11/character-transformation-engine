@@ -5,10 +5,13 @@ heuristic rules are labeled and must not be presented as validated predictions.
 """
 from __future__ import annotations
 from itertools import product
+from hashlib import sha256
+from json import dumps
 from math import isfinite
 from typing import Any, Mapping
 
 VERSION = "2.0"
+RULE_CATALOG_VERSION = "1.0.0"
 SCIENTIFIC_STATUS = "IMPLEMENTATION_BASELINE"
 DOMAINS = {
     "P1": "state_and_resources",
@@ -75,6 +78,12 @@ def _rule_catalog() -> dict[str, dict[str, Any]]:
             "intended_use": "review_prompt_only",
         }
     return dict(sorted(catalog.items()))
+
+
+def _rule_catalog_fingerprint(catalog: Mapping[str, Mapping[str, Any]]) -> str:
+    """Hash canonical catalog content so results can identify the exact rule set."""
+    canonical = dumps(catalog, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
+    return sha256(canonical.encode("utf-8")).hexdigest()
 
 
 def _numeric_profile(profile: Mapping[str, Any], person: str) -> dict[str, float]:
@@ -156,8 +165,12 @@ def evaluate_compatibility_matrix(
         interpretation = "DESCRIPTIVE_ONLY"
     else:
         interpretation = "UNKNOWN_ONLY"
+    rule_catalog = _rule_catalog()
+    rule_catalog_hash = _rule_catalog_fingerprint(rule_catalog)
     return {
         "version": VERSION, "scientific_status": SCIENTIFIC_STATUS,
+        "rule_catalog_version": RULE_CATALOG_VERSION,
+        "rule_catalog_hash": rule_catalog_hash,
         "authoritative_scalar": False,
         "status": "PARTIAL" if rows and known < len(rows) else ("ESTIMATED" if rows else "UNKNOWN"),
         "result_semantics": {
@@ -174,7 +187,7 @@ def evaluate_compatibility_matrix(
         },
         "coverage": {"known_rows": known, "total_rows": len(rows), "unknown_rows": len(rows) - known},
         "domains": DOMAINS.copy(), "rows": rows, "contexts": context_list,
-        "rule_catalog": _rule_catalog(),
+        "rule_catalog": rule_catalog,
         "limitations": [
             "No authoritative compatibility percentage is produced.",
             "Heuristic rules are not empirically validated predictions.",
