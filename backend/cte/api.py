@@ -35,6 +35,7 @@ from .integrity_runner import run_v19_integrity_suite
 from .research_api import install_research_api
 from .science_lab_api import install_science_lab_api
 from .observability import SecurityObservabilityMiddleware, configure_logging
+from .metrics import METRICS
 from .ops_api import install_ops_api
 from .transformation_api import install_transformation_api
 from .persistence import SQLiteRuntimeStore, build_runtime_store
@@ -322,6 +323,11 @@ GRAPH = TraitGraph({
     "P3.cognitive_reappraisal": ["P3.reflection_depth"],
     "P3.attention_regulation": ["P3.pause_capacity"],
 })
+
+@app.get("/metrics", include_in_schema=False)
+def metrics():
+    from fastapi.responses import PlainTextResponse
+    return PlainTextResponse(METRICS.render(), media_type="text/plain; version=0.0.4; charset=utf-8")
 
 @app.get("/health")
 def health():
