@@ -161,7 +161,22 @@ def test_corrupted_transformation_provenance_cannot_support_claim():
     )
     service.runs[run.run_id]=run
     registry.add_node(__import__("cte.evidence_graph",fromlist=["register_node"]).register_node(
-        "result-corrupt","RESULT","result-corrupt","EXP","1",{}
+        "dataset-corrupt","DATASET","dataset-corrupt","EXP","1",{}
+    ))
+    registry.add_node(__import__("cte.evidence_graph",fromlist=["register_node"]).register_node(
+        "analysis-corrupt","ANALYSIS","analysis-corrupt","EXP","1",{}
+    ))
+    registry.add_edge(__import__("cte.evidence_graph",fromlist=["register_edge"]).register_edge(
+        "analysis-corrupt:dataset",registry.nodes["analysis-corrupt"],
+        registry.nodes["dataset-corrupt"],"ANALYZED_FROM",rationale="test dataset"
+    ))
+    registry.add_node(__import__("cte.evidence_graph",fromlist=["register_node"]).register_node(
+        "result-corrupt","RESULT","result-corrupt","EXP","1",
+        {"qc_status":"PASS","validated_descriptive_result":True}
+    ))
+    registry.add_edge(__import__("cte.evidence_graph",fromlist=["register_edge"]).register_edge(
+        "analysis-corrupt:result",registry.nodes["analysis-corrupt"],
+        registry.nodes["result-corrupt"],"RESULTS_IN",rationale="test result"
     ))
     registry.register_claim(
         "claim-corrupt","result-corrupt","REGISTERED","DESCRIPTIVE_RESULT","EXP",
