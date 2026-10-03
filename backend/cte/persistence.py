@@ -9,7 +9,7 @@ import sqlite3
 import tempfile
 from dataclasses import dataclass
 from pathlib import Path
-from .provenance import content_hash
+from .provenance import content_hash, json_safe
 
 MUTABLE_SNAPSHOT_NAMESPACES = {"orchestrator.execution", "intervention.assignment", "report.run", "research.study", "research.experiment", "research.participant", "research.assignment", "research.analysis", "science_lab.matrix", "science_lab.run", "integration.mutable"}
 
@@ -82,6 +82,7 @@ class SQLiteRuntimeStore:
             conn.commit()
 
     def put_snapshot(self, namespace:str, key:str, payload:dict, version:str)->Snapshot:
+        payload=json_safe(payload)
         payload_hash=content_hash(payload)
         payload_json=json.dumps(payload,sort_keys=True,separators=(",",":"))
         with self._connect() as conn:
@@ -108,7 +109,7 @@ class SQLiteRuntimeStore:
 
     def put_snapshots_atomic(self, items:list[tuple[str,str,dict,str]])->list[Snapshot]:
         """Insert immutable snapshots atomically; identical existing rows are idempotent."""
-        prepared=[(ns,key,payload,version,content_hash(payload)) for ns,key,payload,version in items]
+        prepared=[(ns,key,json_safe(payload),version,content_hash(payload)) for ns,key,payload,version in items]
         with self._connect() as conn:
             results=[]
             try:
