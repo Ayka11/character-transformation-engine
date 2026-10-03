@@ -78,7 +78,15 @@ class GraphRegistry:
                     or p.get("provenance_class") != "DRV"
                 ):
                     raise ValueError(f"evidence graph contradiction snapshot envelope failure: {snap.key}")
-                registry.contradiction_sets[p["contradiction_set_id"]]=ContradictionSet(**p)
+                if not isinstance(p.get("node_ids"), list):
+                    raise ValueError(
+                        f"evidence graph contradiction rule invalid: {snap.key}"
+                    )
+                # Persisted JSON arrays load as lists; normalize them to the
+                # immutable tuple representation used by newly registered sets.
+                registry.contradiction_sets[p["contradiction_set_id"]]=ContradictionSet(
+                    **{**p, "node_ids": tuple(p["node_ids"])}
+                )
             for snap in store.list_snapshots("graph.inference"):
                 p=snap.payload
                 if content_hash(p) != snap.payload_hash:

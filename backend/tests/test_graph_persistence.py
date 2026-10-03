@@ -34,6 +34,33 @@ def test_contradiction_and_inference_rules_survive_restart():
         assert "ib" in g2.inference_blocks
 
 
+def test_contradiction_set_replay_after_restart_normalizes_node_ids():
+    with TemporaryDirectory() as d:
+        path = str(Path(d) / "runtime.sqlite3")
+        store = SQLiteRuntimeStore(path)
+        graph = build_registry(store)
+        claim = register_node("replay-claim", "CLAIM", "claim", "DRV", "1", {})
+        evidence = register_node("replay-evidence", "DATASET", "evidence", "DRV", "1", {})
+        graph.add_node(claim)
+        graph.add_node(evidence)
+        original = graph.register_contradiction_set(
+            "replay-contradiction", claim.node_id, [evidence.node_id], "CONFLICT"
+        )
+
+        restored = build_registry(SQLiteRuntimeStore(path))
+        recovered = restored.contradiction_sets["replay-contradiction"]
+        assert recovered.node_ids == (evidence.node_id,)
+        replayed = restored.register_contradiction_set(
+            "replay-contradiction", claim.node_id, [evidence.node_id], "CONFLICT"
+        )
+
+        assert replayed == recovered == original
+        assert len([
+            event for event in restored.audit_events
+            if event.contradiction_set_id == "replay-contradiction"
+        ]) == 1
+
+
 def test_graph_recovery_rejects_semantically_tampered_node_even_with_rehashed_snapshot():
     import json
     import pytest
