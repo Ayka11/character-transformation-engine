@@ -361,8 +361,11 @@ class GraphRegistry:
             stored_state=previous.metadata.get("state")
             if stored_state != current_state:
                 raise ValueError("current_state does not match previous claim state")
+            previous_result_id = previous.metadata.get("result_id")
             if result_id is None:
-                result_id=previous.metadata.get("result_id")
+                result_id=previous_result_id
+            elif previous_result_id is not None and result_id != previous_result_id:
+                raise ValueError("result_id does not match previous claim lineage")
         if result_id is not None:
             result = self.nodes.get(result_id)
             if result is None or result.node_type != "RESULT":
