@@ -62,3 +62,24 @@ def test_indeterminate_requirements_with_non_result_node_fails_closed():
     with pytest.raises(ValueError, match="RESULT node is not registered"):
         graph.indeterminate_requirements(set(), "not-a-result")
 
+
+def test_claim_history_cannot_switch_result_lineage():
+    import pytest
+
+    graph = build_registry()
+    for result_id in ("result-a", "result-b"):
+        result = register_node(result_id, "RESULT", result_id, "DRV", "1", {})
+        analysis = register_node(f"analysis-{result_id}", "ANALYSIS", f"analysis-{result_id}", "DRV", "1", {})
+        dataset = register_node(f"dataset-{result_id}", "DATASET", f"dataset-{result_id}", "DRV", "1", {})
+        for node in (result, analysis, dataset):
+            graph.add_node(node)
+        graph.add_edge(register_edge(f"source-{result_id}", analysis, dataset, "ANALYZED_FROM"))
+        graph.add_edge(register_edge(f"output-{result_id}", analysis, result, "RESULTS_IN"))
+
+    graph.register_claim("claim-a", "result-a", "HYPOTHESIS", "REGISTERED", "DRV", {})
+    with pytest.raises(ValueError, match="result_id does not match previous claim lineage"):
+        graph.register_claim(
+            "claim-b", "result-b", "REGISTERED", "INDETERMINATE", "DRV", {},
+            previous_claim_id="claim-a",
+        )
+
