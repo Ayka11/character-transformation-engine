@@ -911,6 +911,12 @@ def test_postgres_science_lab_provenance_rebind_matches_sqlite_after_restore():
                 "DELETE FROM runtime_snapshots WHERE namespace='graph.node' AND key=%s",
                 (f"transform-{suffix}",),
             )
+            # This adversarial fixture tests degraded lineage recovery rather
+            # than orphan-event rejection, which has a dedicated unit test.
+            cur.execute(
+                "DELETE FROM runtime_events WHERE event_id=%s",
+                (f"graph:node:transform-{suffix}",),
+            )
 
     attacked_service = object.__new__(ScienceLabService)
     attacked_service.registry = GraphRegistry.empty(pg)
@@ -1142,6 +1148,12 @@ def test_postgres_full_durability_gate_crash_restore_and_adversarial_lineage():
             cur.execute(
                 "DELETE FROM runtime_snapshots WHERE namespace='graph.node' AND key=%s",
                 (f"transform-{suffix}",),
+            )
+            # This adversarial fixture tests degraded lineage recovery rather
+            # than orphan-event rejection, which has a dedicated unit test.
+            cur.execute(
+                "DELETE FROM runtime_events WHERE event_id=%s",
+                (f"graph:node:transform-{suffix}",),
             )
 
     attacked = object.__new__(ScienceLabService)
