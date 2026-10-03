@@ -60,3 +60,21 @@ def test_immutable_node_replay_rejects_provenance_or_version_change():
             assert False, "immutable node replay must reject envelope changes"
         except ValueError as exc:
             assert str(exc) == "immutable node conflict"
+
+
+def test_immutable_edge_replay_rejects_changed_relation_status():
+    from dataclasses import replace
+    g=build_registry()
+    source=register_node("edge-source","ANALYSIS","source","DRV","1",{})
+    target=register_node("edge-target","RESULT","target","DRV","1",{})
+    g.add_node(source)
+    g.add_node(target)
+    original=register_edge("edge-immutable",source,target,"RESULTS_IN")
+    g.add_edge(original)
+
+    tampered=replace(original,relation_status="RETRACTED")
+    try:
+        g.add_edge(tampered)
+        assert False, "edge replay must reject changed immutable metadata"
+    except ValueError as exc:
+        assert str(exc) == "immutable edge conflict"

@@ -97,7 +97,10 @@ class GraphRegistry:
     def add_edge(self, edge: GraphEdge) -> GraphEdge:
         if edge.edge_id in self.edges:
             existing=self.edges[edge.edge_id]
-            if existing.input_hash != edge.input_hash:
+            # input_hash is a content fingerprint, but relation_status is not
+            # part of the canonical edge hash. Compare the complete immutable
+            # record so a replay cannot silently substitute status metadata.
+            if existing != edge:
                 raise ValueError("immutable edge conflict")
             return existing
         if edge.from_node_id not in self.nodes or edge.to_node_id not in self.nodes:
