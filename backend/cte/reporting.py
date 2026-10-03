@@ -4,6 +4,7 @@ This renders registered artifacts; it does not create new evidence.
 """
 from __future__ import annotations
 from dataclasses import dataclass, field
+from copy import deepcopy
 from .provenance import content_hash
 from .persistence import SQLiteRuntimeStore
 
