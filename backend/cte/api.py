@@ -1,13 +1,15 @@
 import os
 from dataclasses import asdict
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from pathlib import Path
+from typing import Any
 from pydantic import BaseModel, Field
 from .models import DailyState
 from .capacity import compute_capacity
 from .compatibility import compatibility_report
+from .compatibility_matrix_adapter import evaluate_canonical_compatibility
 from .recovery import evaluate_recovery_gate, evaluate_bio_reset, build_recovery_plan, isolate_compromised_state_from_traits
 from .catalog import ADAPTIVE_LEVELS, MASTER_MATRIX, MATRIX_VERSION, SPRINT_TEMPLATE
 from .assessment import build_profile
@@ -115,6 +117,13 @@ class CompatibilityInput(BaseModel):
     roles_a: list[str] = Field(default_factory=list)
     roles_b: list[str] = Field(default_factory=list)
     synergy: dict[str, float] = Field(default_factory=dict)
+
+class CanonicalCompatibilityInput(BaseModel):
+    profile_a: dict[str, Any] = Field(default_factory=dict)
+    profile_b: dict[str, Any] = Field(default_factory=dict)
+    roles_a: list[str] = Field(default_factory=list)
+    roles_b: list[str] = Field(default_factory=list)
+    contexts: list[str] = Field(default_factory=list)
 
 class RecoveryWindowInput(BaseModel):
     recovery_indices: list[float | None]
@@ -610,6 +619,17 @@ def compatibility(p: CompatibilityInput):
         p.bio_a,p.bio_b,p.values_a,p.values_b,
         set(p.roles_a),set(p.roles_b),role_overrides
     )
+
+@app.post("/compatibility/v2/canonical")
+def canonical_compatibility(p: CanonicalCompatibilityInput):
+    """Evaluate canonical P1–P5 measurements without changing the legacy route."""
+    try:
+        return evaluate_canonical_compatibility(
+            p.profile_a, p.profile_b,
+            roles_a=p.roles_a, roles_b=p.roles_b, contexts=p.contexts,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
 
 @app.post("/runtime/recovery-gate")
 def runtime_recovery_gate(p: StateInput):
