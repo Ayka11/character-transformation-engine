@@ -791,6 +791,14 @@ def test_postgres_science_lab_provenance_rebind_matches_sqlite_after_restore():
             {"execution_id": execution_id},
         ))
         registry.add_node(register_node(
+            f"dataset-{suffix}", "DATASET", f"dataset-{suffix}", "EXP", "1",
+            {"execution_id": execution_id, "row_count": 1, "checksum": "dataset"},
+        ))
+        registry.add_edge(register_edge(
+            f"analysis-{suffix}:dataset", registry.nodes[f"analysis-{suffix}"],
+            registry.nodes[f"dataset-{suffix}"], "ANALYZED_FROM",
+        ))
+        registry.add_node(register_node(
             f"transform-{suffix}", "TRANSFORMATION", execution_id, "EXP", "1",
             {"execution_id": execution_id, "ledger_id": tp["ledger_id"], "certificate_id": tp["certificate_id"]},
         ))
