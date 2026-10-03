@@ -158,6 +158,34 @@ class PostgreSQLRuntimeStore:
                     )
         return Snapshot(namespace, key, version, payload, payload_hash)
 
+    def put_snapshot_if_hash(
+        self, namespace: str, key: str, payload: dict, version: str,
+        *, expected_hash: str | None,
+    ) -> Snapshot:
+        """Compare-and-swap a snapshot, rejecting stale writers."""
+        payload = json_safe(payload)
+        payload_hash = content_hash(payload)
+        with self.transaction() as conn:
+            with conn.cursor() as cur:
+                if expected_hash is None:
+                    cur.execute(
+                        """INSERT INTO runtime_snapshots
+                           (namespace,key,version,payload_json,payload_hash)
+                           VALUES (%s,%s,%s,%s,%s)
+                           ON CONFLICT (namespace,key) DO NOTHING""",
+                        (namespace, key, version, Jsonb(payload), payload_hash),
+                    )
+                else:
+                    cur.execute(
+                        """UPDATE runtime_snapshots
+                           SET version=%s, payload_json=%s, payload_hash=%s
+                           WHERE namespace=%s AND key=%s AND payload_hash=%s""",
+                        (version, Jsonb(payload), payload_hash, namespace, key, expected_hash),
+                    )
+                if cur.rowcount != 1:
+                    raise ValueError("snapshot concurrent update conflict")
+        return Snapshot(namespace, key, version, payload, payload_hash)
+
     def put_snapshots_atomic(self, items: list[tuple[str, str, dict, str]]) -> list[Snapshot]:
         """Insert a snapshot batch atomically with immutable conflict checks."""
         prepared = [

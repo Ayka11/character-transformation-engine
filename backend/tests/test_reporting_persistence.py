@@ -186,12 +186,12 @@ def test_publish_rolls_back_in_memory_state_when_persistence_fails():
             service.add_section("rr-publish-fail", code, {"section": code}, ["r"], ordinal)
         service.bind_claim("rr-publish-fail", "c")
         assert service.qc_run("rr-publish-fail")["status"] == "QC_PASSED"
-        original = store.put_snapshot
-        def fail_report_run(namespace, key, payload, version):
+        original = store.put_snapshot_if_hash
+        def fail_report_run(namespace, key, payload, version, *, expected_hash):
             if namespace == "report.run" and key == "rr-publish-fail":
                 raise OSError("simulated storage failure")
-            return original(namespace, key, payload, version)
-        store.put_snapshot = fail_report_run
+            return original(namespace, key, payload, version, expected_hash=expected_hash)
+        store.put_snapshot_if_hash = fail_report_run
         with pytest.raises(OSError, match="simulated storage failure"):
             service.publish("rr-publish-fail")
         run = service.runs["rr-publish-fail"]
@@ -215,12 +215,12 @@ def test_supersede_rolls_back_in_memory_state_when_persistence_fails():
             service.bind_claim(run_id, "c")
             assert service.qc_run(run_id)["status"] == "QC_PASSED"
             service.publish(run_id)
-        original = store.put_snapshot
-        def fail_old(namespace, key, payload, version):
+        original = store.put_snapshot_if_hash
+        def fail_old(namespace, key, payload, version, *, expected_hash):
             if namespace == "report.run" and key == "rr-old-fail":
                 raise OSError("simulated storage failure")
-            return original(namespace, key, payload, version)
-        store.put_snapshot = fail_old
+            return original(namespace, key, payload, version, expected_hash=expected_hash)
+        store.put_snapshot_if_hash = fail_old
         with pytest.raises(OSError, match="simulated storage failure"):
             service.supersede("rr-old-fail", "rr-new-fail")
         old = service.runs["rr-old-fail"]
@@ -305,3 +305,28 @@ def test_recovery_rejects_supersession_cycle():
 
         with pytest.raises(ValueError, match="supersession cycle"):
             ReportService(build_registry(SQLiteRuntimeStore(path)), SQLiteRuntimeStore(path))
+
+
+
+def test_report_run_compare_and_swap_rejects_stale_service_writer():
+    import pytest
+
+    with TemporaryDirectory() as d:
+        path = str(Path(d) / "runtime.sqlite3")
+        store_a = SQLiteRuntimeStore(path)
+        graph = _graph(store_a)
+        service_a = ReportService(graph, store_a)
+        service_a.register_spec(register_spec("rs", "Concurrent writer"))
+        service_a.create("rr-cas", "rs", "study", ["r"])
+
+        # A second service hydrates the same version before the first writer updates it.
+        store_b = SQLiteRuntimeStore(path)
+        service_b = ReportService(build_registry(store_b), store_b)
+        service_a.add_decision("rr-cas", "decision-a", "QC", "allow", "rule", {}, "first writer")
+
+        with pytest.raises(ValueError, match="snapshot concurrent update conflict"):
+            service_b.add_decision("rr-cas", "decision-b", "QC", "deny", "rule", {}, "stale writer")
+
+        recovered = ReportService(build_registry(SQLiteRuntimeStore(path)), SQLiteRuntimeStore(path))
+        assert "decision-a" in recovered.runs["rr-cas"].decisions
+        assert "decision-b" not in recovered.runs["rr-cas"].decisions

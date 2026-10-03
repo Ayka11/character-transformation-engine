@@ -142,6 +142,7 @@ class ReportService:
         self.store=store
         self.specs={}
         self.runs={}
+        self._run_snapshot_hashes={}
         self._hydrate()
 
     def _hydrate(self):
@@ -166,6 +167,7 @@ class ReportService:
                 v["allowed_language_rule_id"],v["generated_statement"],v["immutable_hash"]) for k,v in p.get("bindings",{}).items()}
             qc={k:ReportQC(v["report_qc_id"],v["report_run_id"],v["check_code"],v["status"],
                 v["observed"],v.get("expected"),v["message"],v["immutable_hash"]) for k,v in p.get("qc",{}).items()}
+            self._run_snapshot_hashes[p["report_run_id"]]=snap.payload_hash
             self.runs[p["report_run_id"]]=ReportRun(
                 p["report_run_id"],p["report_spec_id"],p["study_id"],p["source_manifest_hash"],
                 p["report_input_hash"],p.get("status","REGISTERED"),tuple(p.get("source_artifacts",())),
@@ -267,7 +269,11 @@ class ReportService:
             } for k,v in run.qc.items()},
             "report_output_hash":run.report_output_hash,"report_output_hash_version":run.report_output_hash_version,
             "superseded_by":run.superseded_by,"execution_id":run.execution_id}
-        self.store.put_snapshot("report.run",run.report_run_id,payload,"1.6")
+        snapshot=self.store.put_snapshot_if_hash(
+            "report.run",run.report_run_id,payload,"1.6",
+            expected_hash=self._run_snapshot_hashes.get(run.report_run_id)
+        )
+        self._run_snapshot_hashes[run.report_run_id]=snapshot.payload_hash
 
 
     def register_spec(self,spec:ReportSpec)->ReportSpec:
