@@ -1287,3 +1287,5 @@ def test_graph_node_metadata_is_detached_from_caller_after_registration():
 
         restored = build_registry(SQLiteRuntimeStore(path))
         assert restored.nodes["detached-metadata"].metadata == expected
+        with pytest.raises(TypeError, match="registered graph metadata is immutable"):
+            restored.nodes["detached-metadata"].metadata["nested"]["values"].append(6)
