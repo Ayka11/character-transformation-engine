@@ -4,7 +4,7 @@ from dataclasses import asdict
 from fastapi import HTTPException
 from pydantic import BaseModel, Field
 from .reporting import ReportService, register_spec
-from .persistence import SQLiteRuntimeStore
+from .persistence import SQLiteRuntimeStore, SnapshotConflictError
 from .evidence_graph import register_node, register_edge
 
 class ReportSpecInput(BaseModel):
@@ -62,6 +62,8 @@ def install_reporting_api(app, graph_registry, store:SQLiteRuntimeStore|None=Non
     def create_report(p:ReportCreateInput):
         try:
             return asdict(service.create(p.report_run_id,p.report_spec_id,p.study_id,p.source_artifacts,p.execution_id))
+        except SnapshotConflictError as e:
+            raise HTTPException(409,str(e))
         except ValueError as e:
             raise HTTPException(400,str(e))
 
@@ -71,6 +73,8 @@ def install_reporting_api(app, graph_registry, store:SQLiteRuntimeStore|None=Non
             sec=service.add_section(report_id,p.section_code,p.content,p.source_artifacts,p.ordinal,
                                     p.derivation_rule_id,p.derivation_rule_version,p.evidence_status,p.limitations)
             return asdict(sec)
+        except SnapshotConflictError as e:
+            raise HTTPException(409,str(e))
         except ValueError as e:
             raise HTTPException(400,str(e))
 
@@ -78,6 +82,8 @@ def install_reporting_api(app, graph_registry, store:SQLiteRuntimeStore|None=Non
     def bind_claim(report_id:str,p:ReportClaimInput):
         try:
             return asdict(service.bind_claim(report_id,p.claim_id,p.allowed_claim_status))
+        except SnapshotConflictError as e:
+            raise HTTPException(409,str(e))
         except ValueError as e:
             raise HTTPException(400,str(e))
 
@@ -85,6 +91,8 @@ def install_reporting_api(app, graph_registry, store:SQLiteRuntimeStore|None=Non
     def add_decision(report_id:str,p:ReportDecisionInput):
         try:
             return service.add_decision(report_id,p.decision_id,p.decision_type,p.decision,p.rule_id,p.inputs,p.rationale)
+        except SnapshotConflictError as e:
+            raise HTTPException(409,str(e))
         except ValueError as e:
             raise HTTPException(400,str(e))
 
@@ -92,6 +100,8 @@ def install_reporting_api(app, graph_registry, store:SQLiteRuntimeStore|None=Non
     def report_qc(report_id:str):
         try:
             return service.qc_run(report_id)
+        except SnapshotConflictError as e:
+            raise HTTPException(409,str(e))
         except ValueError as e:
             raise HTTPException(400,str(e))
 
@@ -128,6 +138,8 @@ def install_reporting_api(app, graph_registry, store:SQLiteRuntimeStore|None=Non
                     rationale="published V1.6 report source artifact",
                 ))
             return {"report":asdict(run),"graph_node":asdict(report_node)}
+        except SnapshotConflictError as e:
+            raise HTTPException(409,str(e))
         except ValueError as e:
             raise HTTPException(400,str(e))
 
@@ -135,6 +147,8 @@ def install_reporting_api(app, graph_registry, store:SQLiteRuntimeStore|None=Non
     def supersede_report(report_id:str,p:ReportSupersedeInput):
         try:
             return asdict(service.supersede(report_id,p.new_report_id))
+        except SnapshotConflictError as e:
+            raise HTTPException(409,str(e))
         except ValueError as e:
             raise HTTPException(400,str(e))
 
