@@ -108,7 +108,29 @@ class TransformationRecoveryService:
         before = self.snapshots.get(attempt.before_snapshot_id)
         if after is None:
             if before is None:
-                raise ValueError("recovery requires durable before snapshot")
+                result = TransformationResult.failed(
+                    "INTERVENTION_OUTCOME_UNKNOWN",
+                    {"recovery_status":"OUTCOME_UNKNOWN","rerun_forbidden":True},
+                    before_snapshot_id=attempt.before_snapshot_id,
+                )
+                execution = SimpleNamespace(
+                    execution_id=attempt.execution_id,
+                    before_snapshot_id=attempt.before_snapshot_id,
+                    after_snapshot_id=None,
+                    result=result,
+                    certificate=None,
+                )
+                entry = TransformationLedgerEntry.from_execution(
+                    execution, attempt.character_id, contract, request_hash=attempt.request_hash)
+                self.ledger.append(entry)
+                recovered = JournalAttempt(**{**attempt.__dict__,"status":"RECOVERED"})
+                self.journal.record(
+                    recovered, "RECOVERED",
+                    recovered_status=result.status,
+                    ledger_id=entry.ledger_id,
+                    rerun_forbidden=True,
+                )
+                return recovered
             result = TransformationResult.failed(
                 "INTERVENTION_OUTCOME_UNKNOWN",
                 {"recovery_status":"OUTCOME_UNKNOWN","rerun_forbidden":True},
