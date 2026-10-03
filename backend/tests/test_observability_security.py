@@ -73,3 +73,21 @@ def test_observability_audit_event_is_written(monkeypatch):
     client=TestClient(app)
     response=client.get("/health")
     assert response.status_code==200
+
+
+def test_production_fails_closed_when_no_api_keys_are_configured(monkeypatch):
+    monkeypatch.setenv("CTE_ENV", "production")
+    monkeypatch.delenv("CTE_API_KEY", raising=False)
+    monkeypatch.delenv("CTE_READ_API_KEY", raising=False)
+    monkeypatch.delenv("CTE_WRITE_API_KEY", raising=False)
+    response = TestClient(app).get("/matrix")
+    assert response.status_code == 401
+
+
+def test_development_without_api_keys_remains_available(monkeypatch):
+    monkeypatch.setenv("CTE_ENV", "development")
+    monkeypatch.delenv("CTE_API_KEY", raising=False)
+    monkeypatch.delenv("CTE_READ_API_KEY", raising=False)
+    monkeypatch.delenv("CTE_WRITE_API_KEY", raising=False)
+    response = TestClient(app).get("/matrix")
+    assert response.status_code == 200

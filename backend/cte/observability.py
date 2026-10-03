@@ -80,6 +80,10 @@ class SecurityObservabilityMiddleware(BaseHTTPMiddleware):
         fallback = os.getenv("CTE_API_KEY")
 
         if not any((read_key, write_key, fallback)):
+            # Local development remains frictionless, but production must never
+            # silently downgrade to unauthenticated access because secrets are absent.
+            if os.getenv("CTE_ENV", "development").strip().lower() in {"prod", "production"}:
+                return False, None
             return True, None
 
         if fallback:
