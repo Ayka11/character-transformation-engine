@@ -149,7 +149,7 @@ class GraphRegistry:
                     raise ValueError(
                         f"evidence graph contradiction rule invalid: {item.contradiction_set_id}"
                     )
-                if item.resolution_status not in {
+                if not isinstance(item.resolution_status, str) or item.resolution_status not in {
                     "OPEN", "EXPLAINED", "UNRESOLVED", "RESOLVED_BY_NEW_EVIDENCE"
                 }:
                     raise ValueError(
