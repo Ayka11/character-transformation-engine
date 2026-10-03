@@ -368,7 +368,10 @@ class GraphRegistry:
         transformation_ids = {
             node.node_id for node in self.nodes.values()
             if node.node_type == "TRANSFORMATION"
-            and node.metadata.get("execution_id") == execution_id
+            and (
+                node.metadata.get("execution_id") == execution_id
+                or node.entity_id == execution_id
+            )
         }
         if not transformation_ids:
             raise ValueError("RESULT requires TRANSFORMATION lineage")
