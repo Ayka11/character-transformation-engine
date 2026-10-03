@@ -521,3 +521,45 @@ def test_graph_recovery_repairs_missing_rule_audit_events():
         assert any(event.claim_id == claim.node_id
                    and event.operation == "CONTRADICTION_SET_REGISTERED"
                    for event in recovered.claim_audit(claim.node_id))
+
+
+
+def test_graph_recovery_recreates_missing_contradiction_edges_after_restart(monkeypatch):
+    with TemporaryDirectory() as d:
+        path = str(Path(d) / "runtime.sqlite3")
+        store = SQLiteRuntimeStore(path)
+        graph = build_registry(store)
+        claim = register_node("recover-contradiction-claim", "CLAIM", "claim", "DRV", "1", {})
+        evidence = register_node("recover-contradiction-evidence", "DATASET", "evidence", "DRV", "1", {})
+        graph.add_node(claim)
+        graph.add_node(evidence)
+
+        original_add_edge = graph.add_edge
+
+        def fail_contradiction_edge_once(edge):
+            if edge.edge_type == "CONTRADICTS":
+                raise OSError("simulated interruption before contradiction edge write")
+            return original_add_edge(edge)
+
+        monkeypatch.setattr(graph, "add_edge", fail_contradiction_edge_once)
+        try:
+            graph.register_contradiction_set(
+                "recover-contradiction-set", claim.node_id, [evidence.node_id], "CONFLICT",
+            )
+        except OSError as exc:
+            assert "contradiction edge write" in str(exc)
+        else:
+            raise AssertionError("contradiction edge creation should fail")
+
+        edge_id = "recover-contradiction-set:contradicts:recover-contradiction-evidence:recover-contradiction-claim"
+        assert store.get_snapshot("graph.contradiction", "recover-contradiction-set") is not None
+        assert store.get_snapshot("graph.edge", edge_id) is None
+
+        recovered = build_registry(SQLiteRuntimeStore(path))
+        events = SQLiteRuntimeStore(path).list_events("graph")
+        assert edge_id in recovered.edges
+        assert SQLiteRuntimeStore(path).get_snapshot("graph.edge", edge_id) is not None
+        assert len([event for event in events
+                    if event["event_type"] == "EDGE_REGISTERED"
+                    and event["payload"].get("edge_id") == edge_id]) == 1
+        assert len([event for event in recovered.audit_events if event.edge_id == edge_id]) == 1

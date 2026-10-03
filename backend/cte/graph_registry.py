@@ -127,6 +127,21 @@ class GraphRegistry:
                     raise ValueError(
                         f"evidence graph inference integrity failure: {item.inference_block_id}"
                     )
+            # Contradiction sets imply one CONTRADICTS edge per referenced node.
+            # Recreate missing edges on startup so a crash between the rule
+            # snapshot and edge writes cannot leave a permanently partial graph.
+            for item in registry.contradiction_sets.values():
+                claim = registry.nodes.get(item.claim_id)
+                if claim is None or claim.node_type != "CLAIM":
+                    continue
+                for node_id in item.node_ids:
+                    node = registry.nodes.get(node_id)
+                    if node is None:
+                        continue
+                    registry.add_edge(register_edge(
+                        f"{item.contradiction_set_id}:contradicts:{node_id}:{item.claim_id}",
+                        node, claim, "CONTRADICTS", rationale=item.contradiction_type,
+                    ))
             # Reconcile deterministic audit events from validated snapshots before
             # loading the event stream. A process may have crashed after writing a
             # snapshot but before appending its corresponding event; restart must
@@ -169,6 +184,10 @@ class GraphRegistry:
                      "payload_hash": item.immutable_hash},
                     provenance_record_id="1.4",
                 )
+            # Edge replay above may have populated the in-memory audit list;
+            # rebuild it from the reconciled durable event stream to avoid
+            # duplicate in-memory entries.
+            registry.audit_events.clear()
             for event in store.list_events("graph"):
                 payload = event["payload"]
                 registry.audit_events.append(GraphAuditEvent(
