@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from typing import Callable, Any
 from .contracts.state import StateSnapshot, StateDiffEngine
 from .contracts.transformation import TransformationContract, TransformationResult, TransformationCertificate, validate_transition
+from .contracts.errors import CTEErrorCode
 from .state_snapshot_store import StateSnapshotStore
 from .transformation_ledger import TransformationLedger, TransformationLedgerEntry
 from .transformation_recovery import TransformationJournal, JournalAttempt
@@ -85,7 +86,7 @@ class TransformationExecutor:
                                      allowed=set(contract.allowed_changes),forbidden=set(contract.forbidden_changes))
         result=validate_transition(contract,diff,before_snapshot_id=before.snapshot_id,after_snapshot_id=after.snapshot_id,before_state=before.state,after_state=after.state)
 
-        if result.status=="FAILED" and diff.state_changed:
+        if result.status=="FAILED" and diff.state_changed and result.failure_code != CTEErrorCode.UNEXPECTED_CHANGE.value:
             if contract.rollback is not None:
                 try:
                     restored_state=contract.rollback(dict(after_state),dict(state))
