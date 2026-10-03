@@ -915,3 +915,39 @@ def test_graph_recovery_repairs_missing_inference_audit_event_after_restart(monk
             event for event in recovered.audit_events
             if event.inference_block_id == "restart-inference-block"
         ]) == 1
+
+
+def test_graph_recovery_rejects_orphaned_audit_event():
+    import pytest
+
+    with TemporaryDirectory() as d:
+        path = str(Path(d) / "runtime.sqlite3")
+        store = SQLiteRuntimeStore(path)
+        store.append_event(
+            "graph:node:missing-node", "graph", "NODE_REGISTERED",
+            {"node_id": "missing-node", "payload_hash": "not-backed-by-a-snapshot", "claim_id": None},
+            provenance_record_id="1",
+        )
+
+        with pytest.raises(ValueError, match="orphan graph audit event: graph:node:missing-node"):
+            build_registry(SQLiteRuntimeStore(path))
+
+
+def test_graph_recovery_rejects_audit_event_type_mismatch():
+    import pytest
+
+    with TemporaryDirectory() as d:
+        path = str(Path(d) / "runtime.sqlite3")
+        store = SQLiteRuntimeStore(path)
+        graph = build_registry(store)
+        graph.add_node(register_node("event-type-node", "DATASET", "entity", "DRV", "1", {}))
+
+        with store._connect() as conn:
+            conn.execute(
+                "UPDATE runtime_events SET event_type=? WHERE event_id=?",
+                ("EDGE_REGISTERED", "graph:node:event-type-node"),
+            )
+            conn.commit()
+
+        with pytest.raises(ValueError, match="graph audit event type mismatch: graph:node:event-type-node"):
+            build_registry(SQLiteRuntimeStore(path))
