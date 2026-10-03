@@ -86,8 +86,12 @@ class TransformationExecutor:
                                      allowed=set(contract.allowed_changes),forbidden=set(contract.forbidden_changes))
         result=validate_transition(contract,diff,before_snapshot_id=before.snapshot_id,after_snapshot_id=after.snapshot_id,before_state=before.state,after_state=after.state)
 
-        if result.status=="FAILED" and diff.state_changed and result.failure_code != CTEErrorCode.UNEXPECTED_CHANGE.value:
-            if contract.rollback is not None:
+        if result.status=="FAILED" and diff.state_changed:
+            # Forbidden changes remain hard FAILED; unplanned changes without
+            # rollback are retained as PARTIAL state for recovery/audit.
+            if diff.forbidden:
+                pass
+            elif contract.rollback is not None:
                 try:
                     restored_state=contract.rollback(dict(after_state),dict(state))
                     restored=StateSnapshot.capture(f"{execution_id}:rollback:{sequence}",character_id,sequence+2,
