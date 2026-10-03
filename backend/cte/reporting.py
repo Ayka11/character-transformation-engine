@@ -192,6 +192,8 @@ class ReportService:
             return
         for snap in self.store.list_snapshots("report.spec"):
             p=snap.payload
+            if snap.key != p.get("report_spec_id") or snap.version != p.get("version"):
+                raise ValueError(f"report snapshot integrity failure: report.spec/{snap.key} envelope mismatch")
             if content_hash(p) != snap.payload_hash:
                 raise ValueError(f"report snapshot integrity failure: {snap.namespace}/{snap.key}")
             sections = tuple(p["section_order"])
@@ -207,6 +209,8 @@ class ReportService:
                 rendering_rules,language_rules,p["immutable_hash"])
         for snap in self.store.list_snapshots("report.run"):
             p=snap.payload
+            if snap.key != p.get("report_run_id") or snap.version != "1.6":
+                raise ValueError(f"report snapshot integrity failure: report.run/{snap.key} envelope mismatch")
             if content_hash(p) != snap.payload_hash:
                 raise ValueError(f"report snapshot integrity failure: {snap.namespace}/{snap.key}")
             sections={k:ReportSection(v["report_section_id"],v["report_run_id"],v["section_code"],v["ordinal"],
