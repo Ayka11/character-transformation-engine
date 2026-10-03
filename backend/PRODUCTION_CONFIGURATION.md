@@ -18,6 +18,8 @@ Do not commit credentials, DSNs containing passwords, or API keys to the reposit
 
 When any normal API key is configured, GET/HEAD/OPTIONS require a read or write key and mutating requests require the write key.
 
+Set `CTE_ENV=production` (or `prod`) in production deployments. In this mode, if all of `CTE_API_KEY`, `CTE_READ_API_KEY`, and `CTE_WRITE_API_KEY` are missing, protected routes fail closed with HTTP 401 rather than silently allowing unauthenticated requests. Health/docs/UI allowlisted paths remain public. The default environment is `development`; local development without keys remains supported.
+
 ## Rate limiting
 
 `CTE_RATE_LIMIT_PER_MINUTE` enables the in-process sliding-window limiter. `0` or an absent variable disables the limiter.
