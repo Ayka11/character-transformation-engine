@@ -132,3 +132,68 @@ def test_result_lineage_fails_closed_when_dataset_node_is_missing():
     with pytest.raises(ValueError, match="ANALYSIS lineage references missing source node"):
         graph.require_lineage_for_result("lineage-result")
 
+
+
+
+def test_node_replay_repairs_audit_event_after_partial_write(monkeypatch):
+    with TemporaryDirectory() as d:
+        store = SQLiteRuntimeStore(str(Path(d) / "runtime.sqlite3"))
+        graph = build_registry(store)
+        node = register_node("retry-node", "DATASET", "entity", "DRV", "1", {})
+        original = store.append_event
+        failed = {"once": False}
+
+        def fail_once(*args, **kwargs):
+            if not failed["once"]:
+                failed["once"] = True
+                raise OSError("simulated audit event failure")
+            return original(*args, **kwargs)
+
+        monkeypatch.setattr(store, "append_event", fail_once)
+        try:
+            graph.add_node(node)
+        except OSError:
+            pass
+        else:
+            raise AssertionError("first audit append should fail")
+
+        assert store.list_events("graph") == []
+        graph.add_node(node)
+        events = store.list_events("graph")
+        assert len([e for e in events if e["event_type"] == "NODE_REGISTERED"]) == 1
+        assert len([e for e in graph.audit_events if e.node_id == "retry-node"]) == 1
+
+
+def test_edge_replay_repairs_audit_event_after_partial_write(monkeypatch):
+    with TemporaryDirectory() as d:
+        store = SQLiteRuntimeStore(str(Path(d) / "runtime.sqlite3"))
+        graph = build_registry(store)
+        source = register_node("retry-source", "ANALYSIS", "source", "DRV", "1", {})
+        target = register_node("retry-target", "RESULT", "target", "DRV", "1", {})
+        graph.add_node(source)
+        graph.add_node(target)
+        edge = register_edge("retry-edge", source, target, "RESULTS_IN")
+        original = store.append_event
+        failed = {"once": False}
+
+        def fail_once(*args, **kwargs):
+            if not failed["once"]:
+                failed["once"] = True
+                raise OSError("simulated audit event failure")
+            return original(*args, **kwargs)
+
+        monkeypatch.setattr(store, "append_event", fail_once)
+        try:
+            graph.add_edge(edge)
+        except OSError:
+            pass
+        else:
+            raise AssertionError("first audit append should fail")
+
+        assert not any(
+            e["event_type"] == "EDGE_REGISTERED" for e in store.list_events("graph")
+        )
+        graph.add_edge(edge)
+        events = store.list_events("graph")
+        assert len([e for e in events if e["event_type"] == "EDGE_REGISTERED"]) == 1
+        assert len([e for e in graph.audit_events if e.edge_id == "retry-edge"]) == 1

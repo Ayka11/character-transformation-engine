@@ -109,6 +109,20 @@ class GraphRegistry:
                 or existing.version != node.version
             ):
                 raise ValueError("immutable node conflict")
+            # A prior write may have persisted the snapshot but failed while
+            # appending its audit event. Replaying the same immutable node
+            # repairs that event idempotently.
+            claim_id = existing.node_id if existing.node_type == "CLAIM" else None
+            if self.store is not None:
+                self.store.append_event(
+                    f"graph:node:{existing.node_id}", "graph", "NODE_REGISTERED",
+                    {"node_id":existing.node_id,"payload_hash":existing.immutable_hash,
+                     "claim_id":claim_id}, provenance_record_id=existing.version,
+                )
+            audit = GraphAuditEvent("NODE_REGISTERED",existing.node_id,None,
+                claim_id,existing.immutable_hash,"runtime")
+            if audit not in self.audit_events:
+                self.audit_events.append(audit)
             return existing
         if self.store is not None:
             self.store.put_snapshot("graph.node",node.node_id,{"node_id":node.node_id,"node_type":node.node_type,"entity_id":node.entity_id,"provenance_class":node.provenance_class,"version":node.version,"immutable_hash":node.immutable_hash,"metadata":node.metadata},node.version)
@@ -130,6 +144,19 @@ class GraphRegistry:
             # record so a replay cannot silently substitute status metadata.
             if existing != edge:
                 raise ValueError("immutable edge conflict")
+            # Repair a missing audit event after a partial prior write.
+            claim_id = existing.to_node_id if self.nodes.get(existing.to_node_id) and self.nodes[existing.to_node_id].node_type == "CLAIM" else (existing.from_node_id if self.nodes.get(existing.from_node_id) and self.nodes[existing.from_node_id].node_type == "CLAIM" else None)
+            if self.store is not None:
+                self.store.append_event(
+                    f"graph:edge:{existing.edge_id}", "graph", "EDGE_REGISTERED",
+                    {"edge_id":existing.edge_id,"payload_hash":existing.input_hash,
+                     "claim_id":claim_id}, input_hash=existing.input_hash,
+                    provenance_record_id="1.4",
+                )
+            audit = GraphAuditEvent("EDGE_REGISTERED",None,existing.edge_id,
+                claim_id,existing.input_hash,"runtime")
+            if audit not in self.audit_events:
+                self.audit_events.append(audit)
             return existing
         if edge.from_node_id not in self.nodes or edge.to_node_id not in self.nodes:
             raise ValueError("edge references unknown node")
