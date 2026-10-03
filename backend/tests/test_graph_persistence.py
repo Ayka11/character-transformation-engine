@@ -951,3 +951,48 @@ def test_graph_recovery_rejects_audit_event_type_mismatch():
 
         with pytest.raises(ValueError, match="graph audit event type mismatch: graph:node:event-type-node"):
             build_registry(SQLiteRuntimeStore(path))
+
+
+def test_contradiction_requirements_reject_missing_evidence_after_recovery():
+    import pytest
+
+    with TemporaryDirectory() as d:
+        path = str(Path(d) / "runtime.sqlite3")
+        store = SQLiteRuntimeStore(path)
+        graph = build_registry(store)
+        claim = register_node(
+            "missing-evidence-claim", "CLAIM", "claim", "DRV", "1",
+            {"state": "HYPOTHESIS"},
+        )
+        evidence = register_node(
+            "missing-evidence-dataset", "DATASET", "dataset", "DRV", "1", {},
+        )
+        graph.add_node(claim)
+        graph.add_node(evidence)
+        graph.register_contradiction_set(
+            "missing-evidence-set", claim.node_id, [evidence.node_id], "CONFLICT",
+        )
+
+        # Simulate loss of the evidence snapshot without leaving an orphan
+        # node event, so this test isolates the contradiction gate invariant.
+        with store._connect() as conn:
+            conn.execute(
+                "DELETE FROM runtime_snapshots WHERE namespace=? AND key=?",
+                ("graph.node", evidence.node_id),
+            )
+            conn.execute(
+                "DELETE FROM runtime_events WHERE event_id=?",
+                (f"graph:node:{evidence.node_id}",),
+            )
+            conn.commit()
+
+        recovered = build_registry(SQLiteRuntimeStore(path))
+        assert any(
+            error == f"contradiction set references missing node: missing-evidence-set:{evidence.node_id}"
+            for error in recovered.integrity_errors
+        )
+        with pytest.raises(
+            ValueError,
+            match=f"contradiction set references missing node: missing-evidence-set:{evidence.node_id}",
+        ):
+            recovered.contradiction_requirements({claim.node_id})
