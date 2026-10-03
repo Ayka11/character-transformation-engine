@@ -51,10 +51,11 @@ class TransformationIntegrityVerifier:
             after=self.snapshots.get(entry.after_snapshot_id)
             if after is None:
                 issues.append("AFTER_SNAPSHOT_MISSING")
-            elif not self.snapshots.verify(after.snapshot_id):
-                issues.append("AFTER_SNAPSHOT_INTEGRITY_FAILED")
-            elif after.state_hash != entry.after_hash:
-                issues.append("AFTER_HASH_MISMATCH")
+            else:
+                if not self.snapshots.verify(after.snapshot_id):
+                    issues.append("AFTER_SNAPSHOT_INTEGRITY_FAILED")
+                if after.state_hash != entry.after_hash:
+                    issues.append("AFTER_HASH_MISMATCH")
         elif entry.status=="VALIDATED":
             issues.append("VALIDATED_WITHOUT_AFTER_SNAPSHOT")
         expected_certificate=entry.status=="VALIDATED"
