@@ -37,3 +37,28 @@ def test_inference_block_prevents_model_output_evidence_transition():
     g.register_inference_block("ib","MODEL_OUTPUT","EVIDENCE_SUPPORTED","model output to evidence","MODEL_OUTPUT_REQUIRES_EVIDENCE","V1.4-BLOCK")
     blocked=g.blocked_by_inference_rules("r","EVIDENCE_SUPPORTED")
     assert any(rule.rule_id=="V1.4-BLOCK" for rule in blocked)
+
+
+def test_indeterminate_claim_with_missing_result_fails_closed():
+    import pytest
+
+    graph = build_registry()
+    with pytest.raises(ValueError, match="RESULT node is not registered"):
+        graph.register_claim(
+            "missing-result-claim",
+            "missing-result",
+            "REGISTERED",
+            "INDETERMINATE",
+            "DRV",
+            {},
+        )
+
+
+def test_indeterminate_requirements_with_non_result_node_fails_closed():
+    import pytest
+
+    graph = build_registry()
+    graph.add_node(register_node("not-a-result", "DATASET", "dataset", "DRV", "1", {}))
+    with pytest.raises(ValueError, match="RESULT node is not registered"):
+        graph.indeterminate_requirements(set(), "not-a-result")
+
