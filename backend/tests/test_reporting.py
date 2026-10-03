@@ -47,3 +47,22 @@ def test_full_report_lifecycle_reaches_immutable_published_state():
         assert "immutable" in str(e)
     else:
         assert False
+
+
+def test_report_qc_fails_closed_when_section_source_node_is_missing():
+    from cte.reporting import SECTION_CODES
+
+    service = _service()
+    service.specs["rs"] = register_spec("rs", "Missing source test")
+    service.create("rr-missing-source", "rs", "study-1", ["r"])
+    for ordinal, code in enumerate(SECTION_CODES):
+        service.add_section("rr-missing-source", code, {"section": code}, ["r"], ordinal)
+
+    # Simulate a damaged/reduced graph after report registration. QC must
+    # report the missing lineage as a blocker instead of raising KeyError.
+    del service.registry.nodes["r"]
+    result = service.qc_run("rr-missing-source")
+
+    assert result["status"] == "QC_FAILED"
+    assert "SOURCE_MANIFEST" in result["blocking_checks"]
+    assert "PROVENANCE" in result["blocking_checks"]
