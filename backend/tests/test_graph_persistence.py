@@ -597,3 +597,66 @@ def test_graph_recovery_rejects_tampered_edge_relation_status_even_with_rehashed
 
         with pytest.raises(ValueError, match="evidence graph edge integrity failure: tamper-status-edge"):
             build_registry(SQLiteRuntimeStore(path))
+
+
+
+def test_graph_recovery_rejects_tampered_node_provenance_even_with_rehashed_snapshot():
+    import json
+    import pytest
+    from cte.provenance import content_hash
+
+    with TemporaryDirectory() as d:
+        path = str(Path(d) / "runtime.sqlite3")
+        store = SQLiteRuntimeStore(path)
+        graph = build_registry(store)
+        graph.add_node(register_node(
+            "tamper-envelope-node", "DATASET", "entity", "DRV", "1", {"x": 1},
+        ))
+
+        with store._connect() as conn:
+            row = conn.execute(
+                "SELECT payload_json FROM runtime_snapshots WHERE namespace=? AND key=?",
+                ("graph.node", "tamper-envelope-node"),
+            ).fetchone()
+            payload = json.loads(row[0])
+            payload["provenance_class"] = "OBS"
+            payload_json = json.dumps(payload, sort_keys=True, separators=(",", ":"))
+            conn.execute(
+                "UPDATE runtime_snapshots SET payload_json=?, payload_hash=? WHERE namespace=? AND key=?",
+                (payload_json, content_hash(payload), "graph.node", "tamper-envelope-node"),
+            )
+            conn.commit()
+
+        with pytest.raises(ValueError, match="evidence graph node envelope integrity failure: tamper-envelope-node"):
+            build_registry(SQLiteRuntimeStore(path))
+
+
+def test_graph_recovery_accepts_legacy_node_snapshot_without_envelope_hash():
+    import json
+    from cte.provenance import content_hash
+
+    with TemporaryDirectory() as d:
+        path = str(Path(d) / "runtime.sqlite3")
+        store = SQLiteRuntimeStore(path)
+        graph = build_registry(store)
+        graph.add_node(register_node(
+            "legacy-envelope-node", "DATASET", "entity", "DRV", "1", {"x": 1},
+        ))
+
+        with store._connect() as conn:
+            row = conn.execute(
+                "SELECT payload_json FROM runtime_snapshots WHERE namespace=? AND key=?",
+                ("graph.node", "legacy-envelope-node"),
+            ).fetchone()
+            payload = json.loads(row[0])
+            payload.pop("envelope_hash", None)
+            payload_json = json.dumps(payload, sort_keys=True, separators=(",", ":"))
+            conn.execute(
+                "UPDATE runtime_snapshots SET payload_json=?, payload_hash=? WHERE namespace=? AND key=?",
+                (payload_json, content_hash(payload), "graph.node", "legacy-envelope-node"),
+            )
+            conn.commit()
+
+        recovered = build_registry(SQLiteRuntimeStore(path))
+        assert "legacy-envelope-node" in recovered.nodes
+        assert recovered.nodes["legacy-envelope-node"].envelope_hash is None
