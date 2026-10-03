@@ -458,9 +458,23 @@ class GraphRegistry:
         return item
 
     def contradiction_requirements(self, claim_ids: set[str]) -> set[str]:
-        return {"unresolved_material_contradiction"} if any(
-            s.claim_id in claim_ids and s.resolution_status in {"OPEN","UNRESOLVED"}
-            for s in self.contradiction_sets.values()) else set()
+        requirements: set[str] = set()
+        for item in self.contradiction_sets.values():
+            if item.claim_id not in claim_ids:
+                continue
+            # A contradiction cannot justify a terminal claim transition if
+            # any of its referenced evidence disappeared during recovery.
+            # Recovery preserves a degraded graph for diagnostics, so enforce
+            # this invariant again at the claim gate.
+            for node_id in item.node_ids:
+                if node_id not in self.nodes:
+                    raise ValueError(
+                        f"contradiction set references missing node: "
+                        f"{item.contradiction_set_id}:{node_id}"
+                    )
+            if item.resolution_status in {"OPEN", "UNRESOLVED"}:
+                requirements.add("unresolved_material_contradiction")
+        return requirements
 
     def claim_subgraph(self, claim_id: str) -> tuple[list[GraphNode], list[GraphEdge]]:
         claim=self.nodes.get(claim_id)
