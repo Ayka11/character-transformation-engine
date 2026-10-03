@@ -660,3 +660,42 @@ def test_graph_recovery_accepts_legacy_node_snapshot_without_envelope_hash():
         recovered = build_registry(SQLiteRuntimeStore(path))
         assert "legacy-envelope-node" in recovered.nodes
         assert recovered.nodes["legacy-envelope-node"].envelope_hash is None
+
+
+
+def test_add_node_rejects_forged_envelope_before_persistence():
+    from dataclasses import replace
+    import pytest
+
+    with TemporaryDirectory() as d:
+        store = SQLiteRuntimeStore(str(Path(d) / "runtime.sqlite3"))
+        graph = build_registry(store)
+        original = register_node("forged-envelope-node", "DATASET", "entity", "DRV", "1", {})
+        forged = replace(original, provenance_class="OBS")
+
+        with pytest.raises(ValueError, match="immutable node conflict"):
+            graph.add_node(forged)
+
+        assert "forged-envelope-node" not in graph.nodes
+        assert store.get_snapshot("graph.node", "forged-envelope-node") is None
+
+
+def test_add_edge_rejects_noncanonical_status_before_persistence():
+    from dataclasses import replace
+    import pytest
+
+    with TemporaryDirectory() as d:
+        store = SQLiteRuntimeStore(str(Path(d) / "runtime.sqlite3"))
+        graph = build_registry(store)
+        source = register_node("forged-edge-source", "ANALYSIS", "source", "DRV", "1", {})
+        target = register_node("forged-edge-target", "RESULT", "target", "DRV", "1", {})
+        graph.add_node(source)
+        graph.add_node(target)
+        original = register_edge("forged-edge", source, target, "RESULTS_IN")
+        forged = replace(original, relation_status="RETRACTED")
+
+        with pytest.raises(ValueError, match="immutable edge conflict"):
+            graph.add_edge(forged)
+
+        assert "forged-edge" not in graph.edges
+        assert store.get_snapshot("graph.edge", "forged-edge") is None
