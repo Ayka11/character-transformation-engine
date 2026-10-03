@@ -29,3 +29,53 @@ def test_claim_audit_records_node_and_edge_events():
     events=g.claim_audit("c1")
     assert any(e.operation=="NODE_REGISTERED" and e.node_id=="c1" for e in events)
     assert any(e.operation=="EDGE_REGISTERED" and e.edge_id=="c1:supports:r" for e in events)
+
+
+def test_claim_subgraph_and_upstream_nodes_have_canonical_order():
+    def make_graph(node_order, edge_order):
+        g = build_registry()
+        definitions = {
+            "dataset-z": register_node("dataset-z", "DATASET", "dataset-z", "DRV", "1", {}),
+            "analysis": register_node("analysis", "ANALYSIS", "analysis", "DRV", "1", {}),
+            "result": register_node("result", "RESULT", "result", "DRV", "1", {}),
+            "dataset-a": register_node("dataset-a", "DATASET", "dataset-a", "DRV", "1", {}),
+            "claim": register_node("claim", "CLAIM", "claim", "DRV", "1", {}),
+        }
+        for node_id in node_order:
+            g.add_node(definitions[node_id])
+        edges = {
+            "z-dataset": register_edge(
+                "z-dataset", definitions["analysis"], definitions["dataset-z"], "ANALYZED_FROM",
+            ),
+            "a-dataset": register_edge(
+                "a-dataset", definitions["analysis"], definitions["dataset-a"], "ANALYZED_FROM",
+            ),
+            "analysis-result": register_edge(
+                "analysis-result", definitions["analysis"], definitions["result"], "RESULTS_IN",
+            ),
+            "result-claim": register_edge(
+                "result-claim", definitions["result"], definitions["claim"], "SUPPORTS",
+            ),
+        }
+        for edge_id in edge_order:
+            g.add_edge(edges[edge_id])
+        return g
+
+    first = make_graph(
+        ["dataset-z", "analysis", "result", "dataset-a", "claim"],
+        ["z-dataset", "analysis-result", "result-claim", "a-dataset"],
+    )
+    second = make_graph(
+        ["claim", "dataset-a", "result", "analysis", "dataset-z"],
+        ["a-dataset", "result-claim", "analysis-result", "z-dataset"],
+    )
+
+    expected_nodes = ["analysis", "claim", "dataset-a", "dataset-z", "result"]
+    expected_edges = ["a-dataset", "analysis-result", "result-claim", "z-dataset"]
+    for graph in (first, second):
+        nodes, edges = graph.claim_subgraph("claim")
+        assert [node.node_id for node in nodes] == expected_nodes
+        assert [edge.edge_id for edge in edges] == expected_edges
+        assert [node.node_id for node in graph._upstream_nodes("result")] == [
+            "analysis", "dataset-a", "dataset-z",
+        ]

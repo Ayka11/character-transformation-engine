@@ -489,8 +489,11 @@ class GraphRegistry:
                     continue
                 seen.add(node_id)
                 queue.append(node_id)
-        nodes=[self.nodes[nid] for nid in seen]
-        edges=[e for e in self.edges.values() if e.from_node_id in seen and e.to_node_id in seen]
+        nodes=[self.nodes[nid] for nid in sorted(seen)]
+        edges=sorted(
+            (e for e in self.edges.values() if e.from_node_id in seen and e.to_node_id in seen),
+            key=lambda edge: edge.edge_id,
+        )
         return nodes,edges
 
     def claim_audit(self, claim_id: str) -> list[GraphAuditEvent]:
@@ -522,7 +525,9 @@ class GraphRegistry:
             # the current node in the lineage graph.
             if edge.from_node_id == current and edge.edge_type in {"ANALYZED_FROM","USES_PROTOCOL","DERIVED_FROM"} and edge.to_node_id != current:
                 neighbors.append(edge.to_node_id)
-        return neighbors
+        # Edge insertion order can differ between live execution and recovery.
+        # Canonicalize traversal so downstream lists and diagnostics are stable.
+        return sorted(set(neighbors))
 
     def claim_upstream_types(self, result_id: str) -> set[str]:
         """Return lineage types reachable from a RESULT using typed edge semantics."""
@@ -556,7 +561,7 @@ class GraphRegistry:
                 seen.add(node_id)
                 found.append(node)
                 frontier.append(node_id)
-        return found
+        return sorted(found, key=lambda node: node.node_id)
 
     def claim_requirements(self, result_id: str, claim_ids: set[str] | None = None) -> set[str]:
         """Derive V1.4 transition prerequisites from registered graph metadata/lineage."""
