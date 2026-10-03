@@ -402,6 +402,10 @@ class ReportService:
         if run is None: raise ValueError("report run is not registered")
         if run.status in {"PUBLISHED","SUPERSEDED"}: raise ValueError("immutable report cannot be modified")
         if section_code not in SECTION_CODES: raise ValueError("unsupported report section")
+        if type(ordinal) is not int or ordinal < 0:
+            raise ValueError("report section ordinal must be a non-negative integer")
+        if any(section.ordinal == ordinal for section in run.sections.values()):
+            raise ValueError("report section ordinal already registered")
         if evidence_status not in ALLOWED_EVIDENCE_STATUS: raise ValueError("unsupported evidence status")
         for artifact_id in source_artifacts:
             if artifact_id not in self.registry.nodes: raise ValueError(f"source artifact is not registered: {artifact_id}")
