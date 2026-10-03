@@ -198,3 +198,31 @@ def test_factorial_scenario_generator_rejects_explosion(tmp_path):
         assert "max is 8" in str(e)
     else:
         assert False
+
+
+def test_scenario_comparison_is_descriptive_only(tmp_path):
+    lab=make_lab(tmp_path)
+    matrix=lab.register_matrix(
+        matrix_id="m1",study_id="study-root",name="Compare Matrix",
+        primary_outcome="value",design={"type":"scenario_matrix"}
+    )
+    lab.register_scenario(
+        scenario_id="s1",matrix_id="m1",name="Baseline",
+        description="Baseline",conditions={"dose":0},
+        expected_outcomes=["value"]
+    )
+    lab.register_scenario(
+        scenario_id="s2",matrix_id="m1",name="Higher",
+        description="Higher",conditions={"dose":1},
+        expected_outcomes=["value"]
+    )
+    lab.run_scenario(matrix_id="m1",scenario_id="s1",
+                     payload=e2e_payload("m1-s1-run"))
+    payload2=e2e_payload("m1-s2-run")
+    payload2["trial"]["outcome"]={"value":8.0}
+    lab.run_scenario(matrix_id="m1",scenario_id="s2",
+                     payload=payload2)
+    comparison=lab.scenario_comparison("m1")
+    assert comparison["reference_scenario_id"]=="s1"
+    assert comparison["scenarios"][1]["difference_from_reference"]==1.0
+    assert comparison["scientific_status"]=="DESCRIPTIVE_ONLY_MODEL_DERIVED_RUNTIME"
