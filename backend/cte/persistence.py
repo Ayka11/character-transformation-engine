@@ -11,6 +11,10 @@ from dataclasses import dataclass
 from pathlib import Path
 from .provenance import content_hash, json_safe
 
+class SnapshotConflictError(ValueError):
+    """Raised when a snapshot write is based on a stale persisted version."""
+
+
 MUTABLE_SNAPSHOT_NAMESPACES = {"orchestrator.execution", "intervention.assignment", "report.run", "research.study", "research.experiment", "research.participant", "research.assignment", "research.analysis", "science_lab.matrix", "science_lab.run", "integration.mutable"}
 
 @dataclass(frozen=True)
@@ -133,7 +137,7 @@ class SQLiteRuntimeStore:
                         (namespace, key, version, payload_json, payload_hash),
                     )
                 except sqlite3.IntegrityError as exc:
-                    raise ValueError("snapshot concurrent update conflict") from exc
+                    raise SnapshotConflictError("snapshot concurrent update conflict") from exc
             else:
                 cursor = conn.execute(
                     """UPDATE runtime_snapshots
@@ -142,7 +146,7 @@ class SQLiteRuntimeStore:
                     (version, payload_json, payload_hash, namespace, key, expected_hash),
                 )
                 if cursor.rowcount != 1:
-                    raise ValueError("snapshot concurrent update conflict")
+                    raise SnapshotConflictError("snapshot concurrent update conflict")
             conn.commit()
         return Snapshot(namespace, key, version, payload, payload_hash)
 
