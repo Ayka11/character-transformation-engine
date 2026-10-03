@@ -41,7 +41,7 @@ def test_certificate_exists_only_for_validated_transition():
 def test_intervention_exception_is_auditable_failure_without_certificate():
     ss=StateSnapshotStore(SQLiteRuntimeStore(":memory:"))
     runtime=TransformationExecutor(ss)
-    out=runtime.execute("e4","c1",4,{"tempo":5},
+    out=runtime.execute("e4","c1",1,{"tempo":5},
         TransformationContract("t1","1",expected_changes={"tempo":6}),
         lambda state: (_ for _ in ()).throw(RuntimeError("boom")))
     assert out.result.status=="FAILED"
