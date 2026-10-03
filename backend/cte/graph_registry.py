@@ -89,6 +89,32 @@ class GraphRegistry:
                 })
                 if canonical_hash != edge.input_hash:
                     raise ValueError(f"evidence graph edge integrity failure: {edge.edge_id}")
+            # Reconcile deterministic audit events from validated snapshots before
+            # loading the event stream. A process may have crashed after writing a
+            # snapshot but before appending its corresponding event; restart must
+            # repair that gap without requiring a caller to replay each object.
+            for node in registry.nodes.values():
+                claim_id = node.node_id if node.node_type == "CLAIM" else None
+                store.append_event(
+                    f"graph:node:{node.node_id}", "graph", "NODE_REGISTERED",
+                    {"node_id": node.node_id, "payload_hash": node.immutable_hash,
+                     "claim_id": claim_id},
+                    provenance_record_id=node.version,
+                )
+            for edge in registry.edges.values():
+                if edge.from_node_id not in registry.nodes or edge.to_node_id not in registry.nodes:
+                    continue
+                claim_id = (
+                    edge.to_node_id if registry.nodes[edge.to_node_id].node_type == "CLAIM"
+                    else edge.from_node_id if registry.nodes[edge.from_node_id].node_type == "CLAIM"
+                    else None
+                )
+                store.append_event(
+                    f"graph:edge:{edge.edge_id}", "graph", "EDGE_REGISTERED",
+                    {"edge_id": edge.edge_id, "payload_hash": edge.input_hash,
+                     "claim_id": claim_id},
+                    input_hash=edge.input_hash, provenance_record_id="1.4",
+                )
             for event in store.list_events("graph"):
                 registry.audit_events.append(GraphAuditEvent(
                     event["event_type"],event["payload"].get("node_id"),event["payload"].get("edge_id"),
