@@ -597,5 +597,5 @@ def test_recovery_rejects_report_children_owned_by_another_run():
                 )
                 conn.commit()
 
-            with pytest.raises(ValueError, match=error_fragment.replace("/", r"\/")):
+            with pytest.raises(ValueError, match=error_fragment):
                 ReportService(build_registry(SQLiteRuntimeStore(path)), SQLiteRuntimeStore(path))
