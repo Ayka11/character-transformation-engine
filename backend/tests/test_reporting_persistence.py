@@ -124,3 +124,27 @@ def test_publish_rechecks_qc_after_claim_graph_changes():
         assert service.runs["rr-stale-qc"].status == "QC_FAILED"
         assert "CLAIM_BINDINGS" in service.runs["rr-stale-qc"].qc
         assert service.runs["rr-stale-qc"].report_output_hash is None
+
+
+def test_supersede_rejects_unpublished_successor():
+    import pytest
+
+    with TemporaryDirectory() as d:
+        path = str(Path(d) / "runtime.sqlite3")
+        store = SQLiteRuntimeStore(path)
+        graph = _graph(store)
+        service = ReportService(graph, store)
+        service.register_spec(register_spec("rs", "Supersede"))
+        service.create("rr-old", "rs", "study", ["r"])
+        for ordinal, code in enumerate(SECTION_CODES):
+            service.add_section("rr-old", code, {"section": code}, ["r"], ordinal)
+        service.bind_claim("rr-old", "c")
+        assert service.qc_run("rr-old")["status"] == "QC_PASSED"
+        service.publish("rr-old")
+
+        service.create("rr-new-draft", "rs", "study", ["r"])
+        with pytest.raises(ValueError, match="only be superseded by a published report"):
+            service.supersede("rr-old", "rr-new-draft")
+
+        assert service.runs["rr-old"].status == "PUBLISHED"
+        assert service.runs["rr-old"].superseded_by is None
