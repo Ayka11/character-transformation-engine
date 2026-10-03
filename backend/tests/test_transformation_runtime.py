@@ -31,7 +31,7 @@ def test_runtime_rejects_successful_noop_as_no_state_change():
 def test_certificate_exists_only_for_validated_transition():
     ss=StateSnapshotStore(SQLiteRuntimeStore(":memory:"))
     runtime=TransformationExecutor(ss)
-    ok=runtime.execute("e3","c1",3,{"tempo":5},
+    ok=runtime.execute("e3","c1",1,{"tempo":5},
         TransformationContract("t1","1",expected_changes={"tempo":6}),
         lambda state:{**state,"tempo":6})
     assert ok.certificate is not None
