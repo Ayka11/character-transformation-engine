@@ -33,6 +33,7 @@ def test_register_forces_draft_and_preserves_immutable_definition(registry):
 
 def test_lifecycle_history_is_append_only_and_transitions_are_guarded(registry):
     registry.register(definition(), actor_id="reviewer-1")
+    registry.record_review("regulation.pause", "1.0", reviewer_id="reviewer-2", outcome="APPROVED", reason="independent review")
     active = registry.transition("regulation.pause", "1.0", target_status="ACTIVE",
                                  actor_id="approver-1", reason="review completed")
     assert active["previous_status"] == "DRAFT"
@@ -50,6 +51,7 @@ def test_lifecycle_history_is_append_only_and_transitions_are_guarded(registry):
 
 def test_retired_version_is_terminal_and_new_versions_are_separate(registry):
     registry.register(definition(), actor_id="reviewer-1")
+    registry.record_review("regulation.pause", "1.0", reviewer_id="reviewer-2", outcome="APPROVED", reason="independent review")
     registry.transition("regulation.pause", "1.0", target_status="ACTIVE",
                         actor_id="approver-1", reason="approved")
     registry.transition("regulation.pause", "1.0", target_status="RETIRED",
@@ -84,6 +86,7 @@ def test_concurrent_lifecycle_transitions_use_compare_and_append(registry, monke
     import threading
 
     registry.register(definition(protocol_id="regulation.race"), actor_id="author")
+    registry.record_review("regulation.race", "1.0", reviewer_id="reviewer", outcome="APPROVED", reason="independent review")
     barrier = threading.Barrier(2)
     original = registry._current_status
 
@@ -164,3 +167,37 @@ def test_integrity_audit_detects_lifecycle_event_hash_tampering(registry):
     assert result["valid"] is False
     assert result["history_valid"] is False
     assert "event[0]:output_hash_mismatch" in result["violations"]
+
+
+
+def test_activation_requires_approved_independent_review(registry):
+    registry.register(definition(protocol_id="regulation.review-required"), actor_id="author")
+    with pytest.raises(ValueError, match="approved independent review required"):
+        registry.transition("regulation.review-required", "1.0", target_status="ACTIVE",
+                            actor_id="approver", reason="attempt without review")
+    registry.record_review("regulation.review-required", "1.0", reviewer_id="reviewer",
+                           outcome="REJECTED", reason="insufficient evidence")
+    with pytest.raises(ValueError, match="approved independent review required"):
+        registry.transition("regulation.review-required", "1.0", target_status="ACTIVE",
+                            actor_id="approver", reason="rejected review cannot activate")
+    registry.record_review("regulation.review-required", "1.0", reviewer_id="reviewer-2",
+                           outcome="APPROVED", reason="revised and independently reviewed")
+    with pytest.raises(ValueError, match="approved independent review required"):
+        registry.transition("regulation.review-required", "1.0", target_status="ACTIVE",
+                            actor_id="reviewer-2", reason="reviewer cannot approve own review")
+    active = registry.transition("regulation.review-required", "1.0", target_status="ACTIVE",
+                                 actor_id="approver", reason="approved review on record")
+    assert active["lifecycle"] == "ACTIVE"
+
+
+def test_author_cannot_review_and_review_is_bound_to_definition(registry):
+    registry.register(definition(protocol_id="regulation.review-binding"), actor_id="author")
+    with pytest.raises(ValueError, match="author cannot review"):
+        registry.record_review("regulation.review-binding", "1.0", reviewer_id="author",
+                               outcome="APPROVED", reason="self review")
+    review = registry.record_review("regulation.review-binding", "1.0", reviewer_id="reviewer",
+                                    outcome="APPROVED", reason="independent review")
+    assert review["payload"]["definition_hash"] == registry.get(
+        "regulation.review-binding", "1.0"
+    )["definition_hash"]
+    assert review["event_type"] == "PROTOCOL_REVIEW_RECORDED"
