@@ -512,5 +512,5 @@ def test_recovery_rejects_report_snapshot_key_or_version_envelope_mismatch():
                     )
                 conn.commit()
 
-            with pytest.raises(ValueError, match=message.replace("/", r"\\/")):
+            with pytest.raises(ValueError, match=message):
                 ReportService(build_registry(SQLiteRuntimeStore(path)), SQLiteRuntimeStore(path))
