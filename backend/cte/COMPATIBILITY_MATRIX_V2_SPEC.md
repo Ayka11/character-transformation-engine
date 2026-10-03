@@ -38,6 +38,19 @@ remain UNKNOWN; missing values are never imputed.
 BLOCKED is intentionally not emitted by V2. Hard blocks require a separately approved
 safety policy with explicit authority, evidence and review requirements.
 
+## Canonical Master Matrix adapter
+
+compatibility_matrix_adapter.py accepts canonical P4 IDs such as P4.value_autonomy,
+not arbitrary labels. It checks that each ID is registered in Master Matrix V1.0,
+belongs to P4, and has a finite numeric value within the declared 0–10 scale. It
+translates IDs to the evaluator's registered labels only after validation. Unknown
+IDs, other domains, non-finite values, booleans and out-of-range values fail closed.
+Missing values remain unknown; no values are imputed.
+
+This adapter currently covers P4 value profiles only. It does not yet normalize P1,
+P2, P3 or P5 into compatibility inputs, and it does not change the existing
+POST /compatibility contract.
+
 ## Current rule coverage
 
 - Value tension heuristics: Order/Autonomy, Security/Freedom, Achievement/Compassion.
