@@ -171,3 +171,58 @@ def test_qc_cannot_mutate_published_report():
             service.qc_run("rr-immutable-qc")
         assert service.runs["rr-immutable-qc"].report_output_hash == before_hash
         assert service.runs["rr-immutable-qc"].status == before_status
+
+
+def test_publish_rolls_back_in_memory_state_when_persistence_fails():
+    import pytest
+
+    with TemporaryDirectory() as d:
+        store = SQLiteRuntimeStore(str(Path(d) / "runtime.sqlite3"))
+        graph = _graph(store)
+        service = ReportService(graph, store)
+        service.register_spec(register_spec("rs", "Persistence failure"))
+        service.create("rr-publish-fail", "rs", "study", ["r"])
+        for ordinal, code in enumerate(SECTION_CODES):
+            service.add_section("rr-publish-fail", code, {"section": code}, ["r"], ordinal)
+        service.bind_claim("rr-publish-fail", "c")
+        assert service.qc_run("rr-publish-fail")["status"] == "QC_PASSED"
+        original = store.put_snapshot
+        def fail_report_run(namespace, key, payload, version):
+            if namespace == "report.run" and key == "rr-publish-fail":
+                raise OSError("simulated storage failure")
+            return original(namespace, key, payload, version)
+        store.put_snapshot = fail_report_run
+        with pytest.raises(OSError, match="simulated storage failure"):
+            service.publish("rr-publish-fail")
+        run = service.runs["rr-publish-fail"]
+        assert run.status == "QC_PASSED"
+        assert run.report_output_hash is None
+        assert run.report_output_hash_version == 1
+
+
+def test_supersede_rolls_back_in_memory_state_when_persistence_fails():
+    import pytest
+
+    with TemporaryDirectory() as d:
+        store = SQLiteRuntimeStore(str(Path(d) / "runtime.sqlite3"))
+        graph = _graph(store)
+        service = ReportService(graph, store)
+        service.register_spec(register_spec("rs", "Supersede failure"))
+        for run_id in ("rr-old-fail", "rr-new-fail"):
+            service.create(run_id, "rs", "study", ["r"])
+            for ordinal, code in enumerate(SECTION_CODES):
+                service.add_section(run_id, code, {"section": code}, ["r"], ordinal)
+            service.bind_claim(run_id, "c")
+            assert service.qc_run(run_id)["status"] == "QC_PASSED"
+            service.publish(run_id)
+        original = store.put_snapshot
+        def fail_old(namespace, key, payload, version):
+            if namespace == "report.run" and key == "rr-old-fail":
+                raise OSError("simulated storage failure")
+            return original(namespace, key, payload, version)
+        store.put_snapshot = fail_old
+        with pytest.raises(OSError, match="simulated storage failure"):
+            service.supersede("rr-old-fail", "rr-new-fail")
+        old = service.runs["rr-old-fail"]
+        assert old.status == "PUBLISHED"
+        assert old.superseded_by is None
