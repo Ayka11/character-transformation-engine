@@ -71,7 +71,15 @@ class GraphRegistry:
     def add_node(self, node: GraphNode) -> GraphNode:
         if node.node_id in self.nodes:
             existing=self.nodes[node.node_id]
-            if existing.immutable_hash != node.immutable_hash:
+            # The content hash intentionally excludes envelope metadata for
+            # backward compatibility, so compare provenance/version separately.
+            # Otherwise an ID replay could silently substitute a different
+            # provenance class or schema version while retaining the same hash.
+            if (
+                existing.immutable_hash != node.immutable_hash
+                or existing.provenance_class != node.provenance_class
+                or existing.version != node.version
+            ):
                 raise ValueError("immutable node conflict")
             return existing
         if self.store is not None:
