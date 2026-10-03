@@ -71,7 +71,7 @@ def test_science_lab_lineage_can_reach_transformation_node():
         "scenario:lineage-1:result",
         registry.nodes["scenario:lineage-1"],
         registry.nodes["result:lineage-1"],
-        "DERIVED_FROM",
+        "RESULTS_IN",
         rationale="test result lineage"
     ))
     registry.register_claim(
