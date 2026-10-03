@@ -514,3 +514,15 @@ def test_recovery_rejects_report_snapshot_key_or_version_envelope_mismatch():
 
             with pytest.raises(ValueError, match=message):
                 ReportService(build_registry(SQLiteRuntimeStore(path)), SQLiteRuntimeStore(path))
+
+
+def test_report_spec_rejects_duplicate_section_codes_even_when_all_codes_are_present():
+    import pytest
+
+    duplicated_order = [*SECTION_CODES, SECTION_CODES[0]]
+    with pytest.raises(ValueError, match="report specification must contain the V1.6 section set"):
+        register_spec(
+            "rs-duplicate-sections",
+            "Duplicate section order",
+            section_order=duplicated_order,
+        )
