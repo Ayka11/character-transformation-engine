@@ -100,3 +100,27 @@ def test_recovery_rejects_section_tampering_even_if_snapshot_hash_is_recomputed(
 
         with pytest.raises(ValueError, match="section/EXECUTIVE_SUMMARY"):
             ReportService(build_registry(SQLiteRuntimeStore(path)), SQLiteRuntimeStore(path))
+
+
+def test_publish_rechecks_qc_after_claim_graph_changes():
+    import pytest
+
+    with TemporaryDirectory() as d:
+        path = str(Path(d) / "runtime.sqlite3")
+        store = SQLiteRuntimeStore(path)
+        graph = _graph(store)
+        service = ReportService(graph, store)
+        service.register_spec(register_spec("rs", "Fresh QC"))
+        service.create("rr-stale-qc", "rs", "study", ["r"])
+        for ordinal, code in enumerate(SECTION_CODES):
+            service.add_section("rr-stale-qc", code, {"section": code}, ["r"], ordinal)
+        service.bind_claim("rr-stale-qc", "c")
+        assert service.qc_run("rr-stale-qc")["status"] == "QC_PASSED"
+
+        graph.nodes["c"].metadata["state"] = "CONTRADICTED"
+        with pytest.raises(ValueError, match="current-state QC failed"):
+            service.publish("rr-stale-qc")
+
+        assert service.runs["rr-stale-qc"].status == "QC_FAILED"
+        assert "CLAIM_BINDINGS" in service.runs["rr-stale-qc"].qc
+        assert service.runs["rr-stale-qc"].report_output_hash is None
