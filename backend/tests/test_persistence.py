@@ -107,3 +107,19 @@ def test_mutable_snapshot_can_advance_version_without_payload_change():
     updated=store.put_snapshot("report.run","report-1",{"status":"READY"},"2")
     assert updated.version == "2"
     assert store.get_snapshot("report.run","report-1").version == "2"
+
+def test_temporary_database_file_is_removed_when_store_is_collected():
+    import gc
+    import weakref
+
+    store = SQLiteRuntimeStore(":memory:")
+    path = Path(store.path)
+    store.put_snapshot("test", "temporary", {"value": 1}, "1")
+    store_ref = weakref.ref(store)
+
+    assert path.exists()
+    del store
+    gc.collect()
+
+    assert store_ref() is None
+    assert not path.exists()

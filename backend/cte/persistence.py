@@ -7,9 +7,19 @@ from __future__ import annotations
 import json
 import sqlite3
 import tempfile
+import weakref
 from dataclasses import dataclass
 from pathlib import Path
 from .provenance import content_hash, json_safe
+
+def _remove_temporary_database(path: str) -> None:
+    """Remove the backing file used to emulate an in-memory SQLite store."""
+    try:
+        Path(path).unlink(missing_ok=True)
+    except OSError:
+        # Finalizers must not raise during interpreter shutdown or cleanup.
+        pass
+
 
 class SnapshotConflictError(ValueError):
     """Raised when a snapshot write is based on a stale persisted version."""
@@ -49,6 +59,11 @@ class SQLiteRuntimeStore:
             os.close(fd)
             self._temporary_path = temp_path
             self.path = temp_path
+            # Each operation opens its own connection, so no connection remains
+            # open when the store is collected. Clean up the emulation file then.
+            self._temporary_cleanup = weakref.finalize(
+                self, _remove_temporary_database, temp_path
+            )
         else:
             p=Path(path)
             p.parent.mkdir(parents=True,exist_ok=True)
