@@ -1107,3 +1107,31 @@ def test_inference_block_rejects_invalid_rule_definitions():
         with pytest.raises(ValueError, match=message):
             graph.register_inference_block(**values)
         assert "invalid-inference-rule" not in graph.inference_blocks
+
+
+def test_contradiction_set_rejects_malformed_inputs():
+    import pytest
+
+    invalid_cases = [
+        ("contradiction_set_id", "", "contradiction_set_id must be a non-empty string"),
+        ("claim_id", None, "claim_id must be a non-empty string"),
+        ("contradiction_type", " ", "contradiction_type must be a non-empty string"),
+        ("node_ids", [], "contradiction set requires at least one node"),
+        ("node_ids", "evidence", "contradiction set requires at least one node"),
+        ("node_ids", ["evidence", "evidence"], "contradiction set node IDs must be unique"),
+        ("node_ids", [None], "contradiction set node IDs must be non-empty strings"),
+        ("resolution_status", "UNKNOWN", "unsupported contradiction resolution status"),
+        ("resolution_note", 42, "contradiction resolution note must be a string"),
+    ]
+    for field_name, invalid_value, message in invalid_cases:
+        graph = build_registry()
+        values = {
+            "contradiction_set_id": "invalid-contradiction-set",
+            "claim_id": "claim",
+            "node_ids": ["evidence"],
+            "contradiction_type": "CONFLICT",
+        }
+        values[field_name] = invalid_value
+        with pytest.raises(ValueError, match=message):
+            graph.register_contradiction_set(**values)
+        assert "invalid-contradiction-set" not in graph.contradiction_sets
