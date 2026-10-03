@@ -385,7 +385,7 @@ class GraphRegistry:
             reaches_result = any(
                 edge.from_node_id == run_node.node_id
                 and edge.to_node_id == result_id
-                and edge.edge_type == "DERIVED_FROM"
+                and edge.edge_type in {"RESULTS_IN", "DERIVED_FROM"}
                 for edge in self.edges.values()
             )
             reaches_transformation = any(
