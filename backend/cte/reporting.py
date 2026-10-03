@@ -327,6 +327,8 @@ class ReportService:
     def qc_run(self,run_id:str)->dict:
         run=self.runs.get(run_id)
         if run is None: raise ValueError("report run is not registered")
+        if run.status in {"PUBLISHED","SUPERSEDED"}:
+            raise ValueError("immutable report cannot be rechecked")
         expected=set(self.specs[run.report_spec_id].section_order)
         observed=set(run.sections)
         checks={}
