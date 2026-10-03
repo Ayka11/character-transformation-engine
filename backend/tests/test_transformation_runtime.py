@@ -19,7 +19,7 @@ def test_runtime_rejects_successful_noop_as_no_state_change():
     ss=StateSnapshotStore(SQLiteRuntimeStore(":memory:"))
     runtime=TransformationExecutor(ss)
     result=runtime.execute(
-        "e2","c1",2,{"tempo":5},
+        "e2","c1",1,{"tempo":5},
         TransformationContract("t1","1",expected_changes={"tempo":6}),
         lambda state: state,
     )
