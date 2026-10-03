@@ -61,6 +61,28 @@ class GraphRegistry:
             for snap in store.list_snapshots("graph.inference"):
                 p=snap.payload
                 registry.inference_blocks[p["inference_block_id"]]=InferenceBlock(**p)
+            # Recompute canonical fingerprints during recovery instead of
+            # trusting persisted envelope fields. A backup/database attacker
+            # could otherwise alter both a snapshot payload and its storage hash.
+            for node in registry.nodes.values():
+                canonical = register_node(
+                    node.node_id, node.node_type, node.entity_id,
+                    node.provenance_class, node.version, node.metadata,
+                )
+                if canonical.immutable_hash != node.immutable_hash:
+                    raise ValueError(f"evidence graph node integrity failure: {node.node_id}")
+            for edge in registry.edges.values():
+                if edge.from_node_id not in registry.nodes or edge.to_node_id not in registry.nodes:
+                    raise ValueError(f"evidence graph edge references missing node: {edge.edge_id}")
+                canonical_hash = content_hash({
+                    "edge_id": edge.edge_id,
+                    "from": edge.from_node_id,
+                    "to": edge.to_node_id,
+                    "type": edge.edge_type,
+                    "rationale": edge.rationale,
+                })
+                if canonical_hash != edge.input_hash:
+                    raise ValueError(f"evidence graph edge integrity failure: {edge.edge_id}")
             for event in store.list_events("graph"):
                 registry.audit_events.append(GraphAuditEvent(
                     event["event_type"],event["payload"].get("node_id"),event["payload"].get("edge_id"),
