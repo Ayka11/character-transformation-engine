@@ -5,6 +5,8 @@ This renders registered artifacts; it does not create new evidence.
 from __future__ import annotations
 from dataclasses import dataclass, field
 from copy import deepcopy
+from functools import wraps
+from threading import RLock
 from .provenance import content_hash
 from .persistence import SQLiteRuntimeStore
 
@@ -137,8 +139,18 @@ def build_source_manifest(registry, artifact_ids:list[str])->str:
         entries.append((artifact_id,node.node_type,node.immutable_hash,node.version,node.provenance_class))
     return content_hash(entries)
 
+def _report_service_locked(method):
+    """Serialize ReportService state transitions and nested persistence calls."""
+    @wraps(method)
+    def wrapped(self, *args, **kwargs):
+        with self._service_lock:
+            return method(self, *args, **kwargs)
+    return wrapped
+
+
 class ReportService:
     def __init__(self,registry,store:SQLiteRuntimeStore|None=None):
+        self._service_lock = RLock()
         self.registry=registry
         self.store=store
         self.specs={}
@@ -248,6 +260,7 @@ class ReportService:
                 if expected!=run.report_output_hash:
                     raise ValueError(f"report snapshot integrity failure: report.run/{run.report_run_id} output hash")
 
+    @_report_service_locked
     def _persist_run(self,run:ReportRun):
         if self.store is None:
             return
@@ -289,17 +302,23 @@ class ReportService:
         self._persisted_runs[run.report_run_id]=deepcopy(run)
 
 
+    @_report_service_locked
     def register_spec(self,spec:ReportSpec)->ReportSpec:
         if spec.report_spec_id in self.specs:
             raise ValueError("report spec already registered")
         self.specs[spec.report_spec_id]=spec
         if self.store is not None:
-            self.store.put_snapshot("report.spec",spec.report_spec_id,{"report_spec_id":spec.report_spec_id,
-                "name":spec.name,"version":spec.version,"section_order":list(spec.section_order),
-                "rendering_rules":spec.rendering_rules,"claim_language_rules":spec.claim_language_rules,
-                "immutable_hash":spec.immutable_hash},spec.version)
+            try:
+                self.store.put_snapshot("report.spec",spec.report_spec_id,{"report_spec_id":spec.report_spec_id,
+                    "name":spec.name,"version":spec.version,"section_order":list(spec.section_order),
+                    "rendering_rules":spec.rendering_rules,"claim_language_rules":spec.claim_language_rules,
+                    "immutable_hash":spec.immutable_hash},spec.version)
+            except Exception:
+                self.specs.pop(spec.report_spec_id, None)
+                raise
         return spec
 
+    @_report_service_locked
     def create(self,report_run_id:str,report_spec_id:str,study_id:str,artifact_ids:list[str],execution_id:str|None=None)->ReportRun:
         if report_run_id in self.runs: raise ValueError("report run already registered")
         spec=self.specs.get(report_spec_id)
@@ -313,6 +332,7 @@ class ReportService:
         self._persist_run(run)
         return run
 
+    @_report_service_locked
     def add_decision(self,run_id:str,decision_id:str,decision_type:str,decision:str,rule_id:str,inputs:dict,rationale:str)->dict:
         run=self.runs.get(run_id)
         if run is None: raise ValueError("report run is not registered")
@@ -324,6 +344,7 @@ class ReportService:
         self._persist_run(run)
         return item
 
+    @_report_service_locked
     def add_section(self,run_id:str,section_code:str,content:dict,source_artifacts:list[str],
                     ordinal:int,derivation_rule_id:str="V1.6_RENDER",derivation_rule_version:str="1.6",
                     evidence_status:str="INDETERMINATE",limitations:list[str]|None=None)->ReportSection:
@@ -345,6 +366,7 @@ class ReportService:
         self._persist_run(run)
         return sec
 
+    @_report_service_locked
     def bind_claim(self,run_id:str,claim_id:str,allowed_claim_status:str|None=None)->ReportClaimBinding:
         run=self.runs.get(run_id)
         claim=self.registry.nodes.get(claim_id)
@@ -367,6 +389,7 @@ class ReportService:
         self._persist_run(run)
         return binding
 
+    @_report_service_locked
     def qc_run(self,run_id:str)->dict:
         run=self.runs.get(run_id)
         if run is None: raise ValueError("report run is not registered")
@@ -446,6 +469,7 @@ class ReportService:
         self._persist_run(run)
         return {"status":run.status,"blocking_checks":blocking,"checks":{k:v.status for k,v in checks.items()}}
 
+    @_report_service_locked
     def publish(self,run_id:str)->ReportRun:
         run=self.runs.get(run_id)
         if run is None: raise ValueError("report run is not registered")
@@ -471,6 +495,7 @@ class ReportService:
             raise
         return run
 
+    @_report_service_locked
     def supersede(self,old_id:str,new_id:str)->ReportRun:
         old=self.runs.get(old_id); new=self.runs.get(new_id)
         if old is None or new is None: raise ValueError("both reports must be registered")
