@@ -12,6 +12,7 @@ from .transformation_ledger import TransformationLedger, TransformationLedgerEnt
 
 NAMESPACE = "transformation.journal"
 TERMINAL = {"VALIDATED", "FAILED", "PARTIAL", "ROLLED_BACK", "ROLLBACK_FAILED", "RECOVERED"}
+STATUS_ORDER = {"PREPARED": 10, "INTERVENTION_STARTED": 20, "AFTER_CAPTURED": 30, "VALIDATED": 100, "FAILED": 100, "PARTIAL": 100, "ROLLED_BACK": 100, "ROLLBACK_FAILED": 100, "RECOVERED": 110}
 
 @dataclass(frozen=True)
 class JournalAttempt:
@@ -64,7 +65,16 @@ class TransformationJournal:
             # cannot be used as the lifecycle clock. A terminal event always
             # dominates an earlier non-terminal event.
             terminal_events = [e for e in events if e["payload"].get("status") in TERMINAL]
-            last = terminal_events[-1]["payload"] if terminal_events else events[-1]["payload"]
+            candidates = terminal_events if terminal_events else events
+            last_event = max(
+                candidates,
+                key=lambda e: (
+                    STATUS_ORDER.get(e["payload"].get("status"), 0),
+                    e["payload"].get("status", ""),
+                    e.get("event_id", ""),
+                ),
+            )
+            last = last_event["payload"]
             result.append(JournalAttempt(
                 attempt_id=attempt_id, execution_id=last["execution_id"],
                 character_id=last["character_id"], sequence=last["sequence"],
