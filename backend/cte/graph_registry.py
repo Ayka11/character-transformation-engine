@@ -108,6 +108,15 @@ class GraphRegistry:
                 # them, but verify the stronger fingerprint whenever present.
                 if node.envelope_hash is not None and canonical.envelope_hash != node.envelope_hash:
                     raise ValueError(f"evidence graph node envelope integrity failure: {node.node_id}")
+                # Snapshots deserialize metadata as ordinary mutable JSON
+                # containers. Retain the canonical, deeply frozen metadata
+                # after integrity checks so restart cannot weaken the node
+                # immutability contract.
+                registry.nodes[node.node_id] = GraphNode(
+                    node.node_id, node.node_type, node.entity_id,
+                    node.provenance_class, node.version, node.immutable_hash,
+                    canonical.metadata, node.envelope_hash,
+                )
             for edge in registry.edges.values():
                 if edge.from_node_id not in registry.nodes or edge.to_node_id not in registry.nodes:
                     # Preserve degraded recovery so downstream claim validation can
