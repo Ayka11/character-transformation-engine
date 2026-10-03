@@ -117,6 +117,35 @@ class SQLiteRuntimeStore:
                 return Snapshot(namespace,key,version,payload,payload_hash)
             raise ValueError("immutable snapshot conflict")
 
+    def put_snapshot_if_hash(
+        self, namespace: str, key: str, payload: dict, version: str,
+        *, expected_hash: str | None,
+    ) -> Snapshot:
+        """Compare-and-swap a snapshot, rejecting stale writers."""
+        payload = json_safe(payload)
+        payload_hash = content_hash(payload)
+        payload_json = json.dumps(payload, sort_keys=True, separators=(",", ":"))
+        with self._connect() as conn:
+            if expected_hash is None:
+                try:
+                    conn.execute(
+                        "INSERT INTO runtime_snapshots(namespace,key,version,payload_json,payload_hash) VALUES(?,?,?,?,?)",
+                        (namespace, key, version, payload_json, payload_hash),
+                    )
+                except sqlite3.IntegrityError as exc:
+                    raise ValueError("snapshot concurrent update conflict") from exc
+            else:
+                cursor = conn.execute(
+                    """UPDATE runtime_snapshots
+                       SET version=?, payload_json=?, payload_hash=?
+                       WHERE namespace=? AND key=? AND payload_hash=?""",
+                    (version, payload_json, payload_hash, namespace, key, expected_hash),
+                )
+                if cursor.rowcount != 1:
+                    raise ValueError("snapshot concurrent update conflict")
+            conn.commit()
+        return Snapshot(namespace, key, version, payload, payload_hash)
+
     def put_snapshots_atomic(self, items:list[tuple[str,str,dict,str]])->list[Snapshot]:
         """Insert immutable snapshots atomically; identical existing rows are idempotent."""
         prepared=[(ns,key,json_safe(payload),version,content_hash(payload)) for ns,key,payload,version in items]
