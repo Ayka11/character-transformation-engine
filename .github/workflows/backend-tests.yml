@@ -35,8 +35,11 @@ jobs:
           PYTHONPATH: ${{ github.workspace }}/backend
         run: |
           cd backend
-          python -m pytest --collect-only -q > /tmp/pytest-collect.txt
-          tail -n 5 /tmp/pytest-collect.txt
+          set +e
+          python -m pytest --collect-only -q > /tmp/pytest-collect.txt 2>&1
+          rc=$?
+          cat /tmp/pytest-collect.txt
+          exit $rc
       - name: Run backend tests
         env:
           PYTHONPATH: ${{ github.workspace }}/backend
