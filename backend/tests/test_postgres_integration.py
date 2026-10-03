@@ -39,12 +39,12 @@ def test_postgres_snapshot_event_roundtrip():
         store.put_snapshot("integration.immutable","case-1",{"value":43},"1.0")
 
     store.put_snapshot(
-        "science_lab.matrix","case-1",{"matrix_id":"case-1","scenario_ids":[]},"2.3"
+        "integration.mutable","case-1",{"matrix_id":"case-1","scenario_ids":[]},"2.3"
     )
     store.put_snapshot(
-        "science_lab.matrix","case-1",{"matrix_id":"case-1","scenario_ids":["s1"]},"2.3"
+        "integration.mutable","case-1",{"matrix_id":"case-1","scenario_ids":["s1"]},"2.3"
     )
-    latest=store.get_snapshot("science_lab.matrix","case-1")
+    latest=store.get_snapshot("integration.mutable","case-1")
     assert latest is not None
     assert latest.payload["scenario_ids"]==["s1"]
 
