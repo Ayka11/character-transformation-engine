@@ -405,3 +405,71 @@ def test_inference_block_replay_recovers_after_snapshot_write_then_error(monkeyp
                 "retry-inference-block", "MODEL_OUTPUT", "EVIDENCE_SUPPORTED",
                 "different blocked inference", "MODEL", "RULE-1",
             )
+
+
+
+def test_graph_recovery_rejects_semantically_tampered_contradiction_even_with_rehashed_snapshot():
+    import json
+    import pytest
+    from cte.provenance import content_hash
+
+    with TemporaryDirectory() as d:
+        path = str(Path(d) / "runtime.sqlite3")
+        store = SQLiteRuntimeStore(path)
+        graph = build_registry(store)
+        claim = register_node("tamper-contradiction-claim", "CLAIM", "claim", "DRV", "1", {})
+        evidence = register_node("tamper-contradiction-evidence", "DATASET", "evidence", "DRV", "1", {})
+        graph.add_node(claim)
+        graph.add_node(evidence)
+        graph.register_contradiction_set(
+            "tamper-contradiction", claim.node_id, [evidence.node_id], "CONFLICT",
+        )
+
+        with store._connect() as conn:
+            row = conn.execute(
+                "SELECT payload_json FROM runtime_snapshots WHERE namespace=? AND key=?",
+                ("graph.contradiction", "tamper-contradiction"),
+            ).fetchone()
+            payload = json.loads(row[0])
+            payload["contradiction_type"] = "ALTERED"
+            payload_json = json.dumps(payload, sort_keys=True, separators=(",", ":"))
+            conn.execute(
+                "UPDATE runtime_snapshots SET payload_json=?, payload_hash=? WHERE namespace=? AND key=?",
+                (payload_json, content_hash(payload), "graph.contradiction", "tamper-contradiction"),
+            )
+            conn.commit()
+
+        with pytest.raises(ValueError, match="evidence graph contradiction integrity failure: tamper-contradiction"):
+            build_registry(SQLiteRuntimeStore(path))
+
+
+def test_graph_recovery_rejects_semantically_tampered_inference_even_with_rehashed_snapshot():
+    import json
+    import pytest
+    from cte.provenance import content_hash
+
+    with TemporaryDirectory() as d:
+        path = str(Path(d) / "runtime.sqlite3")
+        store = SQLiteRuntimeStore(path)
+        graph = build_registry(store)
+        graph.register_inference_block(
+            "tamper-inference", "MODEL_OUTPUT", "EVIDENCE_SUPPORTED",
+            "blocked", "MODEL", "RULE-1",
+        )
+
+        with store._connect() as conn:
+            row = conn.execute(
+                "SELECT payload_json FROM runtime_snapshots WHERE namespace=? AND key=?",
+                ("graph.inference", "tamper-inference"),
+            ).fetchone()
+            payload = json.loads(row[0])
+            payload["reason_code"] = "ALTERED"
+            payload_json = json.dumps(payload, sort_keys=True, separators=(",", ":"))
+            conn.execute(
+                "UPDATE runtime_snapshots SET payload_json=?, payload_hash=? WHERE namespace=? AND key=?",
+                (payload_json, content_hash(payload), "graph.inference", "tamper-inference"),
+            )
+            conn.commit()
+
+        with pytest.raises(ValueError, match="evidence graph inference integrity failure: tamper-inference"):
+            build_registry(SQLiteRuntimeStore(path))
