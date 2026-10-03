@@ -33,3 +33,33 @@ def test_report_spec_and_snapshot_survive_restart():
         assert "rs" in second.specs
         assert second.runs["rr"].status=="PUBLISHED"
         assert second.runs["rr"].report_output_hash
+
+
+def test_report_service_rejects_tampered_persisted_run_snapshot():
+    import json
+    import sqlite3
+    import pytest
+
+    with TemporaryDirectory() as d:
+        path = str(Path(d) / "runtime.sqlite3")
+        store = SQLiteRuntimeStore(path)
+        graph = _graph(store)
+        service = ReportService(graph, store)
+        service.register_spec(register_spec("rs", "Durable"))
+        service.create("rr-tampered", "rs", "study", ["r"])
+
+        with sqlite3.connect(path) as conn:
+            row = conn.execute(
+                "SELECT payload_json FROM runtime_snapshots WHERE namespace=? AND key=?",
+                ("report.run", "rr-tampered"),
+            ).fetchone()
+            payload = json.loads(row[0])
+            payload["status"] = "PUBLISHED"
+            conn.execute(
+                "UPDATE runtime_snapshots SET payload_json=? WHERE namespace=? AND key=?",
+                (json.dumps(payload, sort_keys=True, separators=(",", ":")), "report.run", "rr-tampered"),
+            )
+            conn.commit()
+
+        with pytest.raises(ValueError, match="report snapshot integrity failure: report.run/rr-tampered"):
+            ReportService(build_registry(SQLiteRuntimeStore(path)), SQLiteRuntimeStore(path))

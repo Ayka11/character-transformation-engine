@@ -148,11 +148,15 @@ class ReportService:
             return
         for snap in self.store.list_snapshots("report.spec"):
             p=snap.payload
+            if content_hash(p) != snap.payload_hash:
+                raise ValueError(f"report snapshot integrity failure: {snap.namespace}/{snap.key}")
             self.specs[p["report_spec_id"]]=ReportSpec(
                 p["report_spec_id"],p["name"],p["version"],tuple(p["section_order"]),
                 p.get("rendering_rules",{}),p.get("claim_language_rules",{}),p["immutable_hash"])
         for snap in self.store.list_snapshots("report.run"):
             p=snap.payload
+            if content_hash(p) != snap.payload_hash:
+                raise ValueError(f"report snapshot integrity failure: {snap.namespace}/{snap.key}")
             sections={k:ReportSection(v["report_section_id"],v["report_run_id"],v["section_code"],v["ordinal"],
                 v["content"],tuple(v["source_artifacts"]),v["derivation_rule_id"],v["derivation_rule_version"],
                 v["evidence_status"],tuple(v["limitations"]),v["immutable_hash"]) for k,v in p.get("sections",{}).items()}
