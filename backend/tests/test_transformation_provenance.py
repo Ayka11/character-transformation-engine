@@ -310,7 +310,7 @@ def test_science_lab_does_not_trust_tampered_run_transformation_provenance():
         {"qc_status": "PASS", "validated_descriptive_result": True},
     ))
     registry.add_node(register_node(
-        "analysis", "ANALYSIS", "analysis", "EXP", "1", {"kind": "ANALYSIS"},
+        "analysis", "ANALYSIS", "analysis", "EXP", "1", {"kind": "ANALYSIS", "execution_id": "tamper-source"},
     ))
     registry.add_node(register_node(
         "dataset", "DATASET", "dataset", "EXP", "1", {"kind": "DATASET"},
