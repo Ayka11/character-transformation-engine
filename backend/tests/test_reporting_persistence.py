@@ -338,3 +338,89 @@ def test_report_run_compare_and_swap_rejects_stale_service_writer():
         recovered = ReportService(build_registry(SQLiteRuntimeStore(path)), SQLiteRuntimeStore(path))
         assert "decision-a" in recovered.runs["rr-cas"].decisions
         assert "decision-b" not in recovered.runs["rr-cas"].decisions
+
+def test_report_spec_registration_rolls_back_memory_on_persistence_failure():
+    import pytest
+
+    with TemporaryDirectory() as d:
+        store = SQLiteRuntimeStore(str(Path(d) / "runtime.sqlite3"))
+        service = ReportService(_graph(store), store)
+        spec = register_spec("rs-fail", "Spec persistence failure")
+        original = store.put_snapshot
+
+        def fail_spec(namespace, key, payload, version):
+            if namespace == "report.spec" and key == "rs-fail":
+                raise OSError("simulated spec storage failure")
+            return original(namespace, key, payload, version)
+
+        store.put_snapshot = fail_spec
+        with pytest.raises(OSError, match="simulated spec storage failure"):
+            service.register_spec(spec)
+        assert "rs-fail" not in service.specs
+
+        store.put_snapshot = original
+        service.register_spec(spec)
+        assert "rs-fail" in service.specs
+
+
+def test_report_service_serializes_concurrent_run_mutations():
+    import threading
+    from threading import Event, Lock
+
+    with TemporaryDirectory() as d:
+        store = SQLiteRuntimeStore(str(Path(d) / "runtime.sqlite3"))
+        service = ReportService(_graph(store), store)
+        service.register_spec(register_spec("rs-concurrent", "Concurrent"))
+        service.create("rr-concurrent", "rs-concurrent", "study", ["r"])
+        original = store.put_snapshot_if_hash
+        first_entered = Event()
+        second_started = Event()
+        second_entered_persistence = Event()
+        release_first = Event()
+        calls_lock = Lock()
+        calls = 0
+
+        def pause_first_write(namespace, key, payload, version, *, expected_hash):
+            nonlocal calls
+            if namespace == "report.run" and key == "rr-concurrent":
+                with calls_lock:
+                    calls += 1
+                    call_number = calls
+                if call_number == 1:
+                    first_entered.set()
+                    if not release_first.wait(timeout=5):
+                        raise TimeoutError("test did not release first report write")
+                elif call_number == 2:
+                    second_entered_persistence.set()
+            return original(namespace, key, payload, version, expected_hash=expected_hash)
+
+        store.put_snapshot_if_hash = pause_first_write
+        errors = []
+
+        def add_decision(decision_id, started=None):
+            if started is not None:
+                started.set()
+            try:
+                service.add_decision("rr-concurrent", decision_id, "REVIEW", decision_id, "RULE", {}, decision_id)
+            except Exception as exc:
+                errors.append(exc)
+
+        first = threading.Thread(target=add_decision, args=("decision-z",))
+        second = threading.Thread(target=add_decision, args=("decision-a", second_started))
+        first.start()
+        assert first_entered.wait(timeout=5)
+        second.start()
+        assert second_started.wait(timeout=5)
+        try:
+            # With the service lock, the second mutation cannot reach persistence
+            # while the first operation is paused inside its durable write.
+            assert not second_entered_persistence.wait(timeout=0.1)
+        finally:
+            release_first.set()
+        first.join(timeout=5)
+        second.join(timeout=5)
+        assert not first.is_alive() and not second.is_alive()
+        assert errors == []
+        assert set(service.runs["rr-concurrent"].decisions) == {"decision-z", "decision-a"}
+        persisted = store.get_snapshot("report.run", "rr-concurrent").payload
+        assert set(persisted["decisions"]) == {"decision-z", "decision-a"}
