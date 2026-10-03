@@ -290,7 +290,7 @@ class ReportService:
             payload={name:value for name,value in item.items() if name!="immutable_hash"}
             if (key != item.get("decision_id")
                     or item.get("report_run_id") != run.report_run_id
-                    or content_hash(payload) != item.get("immutable_hash"):
+                    or content_hash(payload) != item.get("immutable_hash")):
                 raise ValueError(f"report snapshot integrity failure: report.run/{run.report_run_id} decision/{key}")
         for key,qc in run.qc.items():
             payload={"report_qc_id":qc.report_qc_id,"run_id":run.report_run_id,"check_code":qc.check_code,
