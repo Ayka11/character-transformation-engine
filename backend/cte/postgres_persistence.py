@@ -252,6 +252,7 @@ class PostgreSQLRuntimeStore:
         output_hash: str | None = None,
         provenance_record_id: str | None = None,
     ) -> None:
+        payload=json_safe(payload)
         with self.transaction() as conn:
             with conn.cursor() as cur:
                 cur.execute(
