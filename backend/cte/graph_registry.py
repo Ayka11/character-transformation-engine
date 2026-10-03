@@ -402,10 +402,10 @@ class GraphRegistry:
                 and canonical_node.envelope_hash != node.envelope_hash)
         ):
             raise ValueError("immutable node conflict")
-        # New writes always carry the stronger envelope fingerprint. A
-        # caller passing a legacy-shaped GraphNode is normalized before write.
-        if node.envelope_hash is None:
-            node = canonical_node
+        # Always retain a freshly canonicalized copy. GraphNode is frozen, but
+        # its nested metadata dict is mutable; retaining the caller's object
+        # would let later mutations change runtime semantics without a new hash.
+        node = canonical_node
         if node.node_id in self.nodes:
             existing=self.nodes[node.node_id]
             # The content hash intentionally excludes envelope metadata for

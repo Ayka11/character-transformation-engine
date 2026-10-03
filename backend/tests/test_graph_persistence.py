@@ -1227,3 +1227,25 @@ def test_graph_recovery_rejects_semantically_invalid_inference_snapshot_with_reh
             match="evidence graph inference claim level invalid: recovery-invalid-inference",
         ):
             build_registry(SQLiteRuntimeStore(path))
+
+
+
+def test_graph_node_metadata_is_detached_from_caller_after_registration():
+    with TemporaryDirectory() as d:
+        path = str(Path(d) / "runtime.sqlite3")
+        store = SQLiteRuntimeStore(path)
+        graph = build_registry(store)
+        metadata = {"nested": {"values": [1, 2]}}
+        node = register_node("detached-metadata", "DATASET", "entity", "DRV", "1", metadata)
+
+        graph.add_node(node)
+        metadata["nested"]["values"].append(3)
+        node.metadata["nested"]["values"].append(4)
+
+        assert graph.nodes["detached-metadata"].metadata == {"nested": {"values": [1, 2]}}
+        snapshot = store.get_snapshot("graph.node", "detached-metadata")
+        assert snapshot is not None
+        assert snapshot.payload["metadata"] == {"nested": {"values": [1, 2]}}
+
+        restored = build_registry(SQLiteRuntimeStore(path))
+        assert restored.nodes["detached-metadata"].metadata == {"nested": {"values": [1, 2]}}
