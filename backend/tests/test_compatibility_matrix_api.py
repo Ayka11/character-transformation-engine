@@ -96,3 +96,21 @@ def test_canonical_endpoint_identifies_exact_rule_catalog_version_and_hash():
     canonical = dumps(payload["rule_catalog"], sort_keys=True, separators=(",", ":"), ensure_ascii=False)
     expected_hash = sha256(canonical.encode("utf-8")).hexdigest()
     assert payload["rule_catalog_hash"] == expected_hash
+
+
+
+def test_rule_catalog_fingerprint_is_independent_of_assessment_inputs():
+    first = client.post("/compatibility/v2/canonical", json={
+        "profile_a": {"P4.value_order": 8, "P4.value_autonomy": 3},
+        "profile_b": {"P4.value_order": 7, "P4.value_autonomy": 4},
+        "roles_a": ["Leader"], "roles_b": ["Strategist"], "contexts": ["work"],
+    })
+    second = client.post("/compatibility/v2/canonical", json={
+        "profile_a": {"P1.sleep_quality": 6},
+        "profile_b": {"P1.sleep_quality": 2},
+        "roles_a": ["Artist"], "roles_b": ["Mediator"], "contexts": ["family"],
+    })
+    assert first.status_code == second.status_code == 200
+    first_payload, second_payload = first.json(), second.json()
+    assert first_payload["rule_catalog"] == second_payload["rule_catalog"]
+    assert first_payload["rule_catalog_hash"] == second_payload["rule_catalog_hash"]
