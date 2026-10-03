@@ -548,3 +548,54 @@ def test_report_sections_require_unique_non_negative_integer_ordinals():
                     "rr-ordinals", SECTION_CODES[1], {"section": SECTION_CODES[1]},
                     ["r"], invalid_ordinal,
                 )
+
+
+def test_recovery_rejects_report_children_owned_by_another_run():
+    import json
+    import sqlite3
+    import pytest
+    from cte.provenance import content_hash
+
+    cases = [
+        ("sections", "EXECUTIVE_SUMMARY", "section/EXECUTIVE_SUMMARY"),
+        ("bindings", "c", "binding/c"),
+        ("decisions", "decision-ownership", "decision/decision-ownership"),
+        ("qc", "REQUIRED_SECTIONS", "qc/REQUIRED_SECTIONS"),
+    ]
+    for collection, child_key, error_fragment in cases:
+        with TemporaryDirectory() as d:
+            path = str(Path(d) / "runtime.sqlite3")
+            store = SQLiteRuntimeStore(path)
+            graph = _graph(store)
+            service = ReportService(graph, store)
+            service.register_spec(register_spec("rs-child-owner", "Child ownership"))
+            service.create("rr-child-owner", "rs-child-owner", "study", ["r"])
+            for ordinal, code in enumerate(SECTION_CODES):
+                service.add_section("rr-child-owner", code, {"section": code}, ["r"], ordinal)
+            service.bind_claim("rr-child-owner", "c")
+            service.add_decision(
+                "rr-child-owner", "decision-ownership", "REPORT_SCOPE",
+                "Use registered source set", "RULE-1", {"source": "r"}, "Bounded to registered evidence",
+            )
+            service.qc_run("rr-child-owner")
+
+            with sqlite3.connect(path) as conn:
+                row = conn.execute(
+                    "SELECT payload_json FROM runtime_snapshots WHERE namespace=? AND key=?",
+                    ("report.run", "rr-child-owner"),
+                ).fetchone()
+                payload = json.loads(row[0])
+                child = payload[collection][child_key]
+                child["report_run_id"] = "different-run"
+                if collection in {"sections", "bindings", "decisions"}:
+                    child_payload = {key: value for key, value in child.items() if key != "immutable_hash"}
+                    child["immutable_hash"] = content_hash(child_payload)
+                serialized = json.dumps(payload, sort_keys=True, separators=(",", ":"))
+                conn.execute(
+                    "UPDATE runtime_snapshots SET payload_json=?, payload_hash=? WHERE namespace=? AND key=?",
+                    (serialized, content_hash(payload), "report.run", "rr-child-owner"),
+                )
+                conn.commit()
+
+            with pytest.raises(ValueError, match=error_fragment):
+                ReportService(build_registry(SQLiteRuntimeStore(path)), SQLiteRuntimeStore(path))
