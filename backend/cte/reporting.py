@@ -271,23 +271,34 @@ class ReportService:
                      "source_artifacts":list(section.source_artifacts),"derivation_rule_id":section.derivation_rule_id,
                      "derivation_rule_version":section.derivation_rule_version,"evidence_status":section.evidence_status,
                      "limitations":list(section.limitations)}
-            if key!=section.section_code or content_hash(payload)!=section.immutable_hash:
+            if (key != section.section_code
+                    or section.report_run_id != run.report_run_id
+                    or section.report_section_id != f"{run.report_run_id}:{section.section_code}"
+                    or content_hash(payload) != section.immutable_hash):
                 raise ValueError(f"report snapshot integrity failure: report.run/{run.report_run_id} section/{key}")
         for key,binding in run.bindings.items():
             payload={"binding_id":binding.binding_id,"report_run_id":binding.report_run_id,"claim_id":binding.claim_id,
                      "claim_status":binding.claim_status,"supporting_nodes":binding.supporting_nodes,
                      "limiting_nodes":binding.limiting_nodes,"contradiction_nodes":binding.contradiction_nodes,
                      "allowed_language_rule_id":binding.allowed_language_rule_id,"generated_statement":binding.generated_statement}
-            if key!=binding.claim_id or content_hash(payload)!=binding.immutable_hash:
+            if (key != binding.claim_id
+                    or binding.report_run_id != run.report_run_id
+                    or binding.binding_id != f"{run.report_run_id}:{binding.claim_id}"
+                    or content_hash(payload) != binding.immutable_hash):
                 raise ValueError(f"report snapshot integrity failure: report.run/{run.report_run_id} binding/{key}")
         for key,item in run.decisions.items():
             payload={name:value for name,value in item.items() if name!="immutable_hash"}
-            if key!=item.get("decision_id") or content_hash(payload)!=item.get("immutable_hash"):
+            if (key != item.get("decision_id")
+                    or item.get("report_run_id") != run.report_run_id
+                    or content_hash(payload) != item.get("immutable_hash"):
                 raise ValueError(f"report snapshot integrity failure: report.run/{run.report_run_id} decision/{key}")
         for key,qc in run.qc.items():
             payload={"report_qc_id":qc.report_qc_id,"run_id":run.report_run_id,"check_code":qc.check_code,
                      "status":qc.status,"observed":qc.observed,"expected":qc.expected,"message":qc.message}
-            if key!=qc.check_code or content_hash(payload)!=qc.immutable_hash:
+            if (key != qc.check_code
+                    or qc.report_run_id != run.report_run_id
+                    or qc.report_qc_id != f"{run.report_run_id}:{qc.check_code}"
+                    or content_hash(payload) != qc.immutable_hash):
                 raise ValueError(f"report snapshot integrity failure: report.run/{run.report_run_id} qc/{key}")
         if run.status in {"PUBLISHED","SUPERSEDED"}:
             if not run.report_output_hash:
