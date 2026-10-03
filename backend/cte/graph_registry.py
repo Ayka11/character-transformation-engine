@@ -141,7 +141,7 @@ class GraphRegistry:
                     or not item.claim_id.strip()
                     or not isinstance(item.contradiction_type, str)
                     or not item.contradiction_type.strip()
-                    or not isinstance(item.node_ids, tuple)
+                    or not isinstance(item.node_ids, (list, tuple))
                     or not item.node_ids
                     or any(not isinstance(node_id, str) or not node_id.strip() for node_id in item.node_ids)
                     or len(set(item.node_ids)) != len(item.node_ids)
