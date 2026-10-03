@@ -97,3 +97,14 @@ def test_unknown_role_pair_has_no_fabricated_rule_catalog_entry():
     assert row["status"] == "UNKNOWN"
     assert row["rule_id"] is None
     assert all(item["validation_status"] == "UNVALIDATED_HEURISTIC" for item in result["rule_catalog"].values())
+
+
+
+def test_rule_catalog_fingerprint_is_stable_and_versioned():
+    first = evaluate_compatibility_matrix({"Order": 8, "Autonomy": 3}, {"Order": 7, "Autonomy": 4})
+    second = evaluate_compatibility_matrix({"Order": 8, "Autonomy": 3}, {"Order": 7, "Autonomy": 4})
+    assert first["rule_catalog_version"] == "1.0.0"
+    assert len(first["rule_catalog_hash"]) == 64
+    assert all(ch in "0123456789abcdef" for ch in first["rule_catalog_hash"])
+    assert first["rule_catalog_hash"] == second["rule_catalog_hash"]
+    assert first["rule_catalog"] == second["rule_catalog"]

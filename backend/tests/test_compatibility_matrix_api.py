@@ -81,3 +81,16 @@ def test_canonical_endpoint_exposes_heuristic_rule_catalog():
     assert rule["validation_status"] == "UNVALIDATED_HEURISTIC"
     assert rule["requires_human_review"] is True
     assert rule["context_sensitive"] is False
+
+
+
+def test_canonical_endpoint_identifies_exact_rule_catalog_version_and_hash():
+    response = client.post("/compatibility/v2/canonical", json={
+        "profile_a": {"P4.value_order": 8, "P4.value_autonomy": 3},
+        "profile_b": {"P4.value_order": 7, "P4.value_autonomy": 4},
+    })
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["rule_catalog_version"] == "1.0.0"
+    assert len(payload["rule_catalog_hash"]) == 64
+    assert payload["rule_catalog_hash"] == payload["rule_catalog_hash"].lower()
