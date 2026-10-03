@@ -219,6 +219,7 @@ def test_transformation_provenance_survives_science_lab_reload_and_report_hash()
     service.store=db
     service.research=None
     service.coordinator=None
+    service.transformation_provenance=TransformationProvenanceBinder(db)
     service.matrices={"reload-matrix":matrix}
     service.scenarios={"scenario":scenario}
     service.replication_assessments={}
