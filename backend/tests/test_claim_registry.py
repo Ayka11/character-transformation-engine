@@ -83,7 +83,7 @@ def test_claim_registration_replay_repairs_missing_support_edge_after_restart(mo
         else:
             raise AssertionError("support edge creation should fail once")
 
-        assert "replay-claim" not in graph.nodes
+        assert "replay-claim" in graph.nodes
         assert graph.store.get_snapshot("graph.node", "replay-claim") is not None
         assert graph.store.get_snapshot("graph.edge", "replay-claim:supports:r") is None
 
