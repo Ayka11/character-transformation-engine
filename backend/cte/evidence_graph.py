@@ -5,6 +5,7 @@ Persistence is intentionally left to the database layer.
 """
 from __future__ import annotations
 from dataclasses import dataclass
+from copy import deepcopy
 from .provenance import Provenance, ProvenanceTag, content_hash
 
 NODE_TYPES={"OBSERVATION","MEASUREMENT","DATASET","ANALYSIS","RESULT","REPLICATION","GENERALIZATION","CLAIM","PROTOCOL","REPORT","SOURCE","TRANSFORMATION"}
@@ -45,6 +46,9 @@ def register_node(node_id: str, node_type: str, entity_id: str, provenance_class
             raise ValueError(f"{field_name} must be a non-empty string")
     if not isinstance(metadata, dict):
         raise ValueError("node metadata must be an object")
+    # Graph nodes are immutable records: detach nested metadata from caller-owned
+    # dictionaries before hashing and retaining it on the dataclass.
+    metadata = deepcopy(metadata)
     if node_type not in NODE_TYPES:
         raise ValueError("unsupported graph node type")
     if provenance_class not in {x.value for x in ProvenanceTag}:
