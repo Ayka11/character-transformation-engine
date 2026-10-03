@@ -130,11 +130,40 @@ jobs:
               ).fetchone()
               assert sentinel is not None and sentinel[0] == {"preserve": True}, sentinel
 
-              # Remove the sentinel only after proving the guard preserved it;
-              # then verify that rollback succeeds for an empty rehearsal DB.
+              # Prove the event-only populated case is also protected. This
+              # catches a guard that accidentally checks snapshots but ignores events.
               conn.execute(
                   "DELETE FROM runtime_snapshots WHERE namespace=%s AND key=%s",
                   ("rollback-guard-test", "sentinel"),
+              )
+              conn.execute(
+                  "INSERT INTO runtime_events "
+                  "(event_id, namespace, event_type, payload_json, input_hash, output_hash, provenance_record_id) "
+                  "VALUES (%s, %s, %s, %s::jsonb, %s, %s, %s)",
+                  ("rollback-guard-event", "rollback-guard-test", "SENTINEL",
+                   '{"preserve": true}', "input-sentinel", "output-sentinel", "rollback-guard"),
+              )
+              try:
+                  conn.execute(down)
+              except psycopg.Error as exc:
+                  assert "Refusing destructive rollback" in str(exc), str(exc)
+                  conn.execute("ROLLBACK")
+              else:
+                  raise AssertionError("down migration unexpectedly accepted populated runtime_events")
+
+              tables={row[0] for row in conn.execute("SELECT table_name FROM information_schema.tables WHERE table_schema='public'")}
+              assert {"runtime_snapshots","runtime_events"}.issubset(tables), tables
+              event=conn.execute(
+                  "SELECT payload_json FROM runtime_events WHERE event_id=%s",
+                  ("rollback-guard-event",),
+              ).fetchone()
+              assert event is not None and event[0] == {"preserve": True}, event
+
+              # Remove the sentinel only after proving the guard preserved it;
+              # then verify that rollback succeeds for an empty rehearsal DB.
+              conn.execute(
+                  "DELETE FROM runtime_events WHERE event_id=%s",
+                  ("rollback-guard-event",),
               )
               conn.execute(down)
               tables={row[0] for row in conn.execute("SELECT table_name FROM information_schema.tables WHERE table_schema='public'")}
