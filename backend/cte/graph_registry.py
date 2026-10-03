@@ -667,27 +667,28 @@ class GraphRegistry:
                 ))
             return existing_claim
         self.add_node(claim)
-        try:
-            if result_id:
-                self.add_edge(register_edge(
-                    f"{claim_id}:supports:{result_id}",
-                    self.nodes[result_id],
-                    claim,
-                    "SUPPORTS",
-                    rationale=f"claim transition {current_state} -> {target_state}",
-                ))
-            if previous_claim_id:
-                self.add_edge(register_edge(
-                    f"{claim_id}:derived-from:{previous_claim_id}",
-                    claim,
-                    self.nodes[previous_claim_id],
-                    "DERIVED_FROM",
-                    rationale=f"claim state history {current_state} -> {target_state}",
-                ))
-            return claim
-        except Exception:
-            self.nodes.pop(claim_id, None)
-            raise
+        # Keep the registered claim in memory if a derived edge write fails.
+        # The snapshot/event may already be durable, and replaying this exact
+        # claim repairs any missing support/history edge via the existing-claim
+        # path above. Removing it here would leave persisted and in-memory
+        # graph state inconsistent until a restart or another registration.
+        if result_id:
+            self.add_edge(register_edge(
+                f"{claim_id}:supports:{result_id}",
+                self.nodes[result_id],
+                claim,
+                "SUPPORTS",
+                rationale=f"claim transition {current_state} -> {target_state}",
+            ))
+        if previous_claim_id:
+            self.add_edge(register_edge(
+                f"{claim_id}:derived-from:{previous_claim_id}",
+                claim,
+                self.nodes[previous_claim_id],
+                "DERIVED_FROM",
+                rationale=f"claim state history {current_state} -> {target_state}",
+            ))
+        return claim
 
     def require_transformation_lineage_for_result(self, result_id: str, execution_id: str) -> None:
         """Require an intact graph path from the result to its transformation execution."""
