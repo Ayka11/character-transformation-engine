@@ -137,6 +137,8 @@ def test_integrity_audit_accepts_untampered_definition_and_history(registry):
     assert result["valid"] is True
     assert result["definition_hash_valid"] is True
     assert result["history_valid"] is True
+    assert result["review_history_valid"] is True
+    assert result["review_event_count"] == 1
     assert result["event_count"] == 2
     assert result["current_status"] == "ACTIVE"
     assert result["violations"] == []
@@ -203,3 +205,44 @@ def test_author_cannot_review_and_review_is_bound_to_definition(registry):
         "regulation.review-binding", "1.0"
     )["definition_hash"]
     assert review["event_type"] == "PROTOCOL_REVIEW_RECORDED"
+
+
+
+def test_integrity_audit_detects_review_event_tampering(registry):
+    registry.register(definition(protocol_id="regulation.review-tampered"), actor_id="author")
+    review = registry.record_review(
+        "regulation.review-tampered", "1.0", reviewer_id="reviewer",
+        outcome="APPROVED", reason="independent review",
+    )
+    registry.transition(
+        "regulation.review-tampered", "1.0", target_status="ACTIVE",
+        actor_id="approver", reason="review complete",
+    )
+    with registry.store._connect() as conn:
+        conn.execute(
+            "UPDATE runtime_events SET output_hash=? WHERE event_id=?",
+            ("forged-review-hash", review["event_id"]),
+        )
+        conn.commit()
+    result = registry.verify_integrity("regulation.review-tampered", "1.0")
+    assert result["valid"] is False
+    assert result["review_history_valid"] is False
+    assert "review[0]:output_hash_mismatch" in result["violations"]
+    assert "event[1]:activation_without_valid_review" in result["violations"]
+
+
+def test_integrity_audit_detects_activation_without_review(registry):
+    registry.register(definition(protocol_id="regulation.audit-missing-review"), actor_id="author")
+    # Simulate a legacy or externally corrupted lifecycle event bypassing the service guard.
+    payload = registry._lifecycle_payload(
+        "regulation.audit-missing-review", "1.0", "ACTIVE", "approver", "legacy activation"
+    )
+    event_id = "protocol-lifecycle-" + __import__("cte.persistence", fromlist=["content_hash"]).content_hash(payload)
+    registry.store.append_event(
+        event_id, "protocol.registry.lifecycle", "PROTOCOL_LIFECYCLE_CHANGED",
+        payload, output_hash=__import__("cte.persistence", fromlist=["content_hash"]).content_hash(payload),
+        provenance_record_id="regulation.audit-missing-review@1.0",
+    )
+    result = registry.verify_integrity("regulation.audit-missing-review", "1.0")
+    assert result["valid"] is False
+    assert "event[1]:activation_without_valid_review" in result["violations"]
