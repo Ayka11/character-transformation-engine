@@ -11,6 +11,40 @@ from .provenance import Provenance, ProvenanceTag, content_hash
 NODE_TYPES={"OBSERVATION","MEASUREMENT","DATASET","ANALYSIS","RESULT","REPLICATION","GENERALIZATION","CLAIM","PROTOCOL","REPORT","SOURCE","TRANSFORMATION"}
 EDGE_TYPES={"MEASURED_FROM","DERIVED_FROM","ANALYZED_FROM","RESULTS_IN","REPLICATES","GENERALIZES","SUPPORTS","CONTRADICTS","QUALIFIES","LIMITS","BLOCKS","DOCUMENTS","USES_PROTOCOL","CITES_SOURCE"}
 
+class _FrozenDict(dict):
+    """A JSON-compatible dictionary that prevents mutation of registered metadata."""
+    def _immutable(self, *args, **kwargs):
+        raise TypeError("registered graph metadata is immutable")
+
+    __setitem__ = __delitem__ = clear = pop = popitem = setdefault = update = __ior__ = _immutable
+
+    def __deepcopy__(self, memo):
+        from copy import deepcopy
+        return deepcopy(dict(self), memo)
+
+
+class _FrozenList(list):
+    """A list-compatible sequence that prevents mutation of registered metadata."""
+    def _immutable(self, *args, **kwargs):
+        raise TypeError("registered graph metadata is immutable")
+
+    __setitem__ = __delitem__ = append = clear = extend = insert = pop = remove = reverse = sort = __iadd__ = __imul__ = _immutable
+
+    def __deepcopy__(self, memo):
+        from copy import deepcopy
+        return deepcopy(list(self), memo)
+
+
+def _freeze_metadata(value):
+    if isinstance(value, dict):
+        return _FrozenDict({key: _freeze_metadata(item) for key, item in value.items()})
+    if isinstance(value, list):
+        return _FrozenList(_freeze_metadata(item) for item in value)
+    if isinstance(value, tuple):
+        return tuple(_freeze_metadata(item) for item in value)
+    return value
+
+
 @dataclass(frozen=True)
 class GraphNode:
     node_id: str
@@ -60,6 +94,9 @@ def register_node(node_id: str, node_type: str, entity_id: str, provenance_class
         "provenance_class": provenance_class,
         "version": version,
     })
+    # Keep the public node metadata JSON-compatible but deeply immutable.
+    # Frozen dict/list subclasses preserve normal read and equality behavior.
+    metadata = _freeze_metadata(metadata)
     return GraphNode(
         node_id, node_type, entity_id, provenance_class, version,
         immutable_hash, metadata, envelope_hash,
