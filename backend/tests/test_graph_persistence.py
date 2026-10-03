@@ -1080,3 +1080,30 @@ def test_graph_recovery_rejects_tampered_audit_payload_before_edge_repair():
             build_registry(SQLiteRuntimeStore(path))
 
         assert SQLiteRuntimeStore(path).get_snapshot("graph.edge", derived_edge_id) is None
+
+
+def test_inference_block_rejects_invalid_rule_definitions():
+    import pytest
+
+    invalid_cases = [
+        ("inference_block_id", "", "inference_block_id must be a non-empty string"),
+        ("from_node_type", "   ", "from_node_type must be a non-empty string"),
+        ("to_claim_level", "NOT_A_CLAIM_LEVEL", "unsupported inference block claim level"),
+        ("blocked_inference", "", "blocked_inference must be a non-empty string"),
+        ("reason_code", None, "reason_code must be a non-empty string"),
+        ("rule_id", " ", "rule_id must be a non-empty string"),
+    ]
+    for field_name, invalid_value, message in invalid_cases:
+        graph = build_registry()
+        values = {
+            "inference_block_id": "invalid-inference-rule",
+            "from_node_type": "MODEL_OUTPUT",
+            "to_claim_level": "EVIDENCE_SUPPORTED",
+            "blocked_inference": "Do not infer evidence support from model output",
+            "reason_code": "MODEL_ONLY",
+            "rule_id": "RULE-1",
+        }
+        values[field_name] = invalid_value
+        with pytest.raises(ValueError, match=message):
+            graph.register_inference_block(**values)
+        assert "invalid-inference-rule" not in graph.inference_blocks
