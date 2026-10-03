@@ -44,3 +44,19 @@ def test_claim_upstream_types_are_derived_from_registered_graph():
     g.add_edge(register_edge("x3",rep,r,"REPLICATES"))
     g.add_edge(register_edge("x4",gen,r,"GENERALIZES"))
     assert g.claim_upstream_types("r2") == {"RESULT","ANALYSIS","DATASET","REPLICATION","GENERALIZATION"}
+
+
+def test_immutable_node_replay_rejects_provenance_or_version_change():
+    g=build_registry()
+    original=register_node("immutable","RESULT","immutable","DRV","1",{"x":1})
+    g.add_node(original)
+
+    for changed in (
+        register_node("immutable","RESULT","immutable","OBS","1",{"x":1}),
+        register_node("immutable","RESULT","immutable","DRV","2",{"x":1}),
+    ):
+        try:
+            g.add_node(changed)
+            assert False, "immutable node replay must reject envelope changes"
+        except ValueError as exc:
+            assert str(exc) == "immutable node conflict"
