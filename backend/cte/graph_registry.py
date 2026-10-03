@@ -206,6 +206,20 @@ class GraphRegistry:
         return registry
 
     def add_node(self, node: GraphNode) -> GraphNode:
+        canonical_node = register_node(
+            node.node_id, node.node_type, node.entity_id,
+            node.provenance_class, node.version, node.metadata,
+        )
+        if (
+            canonical_node.immutable_hash != node.immutable_hash
+            or (node.envelope_hash is not None
+                and canonical_node.envelope_hash != node.envelope_hash)
+        ):
+            raise ValueError("immutable node conflict")
+        # New writes always carry the stronger envelope fingerprint. A
+        # caller passing a legacy-shaped GraphNode is normalized before write.
+        if node.envelope_hash is None:
+            node = canonical_node
         if node.node_id in self.nodes:
             existing=self.nodes[node.node_id]
             # The content hash intentionally excludes envelope metadata for
@@ -274,6 +288,12 @@ class GraphRegistry:
             return existing
         if edge.from_node_id not in self.nodes or edge.to_node_id not in self.nodes:
             raise ValueError("edge references unknown node")
+        canonical_edge = register_edge(
+            edge.edge_id, self.nodes[edge.from_node_id], self.nodes[edge.to_node_id],
+            edge.edge_type, rationale=edge.rationale,
+        )
+        if canonical_edge != edge:
+            raise ValueError("immutable edge conflict")
         claim_id = edge.to_node_id if self.nodes.get(edge.to_node_id, None) and self.nodes[edge.to_node_id].node_type=="CLAIM" else (edge.from_node_id if self.nodes.get(edge.from_node_id, None) and self.nodes[edge.from_node_id].node_type=="CLAIM" else None)
         if self.store is not None:
             self.store.put_snapshot("graph.edge",edge.edge_id,{"edge_id":edge.edge_id,"from_node_id":edge.from_node_id,"to_node_id":edge.to_node_id,"edge_type":edge.edge_type,"relation_status":edge.relation_status,"input_hash":edge.input_hash,"rationale":edge.rationale},"1.4")
