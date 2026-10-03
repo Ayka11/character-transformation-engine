@@ -1,4 +1,7 @@
+import pytest
 from fastapi.testclient import TestClient
+from hashlib import sha256
+from json import dumps
 
 from cte.api import app
 
@@ -53,7 +56,6 @@ def test_legacy_compatibility_endpoint_remains_available():
     assert {"v1", "v2", "v3", "authoritative_scalar"} <= set(payload)
 
 
-
 def test_canonical_endpoint_exposes_result_semantics_and_context_boundary():
     response = client.post("/compatibility/v2/canonical", json={
         "profile_a": {"P1.sleep_quality": 7},
@@ -66,7 +68,6 @@ def test_canonical_endpoint_exposes_result_semantics_and_context_boundary():
     assert semantics["context_semantics"] == "ANNOTATION_ONLY"
     assert semantics["descriptive_row_count"] == 1
     assert semantics["heuristic_row_count"] == 0
-
 
 
 def test_canonical_endpoint_exposes_heuristic_rule_catalog():
@@ -83,7 +84,6 @@ def test_canonical_endpoint_exposes_heuristic_rule_catalog():
     assert rule["context_sensitive"] is False
 
 
-
 def test_canonical_endpoint_identifies_exact_rule_catalog_version_and_hash():
     response = client.post("/compatibility/v2/canonical", json={
         "profile_a": {"P4.value_order": 8, "P4.value_autonomy": 3},
@@ -94,3 +94,6 @@ def test_canonical_endpoint_identifies_exact_rule_catalog_version_and_hash():
     assert payload["rule_catalog_version"] == "1.0.0"
     assert len(payload["rule_catalog_hash"]) == 64
     assert payload["rule_catalog_hash"] == payload["rule_catalog_hash"].lower()
+    canonical = dumps(payload["rule_catalog"], sort_keys=True, separators=(",", ":"), ensure_ascii=False)
+    expected_hash = sha256(canonical.encode("utf-8")).hexdigest()
+    assert payload["rule_catalog_hash"] == expected_hash
