@@ -124,13 +124,22 @@ def test_temporary_database_file_is_removed_when_store_is_collected():
     assert store_ref() is None
     assert not path.exists()
 
-def test_event_listing_preserves_insertion_order_within_timestamp_bursts():
+def test_event_listing_preserves_insertion_order_when_timestamps_tie(monkeypatch):
+    from datetime import datetime, timezone
+    import cte.persistence as persistence
+
+    class FixedDateTime:
+        @classmethod
+        def now(cls, tz=None):
+            return datetime(2026, 10, 3, 17, 25, 0, 123456, tzinfo=timezone.utc)
+
+    monkeypatch.setattr(persistence, "datetime", FixedDateTime)
     store = SQLiteRuntimeStore(":memory:")
-    # Reverse lexical order deliberately: event IDs must not be used as a
-    # substitute for insertion order when timestamps share the same second.
+    # Reverse lexical order deliberately and force equal timestamps so row
+    # insertion order, not event ID, determines the audit stream order.
     store.append_event("z-first", "audit", "FIRST", {"position": 1})
     store.append_event("a-second", "audit", "SECOND", {"position": 2})
     events = store.list_events("audit")
 
     assert [event["event_id"] for event in events] == ["z-first", "a-second"]
-    assert all("." in event["created_at"] for event in events)
+    assert all(event["created_at"].endswith(".123456") for event in events)
