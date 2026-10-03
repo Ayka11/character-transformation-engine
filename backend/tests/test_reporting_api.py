@@ -41,6 +41,10 @@ def test_publish_endpoint_maps_snapshot_conflict_to_http_409(monkeypatch):
     def conflict(_report_id):
         raise SnapshotConflictError("snapshot concurrent update conflict")
 
+    from cte.reporting import ReportRun
+    service.runs["report-1"] = ReportRun(
+        "report-1", "spec-1", "study-1", "manifest", "input", status="QC_PASSED"
+    )
     monkeypatch.setattr(service, "publish", conflict)
     endpoint = next(
         route.endpoint for route in app.routes
@@ -53,3 +57,51 @@ def test_publish_endpoint_maps_snapshot_conflict_to_http_409(monkeypatch):
         assert "concurrent update conflict" in exc.detail
     else:
         raise AssertionError("snapshot conflict must map to HTTP 409")
+
+
+
+def test_publish_retry_repairs_graph_after_partial_failure(monkeypatch):
+    from fastapi import FastAPI
+    from cte.persistence import SQLiteRuntimeStore
+    from cte.reporting_api import install_reporting_api
+    from cte.reporting import SECTION_CODES
+
+    graph_service = _service()
+    graph = graph_service.registry
+    app = FastAPI()
+    service = install_reporting_api(app, graph, SQLiteRuntimeStore(":memory:"))
+    service.specs["rs"] = register_spec("rs", "Test")
+    service.create("rr-retry", "rs", "study-1", ["r"])
+    for ordinal, code in enumerate(SECTION_CODES):
+        service.add_section("rr-retry", code, {"section": code}, ["r"], ordinal)
+    assert service.qc_run("rr-retry")["status"] == "QC_PASSED"
+
+    endpoint = next(
+        route.endpoint for route in app.routes
+        if getattr(route, "path", None) == "/reports/{report_id}/publish"
+    )
+    original_add_edge = graph.add_edge
+    attempts = {"count": 0}
+
+    def fail_once(edge):
+        if attempts["count"] == 0:
+            attempts["count"] += 1
+            raise RuntimeError("simulated graph persistence failure")
+        return original_add_edge(edge)
+
+    monkeypatch.setattr(graph, "add_edge", fail_once)
+    try:
+        endpoint("rr-retry")
+    except RuntimeError as exc:
+        assert "simulated graph persistence failure" in str(exc)
+    else:
+        raise AssertionError("first publish attempt should simulate graph failure")
+
+    assert service.runs["rr-retry"].status == "PUBLISHED"
+    assert "rr-retry" in graph.nodes
+    assert "rr-retry:documents:r" not in graph.edges
+
+    result = endpoint("rr-retry")
+    assert result["report"]["status"] == "PUBLISHED"
+    assert result["graph_node"]["node_id"] == "rr-retry"
+    assert "rr-retry:documents:r" in graph.edges
