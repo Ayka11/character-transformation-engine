@@ -69,7 +69,7 @@ def register_spec(report_spec_id:str,name:str,version:str="1.6",
                   rendering_rules:dict|None=None,
                   claim_language_rules:dict|None=None)->ReportSpec:
     sections=tuple(section_order or SECTION_CODES)
-    if set(sections)!=set(SECTION_CODES):
+    if len(sections) != len(SECTION_CODES) or set(sections) != set(SECTION_CODES):
         raise ValueError("report specification must contain the V1.6 section set")
     frozen_rendering_rules = _freeze_json(rendering_rules or {})
     frozen_claim_language_rules = _freeze_json(claim_language_rules or {})
