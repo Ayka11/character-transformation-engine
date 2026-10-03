@@ -265,6 +265,7 @@ def test_transformation_provenance_survives_science_lab_reload_and_report_hash()
 def test_science_lab_does_not_trust_tampered_run_transformation_provenance():
     from cte.graph_registry import GraphRegistry
     from cte.science_lab import ExperimentMatrix, ScenarioDefinition, ScenarioRun, ScienceLabService
+    from cte.provenance import Provenance, ProvenanceTag
     from cte.evidence_graph import register_edge, register_node
 
     db = SQLiteRuntimeStore(":memory:")
