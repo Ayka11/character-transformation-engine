@@ -828,3 +828,90 @@ def test_claim_registration_retry_preserves_in_memory_claim_after_edge_failure(m
         assert store.get_snapshot(
             "graph.edge", "claim-retry-claim:supports:claim-retry-result"
         ) is not None
+
+
+def test_graph_recovery_repairs_missing_contradiction_audit_event_after_restart(monkeypatch):
+    import pytest
+
+    with TemporaryDirectory() as d:
+        path = str(Path(d) / "runtime.sqlite3")
+        store = SQLiteRuntimeStore(path)
+        graph = build_registry(store)
+        claim = register_node("restart-rule-claim", "CLAIM", "claim", "DRV", "1", {})
+        evidence = register_node("restart-rule-evidence", "DATASET", "evidence", "DRV", "1", {})
+        graph.add_node(claim)
+        graph.add_node(evidence)
+        original = store.append_event
+
+        def fail_rule_event(event_id, namespace, event_type, payload, *args, **kwargs):
+            if event_type == "CONTRADICTION_SET_REGISTERED":
+                raise OSError("simulated contradiction audit failure")
+            return original(event_id, namespace, event_type, payload, *args, **kwargs)
+
+        monkeypatch.setattr(store, "append_event", fail_rule_event)
+        with pytest.raises(OSError, match="contradiction audit failure"):
+            graph.register_contradiction_set(
+                "restart-rule-set", claim.node_id, [evidence.node_id], "CONFLICT",
+            )
+
+        assert store.get_snapshot("graph.contradiction", "restart-rule-set") is not None
+        assert not any(
+            event["event_type"] == "CONTRADICTION_SET_REGISTERED"
+            for event in store.list_events("graph")
+        )
+
+        recovered_store = SQLiteRuntimeStore(path)
+        recovered = build_registry(recovered_store)
+        events = recovered_store.list_events("graph")
+        assert "restart-rule-set" in recovered.contradiction_sets
+        assert len([
+            event for event in events
+            if event["event_type"] == "CONTRADICTION_SET_REGISTERED"
+            and event["payload"].get("contradiction_set_id") == "restart-rule-set"
+        ]) == 1
+        assert len([
+            event for event in recovered.audit_events
+            if event.contradiction_set_id == "restart-rule-set"
+        ]) == 1
+
+
+def test_graph_recovery_repairs_missing_inference_audit_event_after_restart(monkeypatch):
+    import pytest
+
+    with TemporaryDirectory() as d:
+        path = str(Path(d) / "runtime.sqlite3")
+        store = SQLiteRuntimeStore(path)
+        graph = build_registry(store)
+        original = store.append_event
+
+        def fail_rule_event(event_id, namespace, event_type, payload, *args, **kwargs):
+            if event_type == "INFERENCE_BLOCK_REGISTERED":
+                raise OSError("simulated inference audit failure")
+            return original(event_id, namespace, event_type, payload, *args, **kwargs)
+
+        monkeypatch.setattr(store, "append_event", fail_rule_event)
+        with pytest.raises(OSError, match="inference audit failure"):
+            graph.register_inference_block(
+                "restart-inference-block", "MODEL_OUTPUT", "EVIDENCE_SUPPORTED",
+                "block inference", "MODEL", "RULE-1",
+            )
+
+        assert store.get_snapshot("graph.inference", "restart-inference-block") is not None
+        assert not any(
+            event["event_type"] == "INFERENCE_BLOCK_REGISTERED"
+            for event in store.list_events("graph")
+        )
+
+        recovered_store = SQLiteRuntimeStore(path)
+        recovered = build_registry(recovered_store)
+        events = recovered_store.list_events("graph")
+        assert "restart-inference-block" in recovered.inference_blocks
+        assert len([
+            event for event in events
+            if event["event_type"] == "INFERENCE_BLOCK_REGISTERED"
+            and event["payload"].get("inference_block_id") == "restart-inference-block"
+        ]) == 1
+        assert len([
+            event for event in recovered.audit_events
+            if event.inference_block_id == "restart-inference-block"
+        ]) == 1
