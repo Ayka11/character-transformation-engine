@@ -32,3 +32,65 @@ def test_contradiction_and_inference_rules_survive_restart():
         g2=build_registry(SQLiteRuntimeStore(path))
         assert "cx" in g2.contradiction_sets
         assert "ib" in g2.inference_blocks
+
+
+def test_graph_recovery_rejects_semantically_tampered_node_even_with_rehashed_snapshot():
+    import json
+    import pytest
+    from cte.provenance import content_hash
+
+    with TemporaryDirectory() as d:
+        path = str(Path(d) / "runtime.sqlite3")
+        store = SQLiteRuntimeStore(path)
+        graph = build_registry(store)
+        graph.add_node(register_node("integrity-node", "DATASET", "entity", "DRV", "1", {"x": 1}))
+
+        with store._connect() as conn:
+            row = conn.execute(
+                "SELECT payload_json FROM runtime_snapshots WHERE namespace=? AND key=?",
+                ("graph.node", "integrity-node"),
+            ).fetchone()
+            payload = json.loads(row[0])
+            payload["metadata"]["x"] = 2
+            payload_json = json.dumps(payload, sort_keys=True, separators=(",", ":"))
+            conn.execute(
+                "UPDATE runtime_snapshots SET payload_json=?, payload_hash=? WHERE namespace=? AND key=?",
+                (payload_json, content_hash(payload), "graph.node", "integrity-node"),
+            )
+            conn.commit()
+
+        with pytest.raises(ValueError, match="evidence graph node integrity failure: integrity-node"):
+            build_registry(SQLiteRuntimeStore(path))
+
+
+def test_graph_recovery_rejects_edge_with_missing_endpoint():
+    import json
+    import pytest
+    from cte.provenance import content_hash
+
+    with TemporaryDirectory() as d:
+        path = str(Path(d) / "runtime.sqlite3")
+        store = SQLiteRuntimeStore(path)
+        graph = build_registry(store)
+        source = register_node("integrity-source", "ANALYSIS", "source", "DRV", "1", {})
+        target = register_node("integrity-target", "RESULT", "target", "DRV", "1", {})
+        graph.add_node(source)
+        graph.add_node(target)
+        graph.add_edge(register_edge("integrity-edge", source, target, "RESULTS_IN"))
+
+        with store._connect() as conn:
+            row = conn.execute(
+                "SELECT payload_json FROM runtime_snapshots WHERE namespace=? AND key=?",
+                ("graph.edge", "integrity-edge"),
+            ).fetchone()
+            payload = json.loads(row[0])
+            payload["to_node_id"] = "missing-target"
+            payload_json = json.dumps(payload, sort_keys=True, separators=(",", ":"))
+            conn.execute(
+                "UPDATE runtime_snapshots SET payload_json=?, payload_hash=? WHERE namespace=? AND key=?",
+                (payload_json, content_hash(payload), "graph.edge", "integrity-edge"),
+            )
+            conn.commit()
+
+        with pytest.raises(ValueError, match="evidence graph edge references missing node: integrity-edge"):
+            build_registry(SQLiteRuntimeStore(path))
