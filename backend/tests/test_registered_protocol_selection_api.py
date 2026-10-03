@@ -1,3 +1,4 @@
+import pytest
 from fastapi.testclient import TestClient
 
 from cte.api import app, RUNTIME_STORE
@@ -85,3 +86,27 @@ def test_registered_selection_keeps_unknown_safety_conditional():
     assert response.status_code == 200
     assert response.json()["candidates"][0]["status"] == "CONDITIONAL"
     assert response.json()["candidates"][0]["selection_authorized"] is False
+
+
+@pytest.mark.parametrize("lifecycle", ["DRAFT", "SUSPENDED", "RETIRED"])
+def test_non_active_registry_lifecycle_never_becomes_review_eligible(lifecycle):
+    protocol_id = f"api.registry.lifecycle-{lifecycle.lower()}"
+    registry = ProtocolRegistry(RUNTIME_STORE)
+    registry.register(definition(protocol_id=protocol_id), actor_id="test-author")
+
+    if lifecycle != "DRAFT":
+        registry.transition(protocol_id, "1.0", target_status="ACTIVE",
+                            actor_id="test-approver", reason="test activation")
+        if lifecycle in {"SUSPENDED", "RETIRED"}:
+            registry.transition(protocol_id, "1.0", target_status=lifecycle,
+                                actor_id="test-approver", reason="test lifecycle guard")
+
+    response = client.post(
+        "/protocols/v1/select-registered-candidates",
+        json=body(protocol_id=protocol_id),
+    )
+    assert response.status_code == 200
+    candidate = response.json()["candidates"][0]
+    assert candidate["status"] == "INELIGIBLE"
+    assert f"registry_status:{lifecycle}" in candidate["reasons"]
+    assert candidate["selection_authorized"] is False
