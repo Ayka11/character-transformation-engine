@@ -996,6 +996,14 @@ def test_postgres_full_durability_gate_crash_restore_and_adversarial_lineage():
         {"execution_id": execution_id},
     ))
     registry.add_node(register_node(
+        f"dataset-{suffix}", "DATASET", f"dataset-{suffix}", "EXP", "1",
+        {"execution_id": execution_id, "row_count": 1, "checksum": "dataset"},
+    ))
+    registry.add_edge(register_edge(
+        f"analysis-dataset-{suffix}", registry.nodes[f"analysis-{suffix}"],
+        registry.nodes[f"dataset-{suffix}"], "ANALYZED_FROM",
+    ))
+    registry.add_node(register_node(
         f"transform-{suffix}", "TRANSFORMATION", execution_id, "EXP", "1",
         {"execution_id": execution_id, "ledger_id": trusted["ledger_id"],
          "certificate_id": trusted["certificate_id"]},
