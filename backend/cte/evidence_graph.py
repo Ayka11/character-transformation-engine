@@ -6,7 +6,7 @@ Persistence is intentionally left to the database layer.
 from __future__ import annotations
 from dataclasses import dataclass
 from copy import deepcopy
-from .provenance import Provenance, ProvenanceTag, content_hash
+from .provenance import Provenance, ProvenanceTag, content_hash, json_safe
 
 NODE_TYPES={"OBSERVATION","MEASUREMENT","DATASET","ANALYSIS","RESULT","REPLICATION","GENERALIZATION","CLAIM","PROTOCOL","REPORT","SOURCE","TRANSFORMATION"}
 EDGE_TYPES={"MEASURED_FROM","DERIVED_FROM","ANALYZED_FROM","RESULTS_IN","REPLICATES","GENERALIZES","SUPPORTS","CONTRADICTS","QUALIFIES","LIMITS","BLOCKS","DOCUMENTS","USES_PROTOCOL","CITES_SOURCE"}
@@ -82,7 +82,10 @@ def register_node(node_id: str, node_type: str, entity_id: str, provenance_class
         raise ValueError("node metadata must be an object")
     # Graph nodes are immutable records: detach nested metadata from caller-owned
     # dictionaries before hashing and retaining it on the dataclass.
-    metadata = deepcopy(metadata)
+    # Match the JSON representation used by persistence before hashing and
+    # retaining metadata. Otherwise non-string keys or tuples can change shape
+    # across a restart even though their canonical hash remains the same.
+    metadata = deepcopy(json_safe(metadata))
     if node_type not in NODE_TYPES:
         raise ValueError("unsupported graph node type")
     if provenance_class not in {x.value for x in ProvenanceTag}:
