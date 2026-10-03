@@ -74,6 +74,10 @@ class GraphRegistry:
                 )
                 if canonical.immutable_hash != node.immutable_hash:
                     raise ValueError(f"evidence graph node integrity failure: {node.node_id}")
+                # Legacy snapshots predate envelope_hash; continue accepting
+                # them, but verify the stronger fingerprint whenever present.
+                if node.envelope_hash is not None and canonical.envelope_hash != node.envelope_hash:
+                    raise ValueError(f"evidence graph node envelope integrity failure: {node.node_id}")
             for edge in registry.edges.values():
                 if edge.from_node_id not in registry.nodes or edge.to_node_id not in registry.nodes:
                     # Preserve degraded recovery so downstream claim validation can
@@ -231,7 +235,7 @@ class GraphRegistry:
             return existing
         claim_id = node.node_id if node.node_type == "CLAIM" else None
         if self.store is not None:
-            self.store.put_snapshot("graph.node",node.node_id,{"node_id":node.node_id,"node_type":node.node_type,"entity_id":node.entity_id,"provenance_class":node.provenance_class,"version":node.version,"immutable_hash":node.immutable_hash,"metadata":node.metadata},node.version)
+            self.store.put_snapshot("graph.node",node.node_id,{"node_id":node.node_id,"node_type":node.node_type,"entity_id":node.entity_id,"provenance_class":node.provenance_class,"version":node.version,"immutable_hash":node.immutable_hash,"metadata":node.metadata,"envelope_hash":node.envelope_hash},node.version)
             # Persist the audit event before publishing the object into the
             # in-memory registry. If event persistence fails, callers must not
             # observe a registered node with a misleading in-memory audit trail.
