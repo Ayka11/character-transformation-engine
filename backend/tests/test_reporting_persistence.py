@@ -186,12 +186,12 @@ def test_publish_rolls_back_in_memory_state_when_persistence_fails():
             service.add_section("rr-publish-fail", code, {"section": code}, ["r"], ordinal)
         service.bind_claim("rr-publish-fail", "c")
         assert service.qc_run("rr-publish-fail")["status"] == "QC_PASSED"
-        original = store.put_snapshot
-        def fail_report_run(namespace, key, payload, version):
+        original = store.put_snapshot_if_hash
+        def fail_report_run(namespace, key, payload, version, *, expected_hash):
             if namespace == "report.run" and key == "rr-publish-fail":
                 raise OSError("simulated storage failure")
             return original(namespace, key, payload, version, expected_hash=expected_hash)
-        store.put_snapshot = fail_report_run
+        store.put_snapshot_if_hash = fail_report_run
         with pytest.raises(OSError, match="simulated storage failure"):
             service.publish("rr-publish-fail")
         run = service.runs["rr-publish-fail"]
