@@ -44,6 +44,7 @@ class GraphRegistry:
     contradiction_sets: dict[str, ContradictionSet] = field(default_factory=dict)
     inference_blocks: dict[str, InferenceBlock] = field(default_factory=dict)
     store: SQLiteRuntimeStore | None = None
+    integrity_errors: list[str] = field(default_factory=list)
 
     @classmethod
     def empty(cls, store: SQLiteRuntimeStore | None = None) -> "GraphRegistry":
@@ -73,7 +74,12 @@ class GraphRegistry:
                     raise ValueError(f"evidence graph node integrity failure: {node.node_id}")
             for edge in registry.edges.values():
                 if edge.from_node_id not in registry.nodes or edge.to_node_id not in registry.nodes:
-                    raise ValueError(f"evidence graph edge references missing node: {edge.edge_id}")
+                    # Preserve degraded recovery so downstream claim validation can
+                    # report missing lineage instead of crashing service startup.
+                    registry.integrity_errors.append(
+                        f"evidence graph edge references missing node: {edge.edge_id}"
+                    )
+                    continue
                 canonical_hash = content_hash({
                     "edge_id": edge.edge_id,
                     "from": edge.from_node_id,
