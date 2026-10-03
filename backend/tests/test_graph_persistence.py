@@ -996,3 +996,8 @@ def test_contradiction_requirements_reject_missing_evidence_after_recovery():
             match=f"contradiction set references missing node: missing-evidence-set:{evidence.node_id}",
         ):
             recovered.contradiction_requirements({claim.node_id})
+        with pytest.raises(
+            ValueError,
+            match=f"contradiction set references missing node: missing-evidence-set:{evidence.node_id}",
+        ):
+            recovered.indeterminate_requirements({claim.node_id}, None)
