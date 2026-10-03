@@ -518,8 +518,8 @@ class ScienceLabService:
             node_id, "GENERALIZATION", node_id, "EXP", "1.5",
             {"kind":"SCIENCE_LAB_GENERALIZATION_RUN","matrix_id":matrix_id,
              "source_result_id":source_result_id,"run_status":"REGISTERED",
-             "target_context":target_context},
-             "transformation_provenance": self._transformation_for_result(source_result_id),
+             "target_context":target_context,
+             "transformation_provenance": self._transformation_for_result(source_result_id)},
         ))
         self.registry.add_edge(register_edge(
             f"{node_id}:generalizes:{source_result_id}",
