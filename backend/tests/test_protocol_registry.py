@@ -130,6 +130,7 @@ def test_concurrent_lifecycle_transitions_use_compare_and_append(registry, monke
 
 def test_integrity_audit_accepts_untampered_definition_and_history(registry):
     registry.register(definition(protocol_id="regulation.audit"), actor_id="author")
+    registry.record_review("regulation.audit", "1.0", reviewer_id="reviewer", outcome="APPROVED", reason="independent review")
     registry.transition("regulation.audit", "1.0", target_status="ACTIVE",
                         actor_id="approver", reason="review complete")
     result = registry.verify_integrity("regulation.audit", "1.0")
