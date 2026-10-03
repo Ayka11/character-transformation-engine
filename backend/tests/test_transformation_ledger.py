@@ -22,7 +22,7 @@ def test_ledger_records_failed_intervention():
     ss=StateSnapshotStore(db)
     ledger=TransformationLedger(db)
     out=TransformationExecutor(ss,ledger).execute(
-        "e11","c1",2,{"tempo":5},
+        "e11","c1",1,{"tempo":5},
         TransformationContract("t1","1",expected_changes={"tempo":6}),
         lambda state: (_ for _ in ()).throw(RuntimeError("boom")))
     entry=ledger.list()[0]
