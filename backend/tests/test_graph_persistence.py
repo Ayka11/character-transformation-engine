@@ -1001,3 +1001,82 @@ def test_contradiction_requirements_reject_missing_evidence_after_recovery():
             match=f"contradiction set references missing node: missing-evidence-set:{evidence.node_id}",
         ):
             recovered.indeterminate_requirements({claim.node_id}, None)
+
+
+def test_graph_recovery_validates_audit_stream_before_repairing_derived_edges():
+    import pytest
+
+    with TemporaryDirectory() as d:
+        path = str(Path(d) / "runtime.sqlite3")
+        store = SQLiteRuntimeStore(path)
+        graph = build_registry(store)
+        claim = register_node("validate-first-claim", "CLAIM", "claim", "DRV", "1", {})
+        evidence = register_node("validate-first-evidence", "DATASET", "evidence", "DRV", "1", {})
+        graph.add_node(claim)
+        graph.add_node(evidence)
+        graph.register_contradiction_set(
+            "validate-first-set", claim.node_id, [evidence.node_id], "CONFLICT"
+        )
+        derived_edge_id = f"validate-first-set:contradicts:{evidence.node_id}:{claim.node_id}"
+
+        # Simulate a crash after the contradiction snapshot/event persisted but
+        # before its derived edge snapshot was durable, then corrupt the event
+        # stream independently. Recovery must reject the stream before writing
+        # the derived edge back into the database.
+        with store._connect() as conn:
+            conn.execute(
+                "DELETE FROM runtime_snapshots WHERE namespace=? AND key=?",
+                ("graph.edge", derived_edge_id),
+            )
+            conn.commit()
+        store.append_event(
+            "graph:node:unrecognized-orphan",
+            "graph",
+            "NODE_REGISTERED",
+            {"node_id": "unrecognized-orphan", "payload_hash": "invalid", "claim_id": None},
+        )
+
+        with pytest.raises(ValueError, match="orphan graph audit event: graph:node:unrecognized-orphan"):
+            build_registry(SQLiteRuntimeStore(path))
+
+        assert SQLiteRuntimeStore(path).get_snapshot("graph.edge", derived_edge_id) is None
+
+
+def test_graph_recovery_rejects_tampered_audit_payload_before_edge_repair():
+    import json
+    import pytest
+
+    with TemporaryDirectory() as d:
+        path = str(Path(d) / "runtime.sqlite3")
+        store = SQLiteRuntimeStore(path)
+        graph = build_registry(store)
+        claim = register_node("audit-payload-claim", "CLAIM", "claim", "DRV", "1", {})
+        evidence = register_node("audit-payload-evidence", "DATASET", "evidence", "DRV", "1", {})
+        graph.add_node(claim)
+        graph.add_node(evidence)
+        graph.register_contradiction_set(
+            "audit-payload-set", claim.node_id, [evidence.node_id], "CONFLICT"
+        )
+        derived_edge_id = f"audit-payload-set:contradicts:{evidence.node_id}:{claim.node_id}"
+        event_id = f"graph:edge:{derived_edge_id}"
+
+        with store._connect() as conn:
+            conn.execute(
+                "DELETE FROM runtime_snapshots WHERE namespace=? AND key=?",
+                ("graph.edge", derived_edge_id),
+            )
+            row = conn.execute(
+                "SELECT payload_json FROM runtime_events WHERE event_id=?", (event_id,)
+            ).fetchone()
+            payload = json.loads(row[0])
+            payload["payload_hash"] = "tampered"
+            conn.execute(
+                "UPDATE runtime_events SET payload_json=? WHERE event_id=?",
+                (json.dumps(payload, sort_keys=True, separators=(",", ":")), event_id),
+            )
+            conn.commit()
+
+        with pytest.raises(ValueError, match=f"graph audit event content mismatch: {event_id}"):
+            build_registry(SQLiteRuntimeStore(path))
+
+        assert SQLiteRuntimeStore(path).get_snapshot("graph.edge", derived_edge_id) is None
