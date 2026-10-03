@@ -28,6 +28,32 @@ CLAIM_ORDER={
     "INDETERMINATE":0,"UNSUPPORTED":0,"CONTRADICTED":0,
 }
 
+class _FrozenDict(dict):
+    """JSON-compatible dictionary for immutable report artifact payloads."""
+    def _immutable(self, *args, **kwargs):
+        raise TypeError("registered report artifact payload is immutable")
+    __setitem__ = __delitem__ = clear = pop = popitem = setdefault = update = __ior__ = _immutable
+    def __deepcopy__(self, memo):
+        return _FrozenDict({deepcopy(key, memo): deepcopy(value, memo) for key, value in self.items()})
+
+class _FrozenList(list):
+    """JSON-compatible list for immutable report artifact payloads."""
+    def _immutable(self, *args, **kwargs):
+        raise TypeError("registered report artifact payload is immutable")
+    __setitem__ = __delitem__ = append = clear = extend = insert = pop = remove = reverse = sort = __iadd__ = __imul__ = _immutable
+    def __deepcopy__(self, memo):
+        return _FrozenList(deepcopy(value, memo) for value in self)
+
+def _freeze_json(value):
+    if isinstance(value, dict):
+        return _FrozenDict({key: _freeze_json(item) for key, item in value.items()})
+    if isinstance(value, list):
+        return _FrozenList(_freeze_json(item) for item in value)
+    if isinstance(value, tuple):
+        return tuple(_freeze_json(item) for item in value)
+    return deepcopy(value)
+
+
 @dataclass(frozen=True)
 class ReportSpec:
     report_spec_id:str
@@ -45,11 +71,13 @@ def register_spec(report_spec_id:str,name:str,version:str="1.6",
     sections=tuple(section_order or SECTION_CODES)
     if set(sections)!=set(SECTION_CODES):
         raise ValueError("report specification must contain the V1.6 section set")
+    frozen_rendering_rules = _freeze_json(rendering_rules or {})
+    frozen_claim_language_rules = _freeze_json(claim_language_rules or {})
     payload={"report_spec_id":report_spec_id,"name":name,"version":version,
-             "section_order":sections,"rendering_rules":rendering_rules or {},
-             "claim_language_rules":claim_language_rules or {}}
-    return ReportSpec(report_spec_id,name,version,sections,rendering_rules or {},
-                      claim_language_rules or {},content_hash(payload))
+             "section_order":sections,"rendering_rules":frozen_rendering_rules,
+             "claim_language_rules":frozen_claim_language_rules}
+    return ReportSpec(report_spec_id,name,version,sections,frozen_rendering_rules,
+                      frozen_claim_language_rules,content_hash(payload))
 
 @dataclass(frozen=True)
 class ReportSection:
@@ -166,26 +194,34 @@ class ReportService:
             p=snap.payload
             if content_hash(p) != snap.payload_hash:
                 raise ValueError(f"report snapshot integrity failure: {snap.namespace}/{snap.key}")
+            sections = tuple(p["section_order"])
+            rendering_rules = _freeze_json(p.get("rendering_rules", {}))
+            language_rules = _freeze_json(p.get("claim_language_rules", {}))
+            spec_payload = {"report_spec_id": p["report_spec_id"], "name": p["name"],
+                "version": p["version"], "section_order": sections,
+                "rendering_rules": rendering_rules, "claim_language_rules": language_rules}
+            if content_hash(spec_payload) != p["immutable_hash"]:
+                raise ValueError(f"report snapshot integrity failure: report.spec/{snap.key} immutable hash")
             self.specs[p["report_spec_id"]]=ReportSpec(
-                p["report_spec_id"],p["name"],p["version"],tuple(p["section_order"]),
-                p.get("rendering_rules",{}),p.get("claim_language_rules",{}),p["immutable_hash"])
+                p["report_spec_id"],p["name"],p["version"],sections,
+                rendering_rules,language_rules,p["immutable_hash"])
         for snap in self.store.list_snapshots("report.run"):
             p=snap.payload
             if content_hash(p) != snap.payload_hash:
                 raise ValueError(f"report snapshot integrity failure: {snap.namespace}/{snap.key}")
             sections={k:ReportSection(v["report_section_id"],v["report_run_id"],v["section_code"],v["ordinal"],
-                v["content"],tuple(v["source_artifacts"]),v["derivation_rule_id"],v["derivation_rule_version"],
+                _freeze_json(v["content"]),tuple(v["source_artifacts"]),v["derivation_rule_id"],v["derivation_rule_version"],
                 v["evidence_status"],tuple(v["limitations"]),v["immutable_hash"]) for k,v in p.get("sections",{}).items()}
             bindings={k:ReportClaimBinding(v["binding_id"],v["report_run_id"],v["claim_id"],v["claim_status"],
                 tuple(v["supporting_nodes"]),tuple(v["limiting_nodes"]),tuple(v["contradiction_nodes"]),
                 v["allowed_language_rule_id"],v["generated_statement"],v["immutable_hash"]) for k,v in p.get("bindings",{}).items()}
             qc={k:ReportQC(v["report_qc_id"],v["report_run_id"],v["check_code"],v["status"],
-                v["observed"],v.get("expected"),v["message"],v["immutable_hash"]) for k,v in p.get("qc",{}).items()}
+                _freeze_json(v["observed"]),_freeze_json(v.get("expected")),v["message"],v["immutable_hash"]) for k,v in p.get("qc",{}).items()}
             self._run_snapshot_hashes[p["report_run_id"]]=snap.payload_hash
             self.runs[p["report_run_id"]]=ReportRun(
                 p["report_run_id"],p["report_spec_id"],p["study_id"],p["source_manifest_hash"],
                 p["report_input_hash"],p.get("status","REGISTERED"),tuple(p.get("source_artifacts",())),
-                dict(p.get("decisions",{})),sections,bindings,qc,p.get("report_output_hash"),p.get("superseded_by"),p.get("execution_id"),
+                {key: _freeze_json(value) for key, value in p.get("decisions",{}).items()},sections,bindings,qc,p.get("report_output_hash"),p.get("superseded_by"),p.get("execution_id"),
                 p.get("report_output_hash_version",1)
             )
             run=self.runs[p["report_run_id"]]
@@ -304,6 +340,16 @@ class ReportService:
 
     @_report_service_locked
     def register_spec(self,spec:ReportSpec)->ReportSpec:
+        frozen_rendering = _freeze_json(spec.rendering_rules)
+        frozen_language = _freeze_json(spec.claim_language_rules)
+        frozen_order = tuple(spec.section_order)
+        spec_payload = {"report_spec_id": spec.report_spec_id, "name": spec.name,
+            "version": spec.version, "section_order": frozen_order,
+            "rendering_rules": frozen_rendering, "claim_language_rules": frozen_language}
+        if content_hash(spec_payload) != spec.immutable_hash:
+            raise ValueError("report spec immutable hash mismatch")
+        spec = ReportSpec(spec.report_spec_id, spec.name, spec.version, frozen_order,
+            frozen_rendering, frozen_language, spec.immutable_hash)
         if spec.report_spec_id in self.specs:
             raise ValueError("report spec already registered")
         self.specs[spec.report_spec_id]=spec
@@ -338,8 +384,8 @@ class ReportService:
         if run is None: raise ValueError("report run is not registered")
         if run.status in {"PUBLISHED","SUPERSEDED"}: raise ValueError("immutable report cannot be modified")
         if decision_id in run.decisions: raise ValueError("report decision already registered")
-        payload={"decision_id":decision_id,"report_run_id":run_id,"decision_type":decision_type,"decision":decision,"rule_id":rule_id,"inputs":inputs,"rationale":rationale}
-        item={**payload,"immutable_hash":content_hash(payload)}
+        payload={"decision_id":decision_id,"report_run_id":run_id,"decision_type":decision_type,"decision":decision,"rule_id":rule_id,"inputs":_freeze_json(inputs),"rationale":rationale}
+        item=_FrozenDict({**payload,"immutable_hash":content_hash(payload)})
         run.decisions[decision_id]=item
         self._persist_run(run)
         return item
@@ -355,11 +401,12 @@ class ReportService:
         if evidence_status not in ALLOWED_EVIDENCE_STATUS: raise ValueError("unsupported evidence status")
         for artifact_id in source_artifacts:
             if artifact_id not in self.registry.nodes: raise ValueError(f"source artifact is not registered: {artifact_id}")
+        frozen_content = _freeze_json(content)
         payload={"report_section_id":f"{run_id}:{section_code}","report_run_id":run_id,"section_code":section_code,
-                 "ordinal":ordinal,"content":content,"source_artifacts":source_artifacts,
+                 "ordinal":ordinal,"content":frozen_content,"source_artifacts":source_artifacts,
                  "derivation_rule_id":derivation_rule_id,"derivation_rule_version":derivation_rule_version,
                  "evidence_status":evidence_status,"limitations":limitations or []}
-        sec=ReportSection(payload["report_section_id"],run_id,section_code,ordinal,content,tuple(source_artifacts),
+        sec=ReportSection(payload["report_section_id"],run_id,section_code,ordinal,frozen_content,tuple(source_artifacts),
                           derivation_rule_id,derivation_rule_version,evidence_status,tuple(limitations or []),content_hash(payload))
         if section_code in run.sections: raise ValueError("report section already registered")
         run.sections[section_code]=sec
@@ -399,6 +446,8 @@ class ReportService:
         observed=set(run.sections)
         checks={}
         def add(code,status,observed,expected,message):
+            observed = _freeze_json(observed)
+            expected = _freeze_json(expected)
             payload={"report_qc_id":f"{run_id}:{code}","run_id":run_id,"check_code":code,"status":status,"observed":observed,"expected":expected,"message":message}
             checks[code]=ReportQC(payload["report_qc_id"],run_id,code,status,observed,expected,message,content_hash(payload))
         add("REQUIRED_SECTIONS","PASS" if observed==expected else "FAIL",
