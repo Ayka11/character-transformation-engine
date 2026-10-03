@@ -89,6 +89,42 @@ class GraphRegistry:
                 })
                 if canonical_hash != edge.input_hash:
                     raise ValueError(f"evidence graph edge integrity failure: {edge.edge_id}")
+            for item in registry.contradiction_sets.values():
+                canonical_payload = {
+                    "contradiction_set_id": item.contradiction_set_id,
+                    "claim_id": item.claim_id,
+                    "node_ids": list(item.node_ids),
+                    "contradiction_type": item.contradiction_type,
+                    "resolution_status": item.resolution_status,
+                    "resolution_note": item.resolution_note,
+                }
+                if content_hash(canonical_payload) != item.immutable_hash:
+                    raise ValueError(
+                        f"evidence graph contradiction integrity failure: {item.contradiction_set_id}"
+                    )
+                claim = registry.nodes.get(item.claim_id)
+                if claim is None or claim.node_type != "CLAIM":
+                    registry.integrity_errors.append(
+                        f"contradiction set references missing claim: {item.contradiction_set_id}"
+                    )
+                for node_id in item.node_ids:
+                    if node_id not in registry.nodes:
+                        registry.integrity_errors.append(
+                            f"contradiction set references missing node: {item.contradiction_set_id}:{node_id}"
+                        )
+            for item in registry.inference_blocks.values():
+                canonical_payload = {
+                    "inference_block_id": item.inference_block_id,
+                    "from_node_type": item.from_node_type,
+                    "to_claim_level": item.to_claim_level,
+                    "blocked_inference": item.blocked_inference,
+                    "reason_code": item.reason_code,
+                    "rule_id": item.rule_id,
+                }
+                if content_hash(canonical_payload) != item.immutable_hash:
+                    raise ValueError(
+                        f"evidence graph inference integrity failure: {item.inference_block_id}"
+                    )
             # Reconcile deterministic audit events from validated snapshots before
             # loading the event stream. A process may have crashed after writing a
             # snapshot but before appending its corresponding event; restart must
