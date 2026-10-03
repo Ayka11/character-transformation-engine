@@ -34,6 +34,49 @@ ROLE_COMPETITION_RULES = {
 }
 
 
+def _value_rule_id(pair: set[str] | frozenset[str]) -> str:
+    return "value_tension." + ".".join(name.lower() for name in sorted(pair))
+
+
+def _role_rule_id(kind: str, role_a: str, role_b: str) -> str:
+    left, right = sorted((role_a.lower(), role_b.lower()))
+    return f"{kind}.{left}.{right}"
+
+
+def _rule_catalog() -> dict[str, dict[str, Any]]:
+    """Publish rule scope and validation limits alongside every heuristic finding."""
+    catalog: dict[str, dict[str, Any]] = {}
+    for pair, explanation in VALUE_TENSION_RULES.items():
+        rule_id = _value_rule_id(pair)
+        catalog[rule_id] = {
+            "rule_id": rule_id, "kind": "VALUE_TENSION", "domains": ["P4"],
+            "evidence_class": "HEURISTIC", "validation_status": "UNVALIDATED_HEURISTIC",
+            "explanation": explanation, "requires_human_review": True,
+            "context_sensitive": False, "intended_use": "review_prompt_only",
+        }
+    for pair, interaction in ROLE_SYNERGY_RULES.items():
+        left, right = sorted(pair)
+        rule_id = _role_rule_id("role_interaction", left, right)
+        catalog[rule_id] = {
+            "rule_id": rule_id, "kind": "ROLE_INTERACTION", "domains": ["P5"],
+            "evidence_class": "HEURISTIC", "validation_status": "UNVALIDATED_HEURISTIC",
+            "explanation": f"Potential role interaction: {interaction}",
+            "requires_human_review": True, "context_sensitive": False,
+            "intended_use": "review_prompt_only",
+        }
+    for pair in ROLE_COMPETITION_RULES:
+        role = next(iter(pair))
+        rule_id = _role_rule_id("role_competition", role, role)
+        catalog[rule_id] = {
+            "rule_id": rule_id, "kind": "ROLE_INTERACTION", "domains": ["P5"],
+            "evidence_class": "HEURISTIC", "validation_status": "UNVALIDATED_HEURISTIC",
+            "explanation": f"Potential role competition: {role} paired with {role}",
+            "requires_human_review": True, "context_sensitive": False,
+            "intended_use": "review_prompt_only",
+        }
+    return dict(sorted(catalog.items()))
+
+
 def _numeric_profile(profile: Mapping[str, Any], person: str) -> dict[str, float]:
     normalized: dict[str, float] = {}
     for key, value in profile.items():
@@ -78,7 +121,7 @@ def evaluate_compatibility_matrix(
                 "a_priorities": {left: a[left], right: a[right]},
                 "b_priorities": {left: b[left], right: b[right]},
                 "status": "CONDITIONAL",
-                "rule_id": "value_tension." + ".".join(sorted(pair)).lower(),
+                "rule_id": _value_rule_id(pair),
                 "evidence_class": "HEURISTIC", "explanation": VALUE_TENSION_RULES[pair],
                 "contexts": context_list, "requires_human_review": True,
             })
@@ -86,9 +129,9 @@ def evaluate_compatibility_matrix(
         for rb in role_b:
             pair = frozenset((ra, rb))
             if pair in ROLE_COMPETITION_RULES:
-                status, interaction, rule = "CONDITIONAL", "COMPETITION", "role_competition"
+                status, interaction, rule = "CONDITIONAL", "COMPETITION", _role_rule_id("role_competition", ra, rb)
             elif pair in ROLE_SYNERGY_RULES:
-                status, interaction, rule = "CONDITIONAL", ROLE_SYNERGY_RULES[pair], "role_interaction"
+                status, interaction, rule = "CONDITIONAL", ROLE_SYNERGY_RULES[pair], _role_rule_id("role_interaction", ra, rb)
             else:
                 status, interaction, rule = "UNKNOWN", "UNKNOWN", None
             rows.append({
@@ -131,6 +174,7 @@ def evaluate_compatibility_matrix(
         },
         "coverage": {"known_rows": known, "total_rows": len(rows), "unknown_rows": len(rows) - known},
         "domains": DOMAINS.copy(), "rows": rows, "contexts": context_list,
+        "rule_catalog": _rule_catalog(),
         "limitations": [
             "No authoritative compatibility percentage is produced.",
             "Heuristic rules are not empirically validated predictions.",

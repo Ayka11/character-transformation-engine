@@ -72,3 +72,28 @@ def test_unknown_only_result_is_not_described_as_a_compatibility_estimate():
     result = evaluate_compatibility_matrix({"Honesty": 4}, {"Autonomy": 3})
     assert result["result_semantics"]["interpretation"] == "UNKNOWN_ONLY"
     assert result["result_semantics"]["unknown_row_count"] == 2
+
+
+
+def test_heuristic_rows_reference_a_catalog_entry_with_explicit_validation_limits():
+    result = evaluate_compatibility_matrix(
+        {"Order": 8, "Autonomy": 3}, {"Order": 7, "Autonomy": 4},
+        roles_a=["Leader"], roles_b=["Strategist"],
+    )
+    catalog = result["rule_catalog"]
+    heuristic_rows = [row for row in result["rows"] if row["evidence_class"] == "HEURISTIC"]
+    assert heuristic_rows
+    for row in heuristic_rows:
+        metadata = catalog[row["rule_id"]]
+        assert metadata["validation_status"] == "UNVALIDATED_HEURISTIC"
+        assert metadata["requires_human_review"] is True
+        assert metadata["context_sensitive"] is False
+        assert metadata["intended_use"] == "review_prompt_only"
+
+
+def test_unknown_role_pair_has_no_fabricated_rule_catalog_entry():
+    result = evaluate_compatibility_matrix({}, {}, roles_a=["Artist"], roles_b=["Leader"])
+    row = next(row for row in result["rows"] if row["kind"] == "ROLE_INTERACTION")
+    assert row["status"] == "UNKNOWN"
+    assert row["rule_id"] is None
+    assert all(item["validation_status"] == "UNVALIDATED_HEURISTIC" for item in result["rule_catalog"].values())
