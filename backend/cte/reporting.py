@@ -420,7 +420,9 @@ class ReportService:
     def supersede(self,old_id:str,new_id:str)->ReportRun:
         old=self.runs.get(old_id); new=self.runs.get(new_id)
         if old is None or new is None: raise ValueError("both reports must be registered")
+        if old_id==new_id: raise ValueError("a report cannot supersede itself")
         if old.status!="PUBLISHED": raise ValueError("only published reports can be superseded")
+        if new.status!="PUBLISHED": raise ValueError("a report can only be superseded by a published report")
         old.superseded_by=new_id
         old.status="SUPERSEDED"
         self._persist_run(old)
