@@ -699,3 +699,44 @@ def test_add_edge_rejects_noncanonical_status_before_persistence():
 
         assert "forged-edge" not in graph.edges
         assert store.get_snapshot("graph.edge", "forged-edge") is None
+
+
+
+def test_graph_recovery_rejects_snapshot_version_column_mismatch():
+    import pytest
+
+    with TemporaryDirectory() as d:
+        path = str(Path(d) / "runtime.sqlite3")
+        store = SQLiteRuntimeStore(path)
+        graph = build_registry(store)
+        graph.add_node(register_node("envelope-version-node", "DATASET", "entity", "DRV", "1", {}))
+
+        with store._connect() as conn:
+            conn.execute(
+                "UPDATE runtime_snapshots SET version=? WHERE namespace=? AND key=?",
+                ("2", "graph.node", "envelope-version-node"),
+            )
+            conn.commit()
+
+        with pytest.raises(ValueError, match="evidence graph node snapshot envelope failure: envelope-version-node"):
+            build_registry(SQLiteRuntimeStore(path))
+
+
+def test_graph_recovery_rejects_snapshot_storage_hash_mismatch():
+    import pytest
+
+    with TemporaryDirectory() as d:
+        path = str(Path(d) / "runtime.sqlite3")
+        store = SQLiteRuntimeStore(path)
+        graph = build_registry(store)
+        graph.add_node(register_node("storage-hash-node", "DATASET", "entity", "DRV", "1", {}))
+
+        with store._connect() as conn:
+            conn.execute(
+                "UPDATE runtime_snapshots SET payload_hash=? WHERE namespace=? AND key=?",
+                ("incorrect-storage-hash", "graph.node", "storage-hash-node"),
+            )
+            conn.commit()
+
+        with pytest.raises(ValueError, match="evidence graph node storage hash failure: storage-hash-node"):
+            build_registry(SQLiteRuntimeStore(path))
