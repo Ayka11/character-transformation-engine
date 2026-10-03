@@ -70,7 +70,12 @@ class GraphRegistry:
                 p=snap.payload
                 if content_hash(p) != snap.payload_hash:
                     raise ValueError(f"evidence graph contradiction storage hash failure: {snap.key}")
-                if snap.key != p.get("contradiction_set_id") or snap.version != p.get("version"):
+                if (
+                    snap.key != p.get("contradiction_set_id")
+                    or snap.version != "1.4"
+                    or p.get("version") != "1.4"
+                    or p.get("provenance_class") != "DRV"
+                ):
                     raise ValueError(f"evidence graph contradiction snapshot envelope failure: {snap.key}")
                 registry.contradiction_sets[p["contradiction_set_id"]]=ContradictionSet(**p)
             for snap in store.list_snapshots("graph.inference"):
