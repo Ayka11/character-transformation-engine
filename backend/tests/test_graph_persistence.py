@@ -1231,6 +1231,8 @@ def test_graph_recovery_rejects_semantically_invalid_inference_snapshot_with_reh
 
 
 def test_graph_node_metadata_is_detached_from_caller_after_registration():
+    import pytest
+
     with TemporaryDirectory() as d:
         path = str(Path(d) / "runtime.sqlite3")
         store = SQLiteRuntimeStore(path)
@@ -1240,12 +1242,21 @@ def test_graph_node_metadata_is_detached_from_caller_after_registration():
 
         graph.add_node(node)
         metadata["nested"]["values"].append(3)
-        node.metadata["nested"]["values"].append(4)
 
-        assert graph.nodes["detached-metadata"].metadata == {"nested": {"values": [1, 2]}}
+        # Registered node metadata is deeply immutable, including nested lists,
+        # whether accessed through the original node or the registry.
+        with pytest.raises(TypeError, match="registered graph metadata is immutable"):
+            node.metadata["nested"]["values"].append(4)
+        with pytest.raises(TypeError, match="registered graph metadata is immutable"):
+            graph.nodes["detached-metadata"].metadata["nested"]["values"].append(5)
+        with pytest.raises(TypeError, match="registered graph metadata is immutable"):
+            graph.nodes["detached-metadata"].metadata["new"] = "tamper"
+
+        expected = {"nested": {"values": [1, 2]}}
+        assert graph.nodes["detached-metadata"].metadata == expected
         snapshot = store.get_snapshot("graph.node", "detached-metadata")
         assert snapshot is not None
-        assert snapshot.payload["metadata"] == {"nested": {"values": [1, 2]}}
+        assert snapshot.payload["metadata"] == expected
 
         restored = build_registry(SQLiteRuntimeStore(path))
-        assert restored.nodes["detached-metadata"].metadata == {"nested": {"values": [1, 2]}}
+        assert restored.nodes["detached-metadata"].metadata == expected
