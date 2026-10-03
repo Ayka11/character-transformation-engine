@@ -405,6 +405,9 @@ class ReportService:
         run=self.runs.get(run_id)
         if run is None: raise ValueError("report run is not registered")
         if run.status!="QC_PASSED": raise ValueError("report cannot publish before QC_PASSED")
+        current_qc=self.qc_run(run_id)
+        if current_qc["status"]!="QC_PASSED":
+            raise ValueError("report cannot publish because current-state QC failed")
         run.report_output_hash_version=2
         run.report_output_hash=content_hash({"run_id":run.report_run_id,
             "sections":[run.sections[k].immutable_hash for k in sorted(run.sections)],
