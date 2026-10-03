@@ -177,8 +177,12 @@ class GraphRegistry:
         nodes,edges=self.claim_subgraph(claim_id)
         ids={n.node_id for n in nodes}
         edge_ids={e.edge_id for e in edges}
-        return [e for e in self.audit_events if (e.claim_id==claim_id) or
-                (e.node_id in ids) or (e.edge_id in edge_ids)]
+        matching=[e for e in self.audit_events if (e.claim_id==claim_id) or
+                  (e.node_id in ids) or (e.edge_id in edge_ids)]
+        return sorted(matching, key=lambda e: (
+            e.operation, e.node_id or "", e.edge_id or "",
+            e.claim_id or "", e.payload_hash
+        ))
     
     def upstream_types(self, node_id: str) -> set[str]:
         if node_id not in self.nodes:
