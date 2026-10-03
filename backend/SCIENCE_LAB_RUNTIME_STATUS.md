@@ -30,7 +30,7 @@ GitHub Actions run **#397** passed the current main backend suite and live Postg
 ## Next open layers
 
 - production deployment approval and environment-specific PostgreSQL operations;
-- authentication/authorization;
+- external IAM/SSO and secret rotation;
 - observability and operational audit retention;
 - richer inferential statistics where contractually registered;
 - empirical scientific validation;
