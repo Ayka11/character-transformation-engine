@@ -40,7 +40,7 @@ def test_science_lab_lineage_can_reach_transformation_node():
     from cte.science_lab import ScienceLabService
 
     db=SQLiteRuntimeStore(":memory:")
-    registry=GraphRegistry(db)
+    registry=GraphRegistry.empty(db)
     binder=TransformationProvenanceBinder(db)
     from cte.transformation_runtime import TransformationExecutor
     executor=TransformationExecutor(StateSnapshotStore(db), TransformationLedger(db))
@@ -87,7 +87,7 @@ def test_science_lab_report_exposes_transformation_provenance_without_promotion(
 
     db=SQLiteRuntimeStore(":memory:")
     binder=TransformationProvenanceBinder(db)
-    registry=__import__("cte.graph_registry",fromlist=["GraphRegistry"]).GraphRegistry(db)
+    registry=__import__("cte.graph_registry",fromlist=["GraphRegistry"]).GraphRegistry.empty(db)
 
     # A missing execution is deliberately not promoted to validated evidence.
     tp=binder.bind_execution("report-missing")
@@ -125,7 +125,7 @@ def test_corrupted_transformation_provenance_cannot_support_claim():
     from cte.science_lab import ScienceLabService, ScenarioRun
 
     db=SQLiteRuntimeStore(":memory:")
-    registry=GraphRegistry(db)
+    registry=GraphRegistry.empty(db)
     service=object.__new__(ScienceLabService)
     service.store=db
     service.registry=registry
@@ -173,7 +173,7 @@ def test_transformation_provenance_survives_science_lab_reload_and_report_hash()
     from cte.science_lab import ScienceLabService, ExperimentMatrix, ScenarioDefinition, ScenarioRun
 
     db=SQLiteRuntimeStore(":memory:")
-    registry=GraphRegistry(db)
+    registry=GraphRegistry.empty(db)
     binder=TransformationProvenanceBinder(db)
     executor=TransformationExecutor(StateSnapshotStore(db), TransformationLedger(db))
     execution=executor.execute(
@@ -208,7 +208,7 @@ def test_transformation_provenance_survives_science_lab_reload_and_report_hash()
     assert bundle1["transformation_provenance"]["all_runs_validated"] is True
     assert bundle1["transformation_provenance"]["runs"][0]["certificate_id"] == execution.certificate.certificate_id
 
-    registry2=GraphRegistry(db)
+    registry2=GraphRegistry.empty(db)
     service2=object.__new__(ScienceLabService)
     service2.registry=registry2
     service2.store=db
