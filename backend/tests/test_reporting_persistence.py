@@ -327,6 +327,10 @@ def test_report_run_compare_and_swap_rejects_stale_service_writer():
         with pytest.raises(ValueError, match="snapshot concurrent update conflict"):
             service_b.add_decision("rr-cas", "decision-b", "QC", "deny", "rule", {}, "stale writer")
 
+        # A failed persistence operation must roll back the stale service's in-memory mutation too.
+        assert "decision-b" not in service_b.runs["rr-cas"].decisions
+        assert "decision-a" not in service_b.runs["rr-cas"].decisions
+
         recovered = ReportService(build_registry(SQLiteRuntimeStore(path)), SQLiteRuntimeStore(path))
         assert "decision-a" in recovered.runs["rr-cas"].decisions
         assert "decision-b" not in recovered.runs["rr-cas"].decisions
