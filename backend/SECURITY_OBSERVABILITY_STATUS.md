@@ -26,4 +26,4 @@ Production boundary:
 
 CI:
 - GitHub Actions run #397 passed the backend suite with the security/observability tests.
-- The live PostgreSQL integration job in the same run also passed.
+- The live PostgreSQL integration and migration rehearsal jobs in the same RC workflow also passed.
