@@ -445,7 +445,10 @@ class GraphRegistry:
         if not analysis_ids:
             raise ValueError("RESULT requires ANALYSIS -> RESULT lineage")
         for analysis_id in analysis_ids:
-            if self.nodes[analysis_id].node_type != "ANALYSIS":
+            analysis = self.nodes.get(analysis_id)
+            if analysis is None:
+                raise ValueError("RESULT lineage references missing ANALYSIS node")
+            if analysis.node_type != "ANALYSIS":
                 raise ValueError("RESULT lineage source must be ANALYSIS")
             upstream={
                 e.to_node_id for e in self.edges.values()
@@ -457,7 +460,9 @@ class GraphRegistry:
                     e.from_node_id for e in self.edges.values()
                     if e.to_node_id==analysis_id and e.edge_type=="ANALYZED_FROM"
                 }
-            if not any(self.nodes[x].node_type in {"DATASET","MEASUREMENT"} for x in upstream):
+            if any(node_id not in self.nodes for node_id in upstream):
+                raise ValueError("ANALYSIS lineage references missing source node")
+            if not any(self.nodes[node_id].node_type in {"DATASET","MEASUREMENT"} for node_id in upstream):
                 raise ValueError("ANALYSIS requires DATASET or MEASUREMENT upstream")
 
 def build_registry(store: SQLiteRuntimeStore | None = None) -> GraphRegistry:
