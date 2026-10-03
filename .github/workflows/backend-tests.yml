@@ -48,6 +48,11 @@ jobs:
           python -m pytest -vv --timeout=120 --durations=20 --maxfail=1
       - name: Check Science Lab UI JavaScript
         run: node --check frontend/app.js
+      - name: Verify v2.6 RC gate
+        env:
+          PYTHONPATH: ${{ github.workspace }}/backend
+          GITHUB_SHA: ${{ github.sha }}
+        run: python backend/scripts/verify_rc_gate.py
 
   postgres-integration:
     runs-on: ubuntu-latest
