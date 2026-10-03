@@ -42,7 +42,7 @@ Recovery / Detox notes:
 
 Important status boundary:
 - SPECIFIED contracts are not automatically IMPLEMENTED.
-- Runtime acceptance is CI-TESTED: GitHub Actions run #393 completed successfully with 251 tests passed and 12 skipped, including Research Execution V1.2, V2.2 E2E, Science Lab, transformation hardening, backup/recovery, and UI syntax checks. This is not scientific/empirical validation.
+- Runtime acceptance is CI-TESTED: GitHub Actions run #397 completed successfully with 251 tests passed and 12 skipped, including Research Execution V1.2, V2.2 E2E, Science Lab, transformation hardening, backup/recovery, PostgreSQL integration, migration rehearsal, and UI syntax checks. This is not scientific/empirical validation.
 - Model-derived rules remain model-derived unless separately supported by empirical evidence.
 - Production PostgreSQL, authentication/authorization, observability, and empirical validation remain open work.
 
