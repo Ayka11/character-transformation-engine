@@ -13,6 +13,7 @@ from .protocol_selection import _validate_protocol
 
 NAMESPACE = "protocol.registry.definition"
 EVENT_NAMESPACE = "protocol.registry.lifecycle"
+REVIEW_NAMESPACE = "protocol.registry.review"
 LIFECYCLE = frozenset({"DRAFT", "ACTIVE", "SUSPENDED", "RETIRED"})
 _ALLOWED = {
     "DRAFT": frozenset({"ACTIVE", "RETIRED"}),
@@ -64,6 +65,10 @@ class ProtocolRegistry:
         current = self._current_status(protocol_id, version)
         if target_status not in _ALLOWED[current]:
             raise ValueError(f"invalid lifecycle transition: {current} -> {target_status}")
+        if target_status == "ACTIVE" and not self._has_approved_review(
+            protocol_id, version, snapshot.payload_hash, actor_id.strip()
+        ):
+            raise ValueError("approved independent review required for activation")
         payload = self._lifecycle_payload(
             protocol_id, version, target_status, actor_id.strip(), reason.strip()
         )
@@ -76,6 +81,70 @@ class ProtocolRegistry:
         event = self.store.get_event(event_id)
         return {"protocol_id": protocol_id, "version": version, "definition_hash": snapshot.payload_hash,
                 "previous_status": current, "lifecycle": target_status, "lifecycle_event": event}
+
+
+    def record_review(self, protocol_id: str, version: str, *, reviewer_id: str,
+                      outcome: str, reason: str) -> dict[str, Any]:
+        """Append a review bound to this exact immutable definition hash.
+
+        The caller must supply reviewer_id from a verified server-side principal.
+        This method records governance evidence; it does not authenticate the caller.
+        """
+        if not all(isinstance(x, str) and x.strip()
+                   for x in (protocol_id, version, reviewer_id, outcome, reason)):
+            raise ValueError("protocol_id, version, reviewer_id, outcome and reason are required")
+        normalized_outcome = outcome.strip().upper()
+        if normalized_outcome not in {"APPROVED", "REJECTED"}:
+            raise ValueError("review outcome must be APPROVED or REJECTED")
+        snapshot = self.store.get_snapshot(NAMESPACE, f"{protocol_id}@{version}")
+        if snapshot is None:
+            raise KeyError(f"unknown protocol version: {protocol_id}@{version}")
+        lifecycle = self.history(protocol_id, version)
+        if not lifecycle:
+            raise ValueError("protocol definition has no lifecycle event")
+        author_id = lifecycle[0]["payload"].get("actor_id")
+        if reviewer_id.strip() == author_id:
+            raise ValueError("author cannot review own protocol")
+        if self._current_status(protocol_id, version) not in {"DRAFT", "SUSPENDED"}:
+            raise ValueError("reviews can only be recorded for DRAFT or SUSPENDED protocols")
+        payload = {
+            "protocol_id": protocol_id, "version": version,
+            "definition_hash": snapshot.payload_hash, "author_id": author_id,
+            "reviewer_id": reviewer_id.strip(), "outcome": normalized_outcome,
+            "reason": reason.strip(),
+            "recorded_at": datetime.now(timezone.utc).isoformat(timespec="microseconds"),
+        }
+        event_id = "protocol-review-" + content_hash(payload)
+        self.store.append_event(
+            event_id, REVIEW_NAMESPACE, "PROTOCOL_REVIEW_RECORDED", payload,
+            output_hash=content_hash(payload), provenance_record_id=f"{protocol_id}@{version}",
+        )
+        return self.store.get_event(event_id)
+
+    def _has_approved_review(self, protocol_id: str, version: str,
+                             definition_hash: str, approver_id: str) -> bool:
+        lifecycle = self.history(protocol_id, version)
+        if not lifecycle:
+            return False
+        author_id = lifecycle[0]["payload"].get("actor_id")
+        for event in self.store.list_events(REVIEW_NAMESPACE):
+            payload = event.get("payload", {})
+            if payload.get("protocol_id") != protocol_id or payload.get("version") != version:
+                continue
+            if payload.get("definition_hash") != definition_hash or payload.get("outcome") != "APPROVED":
+                continue
+            if payload.get("author_id") != author_id or payload.get("reviewer_id") in {author_id, approver_id}:
+                continue
+            if event.get("event_type") != "PROTOCOL_REVIEW_RECORDED":
+                continue
+            if event.get("event_id") != "protocol-review-" + content_hash(payload):
+                continue
+            if event.get("output_hash") != content_hash(payload):
+                continue
+            if event.get("provenance_record_id") != f"{protocol_id}@{version}":
+                continue
+            return True
+        return False
 
     def get(self, protocol_id: str, version: str) -> dict[str, Any] | None:
         snapshot = self.store.get_snapshot(NAMESPACE, f"{protocol_id}@{version}")
