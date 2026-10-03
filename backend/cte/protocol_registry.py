@@ -64,7 +64,16 @@ class ProtocolRegistry:
         current = self._current_status(protocol_id, version)
         if target_status not in _ALLOWED[current]:
             raise ValueError(f"invalid lifecycle transition: {current} -> {target_status}")
-        event = self._append_lifecycle(protocol_id, version, target_status, actor_id.strip(), reason.strip())
+        payload = self._lifecycle_payload(
+            protocol_id, version, target_status, actor_id.strip(), reason.strip()
+        )
+        event_id = "protocol-lifecycle-" + content_hash(payload)
+        self.store.append_event_if_latest_status(
+            EVENT_NAMESPACE, protocol_id, version, current, event_id,
+            "PROTOCOL_LIFECYCLE_CHANGED", payload, output_hash=content_hash(payload),
+            provenance_record_id=f"{protocol_id}@{version}",
+        )
+        event = self.store.get_event(event_id)
         return {"protocol_id": protocol_id, "version": version, "definition_hash": snapshot.payload_hash,
                 "previous_status": current, "lifecycle": target_status, "lifecycle_event": event}
 
@@ -91,17 +100,20 @@ class ProtocolRegistry:
                   and event["payload"].get("version") == version]
         return sorted(events, key=lambda event: event["payload"].get("recorded_at", ""))
 
+    def _lifecycle_payload(self, protocol_id: str, version: str, status: str,
+                           actor_id: str, reason: str) -> dict[str, Any]:
+        return {"protocol_id": protocol_id, "version": version, "status": status,
+                "actor_id": actor_id, "reason": reason,
+                "recorded_at": datetime.now(timezone.utc).isoformat(timespec="microseconds")}
+
     def _append_lifecycle(self, protocol_id: str, version: str, status: str,
                           actor_id: str, reason: str) -> dict[str, Any]:
-        payload = {"protocol_id": protocol_id, "version": version, "status": status,
-                   "actor_id": actor_id, "reason": reason,
-                   "recorded_at": datetime.now(timezone.utc).isoformat(timespec="microseconds")}
+        payload = self._lifecycle_payload(protocol_id, version, status, actor_id, reason)
         event_id = "protocol-lifecycle-" + content_hash(payload)
         self.store.append_event(event_id, EVENT_NAMESPACE, "PROTOCOL_LIFECYCLE_CHANGED",
                                 payload, output_hash=content_hash(payload),
                                 provenance_record_id=f"{protocol_id}@{version}")
-        event = self.store.get_event(event_id)
-        return event
+        return self.store.get_event(event_id)
 
     def _current_status(self, protocol_id: str, version: str) -> str:
         events = self.history(protocol_id, version)

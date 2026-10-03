@@ -193,6 +193,39 @@ class SQLiteRuntimeStore:
                 raise ValueError("immutable event conflict")
             conn.commit()
 
+    def append_event_if_latest_status(
+        self, namespace: str, protocol_id: str, version: str, expected_status: str,
+        event_id: str, event_type: str, payload: dict, output_hash: str | None = None,
+        provenance_record_id: str | None = None,
+    ) -> None:
+        """Atomically compare lifecycle state and append one event, or fail on a race."""
+        payload_json = json.dumps(payload, sort_keys=True, separators=(",", ":"))
+        with self._connect() as conn:
+            conn.execute("BEGIN IMMEDIATE")
+            try:
+                row = conn.execute(
+                    """SELECT payload_json FROM runtime_events
+                       WHERE namespace = ?
+                         AND json_extract(payload_json, '$.protocol_id') = ?
+                         AND json_extract(payload_json, '$.version') = ?
+                       ORDER BY json_extract(payload_json, '$.recorded_at') DESC
+                       LIMIT 1""",
+                    (namespace, protocol_id, version),
+                ).fetchone()
+                current = json.loads(row[0]).get("status") if row else None
+                if current != expected_status:
+                    raise ValueError("concurrent lifecycle transition conflict")
+                conn.execute(
+                    """INSERT INTO runtime_events
+                       (event_id,namespace,event_type,payload_json,output_hash,provenance_record_id)
+                       VALUES(?,?,?,?,?,?)""",
+                    (event_id, namespace, event_type, payload_json, output_hash, provenance_record_id),
+                )
+                conn.commit()
+            except Exception:
+                conn.rollback()
+                raise
+
     def get_event(self, event_id: str) -> dict | None:
         with self._connect() as conn:
             row=conn.execute("SELECT event_type,namespace,payload_json,input_hash,output_hash,provenance_record_id,created_at FROM runtime_events WHERE event_id=?", (event_id,)).fetchone()
