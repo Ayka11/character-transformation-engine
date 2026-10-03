@@ -321,8 +321,14 @@ class GraphRegistry:
             s.claim_id in claim_ids and s.resolution_status in {"OPEN","UNRESOLVED"}
             for s in self.contradiction_sets.values()
         )
-        has_insufficient=bool(result_id and self.nodes[result_id].metadata.get("insufficient_information",False))
-        has_not_estimable=bool(result_id and self.nodes[result_id].metadata.get("qc_status")=="NOT_ESTIMABLE")
+        if result_id is not None:
+            result = self.nodes.get(result_id)
+            if result is None or result.node_type != "RESULT":
+                raise ValueError("RESULT node is not registered")
+        else:
+            result = None
+        has_insufficient=bool(result and result.metadata.get("insufficient_information",False))
+        has_not_estimable=bool(result and result.metadata.get("qc_status")=="NOT_ESTIMABLE")
         return {"insufficient_or_conflicting_information"} if (has_conflict or has_insufficient or has_not_estimable) else set()
 
     def blocked_by_inference_rules(self, result_id: str, target_state: str) -> list[InferenceBlock]:
@@ -357,6 +363,10 @@ class GraphRegistry:
                 raise ValueError("current_state does not match previous claim state")
             if result_id is None:
                 result_id=previous.metadata.get("result_id")
+        if result_id is not None:
+            result = self.nodes.get(result_id)
+            if result is None or result.node_type != "RESULT":
+                raise ValueError("RESULT node is not registered")
         terminal_state=target_state in {"CONTRADICTED","INDETERMINATE"}
         if not terminal_state and (target_state != "REGISTERED" or current_state != "HYPOTHESIS"):
             if not result_id:
