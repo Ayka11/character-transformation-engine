@@ -4,6 +4,7 @@ from dataclasses import dataclass, field
 from .evidence_graph import GraphNode, GraphEdge, register_node, register_edge
 from .provenance import content_hash
 from .persistence import SQLiteRuntimeStore
+from .claim_gate import CLAIM_LEVELS
 
 @dataclass(frozen=True)
 class GraphAuditEvent:
@@ -523,6 +524,18 @@ class GraphRegistry:
     def register_inference_block(self, inference_block_id: str, from_node_type: str,
                                  to_claim_level: str, blocked_inference: str,
                                  reason_code: str, rule_id: str) -> InferenceBlock:
+        for field_name, value in (
+            ("inference_block_id", inference_block_id),
+            ("from_node_type", from_node_type),
+            ("to_claim_level", to_claim_level),
+            ("blocked_inference", blocked_inference),
+            ("reason_code", reason_code),
+            ("rule_id", rule_id),
+        ):
+            if not isinstance(value, str) or not value.strip():
+                raise ValueError(f"{field_name} must be a non-empty string")
+        if to_claim_level not in CLAIM_LEVELS:
+            raise ValueError("unsupported inference block claim level")
         payload={"inference_block_id":inference_block_id,"from_node_type":from_node_type,
                  "to_claim_level":to_claim_level,"blocked_inference":blocked_inference,
                  "reason_code":reason_code,"rule_id":rule_id}
