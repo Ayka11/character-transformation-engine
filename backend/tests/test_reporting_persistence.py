@@ -526,3 +526,25 @@ def test_report_spec_rejects_duplicate_section_codes_even_when_all_codes_are_pre
             "Duplicate section order",
             section_order=duplicated_order,
         )
+
+
+def test_report_sections_require_unique_non_negative_integer_ordinals():
+    import pytest
+
+    with TemporaryDirectory() as d:
+        store = SQLiteRuntimeStore(str(Path(d) / "runtime.sqlite3"))
+        graph = _graph(store)
+        service = ReportService(graph, store)
+        service.register_spec(register_spec("rs-ordinals", "Ordinal validation"))
+        service.create("rr-ordinals", "rs-ordinals", "study", ["r"])
+        service.add_section("rr-ordinals", SECTION_CODES[0], {"section": SECTION_CODES[0]}, ["r"], 0)
+
+        with pytest.raises(ValueError, match="report section ordinal already registered"):
+            service.add_section("rr-ordinals", SECTION_CODES[1], {"section": SECTION_CODES[1]}, ["r"], 0)
+
+        for invalid_ordinal in (-1, 1.5, True):
+            with pytest.raises(ValueError, match="report section ordinal must be a non-negative integer"):
+                service.add_section(
+                    "rr-ordinals", SECTION_CODES[1], {"section": SECTION_CODES[1]},
+                    ["r"], invalid_ordinal,
+                )
