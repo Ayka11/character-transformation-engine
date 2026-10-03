@@ -103,6 +103,39 @@ jobs:
               conn.execute(up)
               tables={row[0] for row in conn.execute("SELECT table_name FROM information_schema.tables WHERE table_schema='public'")}
               assert {"runtime_snapshots","runtime_events"}.issubset(tables)
+
+              # A populated database must reject the destructive down migration.
+              conn.execute(
+                  "INSERT INTO runtime_snapshots "
+                  "(namespace, key, version, payload_json, payload_hash) "
+                  "VALUES (%s, %s, %s, %s::jsonb, %s)",
+                  ("rollback-guard-test", "sentinel", "1", '{"preserve": true}', "sentinel-hash"),
+              )
+              try:
+                  conn.execute(down)
+              except psycopg.Error as exc:
+                  assert "Refusing destructive rollback" in str(exc), str(exc)
+                  # The down migration opens an explicit transaction; clear its
+                  # aborted transaction before checking that the sentinel survived.
+                  conn.execute("ROLLBACK")
+              else:
+                  raise AssertionError("down migration unexpectedly accepted populated runtime tables")
+
+              tables={row[0] for row in conn.execute("SELECT table_name FROM information_schema.tables WHERE table_schema='public'")}
+              assert {"runtime_snapshots","runtime_events"}.issubset(tables), tables
+              sentinel=conn.execute(
+                  "SELECT payload_json FROM runtime_snapshots "
+                  "WHERE namespace=%s AND key=%s",
+                  ("rollback-guard-test", "sentinel"),
+              ).fetchone()
+              assert sentinel is not None and sentinel[0] == {"preserve": True}, sentinel
+
+              # Remove the sentinel only after proving the guard preserved it;
+              # then verify that rollback succeeds for an empty rehearsal DB.
+              conn.execute(
+                  "DELETE FROM runtime_snapshots WHERE namespace=%s AND key=%s",
+                  ("rollback-guard-test", "sentinel"),
+              )
               conn.execute(down)
               tables={row[0] for row in conn.execute("SELECT table_name FROM information_schema.tables WHERE table_schema='public'")}
               assert "runtime_snapshots" not in tables and "runtime_events" not in tables
