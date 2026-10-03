@@ -190,9 +190,9 @@ def test_edge_replay_repairs_audit_event_after_partial_write(monkeypatch):
         else:
             raise AssertionError("first audit append should fail")
 
-        assert store.list_events("graph") == [
-            e for e in store.list_events("graph") if e.get("event_type") != "EDGE_REGISTERED"
-        ]
+        assert not any(
+            e["event_type"] == "EDGE_REGISTERED" for e in store.list_events("graph")
+        )
         graph.add_edge(edge)
         events = store.list_events("graph")
         assert len([e for e in events if e["event_type"] == "EDGE_REGISTERED"]) == 1
