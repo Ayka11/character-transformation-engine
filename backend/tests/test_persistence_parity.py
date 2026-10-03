@@ -70,3 +70,51 @@ def test_postgres_atomic_snapshot_rollback_matches_sqlite():
             cur.execute(
                 "DELETE FROM runtime_snapshots WHERE namespace='parity.rollback'"
             )
+
+
+
+def _compare_and_swap_contract(store, namespace, key):
+    first = store.put_snapshot_if_hash(
+        namespace, key, {"value": 1}, "1.0", expected_hash=None
+    )
+    second = store.put_snapshot_if_hash(
+        namespace, key, {"value": 2}, "1.0", expected_hash=first.payload_hash
+    )
+    with pytest.raises(ValueError, match="snapshot concurrent update conflict"):
+        store.put_snapshot_if_hash(
+            namespace, key, {"value": 3}, "1.0", expected_hash=first.payload_hash
+        )
+    latest = store.get_snapshot(namespace, key)
+    assert latest is not None
+    assert latest.payload == {"value": 2}
+    assert latest.payload_hash == second.payload_hash
+    return second.payload_hash
+
+
+def test_sqlite_snapshot_compare_and_swap_rejects_stale_hash():
+    _compare_and_swap_contract(
+        SQLiteRuntimeStore(":memory:"), "parity.cas", "stale-writer"
+    )
+
+
+@pytest.mark.skipif(
+    not os.getenv("CTE_DATABASE_URL"),
+    reason="CTE_DATABASE_URL is required for live PostgreSQL parity",
+)
+def test_postgres_snapshot_compare_and_swap_matches_sqlite():
+    from cte.postgres_persistence import PostgreSQLRuntimeStore
+
+    namespace = "parity.cas"
+    key = f"stale-writer-{os.urandom(6).hex()}"
+    sqlite_hash = _compare_and_swap_contract(
+        SQLiteRuntimeStore(":memory:"), namespace, "sqlite-stale-writer"
+    )
+    store = PostgreSQLRuntimeStore(os.environ["CTE_DATABASE_URL"])
+    postgres_hash = _compare_and_swap_contract(store, namespace, key)
+    assert postgres_hash == sqlite_hash
+    with store.transaction() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                "DELETE FROM runtime_snapshots WHERE namespace=%s AND key=%s",
+                (namespace, key),
+            )
