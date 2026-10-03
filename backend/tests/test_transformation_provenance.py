@@ -75,7 +75,7 @@ def test_science_lab_lineage_can_reach_transformation_node():
         rationale="test dataset lineage"
     ))
     registry.add_node(__import__("cte.evidence_graph",fromlist=["register_node"]).register_node(
-        "result:lineage-1","RESULT","result:lineage-1","EXP","1.0",{}
+        "result:lineage-1","RESULT","result:lineage-1","EXP","1.0",{"qc_status":"PASS","validated_descriptive_result":True}
     ))
     registry.add_edge(__import__("cte.evidence_graph",fromlist=["register_edge"]).register_edge(
         "scenario:lineage-1:result",
