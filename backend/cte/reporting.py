@@ -275,6 +275,14 @@ class ReportService:
                       "claim_language_rules":spec.claim_language_rules}
         if content_hash(spec_payload)!=spec.immutable_hash:
             raise ValueError(f"report snapshot integrity failure: report.spec/{spec.report_spec_id} immutable hash")
+        ordinals = [section.ordinal for section in run.sections.values()]
+        if (
+            any(type(ordinal) is not int or ordinal < 0 for ordinal in ordinals)
+            or len(set(ordinals)) != len(ordinals)
+        ):
+            raise ValueError(
+                f"report snapshot integrity failure: report.run/{run.report_run_id} section ordinals invalid"
+            )
         for key,section in run.sections.items():
             payload={"report_section_id":section.report_section_id,"report_run_id":section.report_run_id,
                      "section_code":section.section_code,"ordinal":section.ordinal,"content":section.content,
