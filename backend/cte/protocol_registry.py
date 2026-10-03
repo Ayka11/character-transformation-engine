@@ -225,14 +225,86 @@ class ProtocolRegistry:
             previous_status = payload.get("status")
             previous_time = timestamp if isinstance(timestamp, str) else previous_time
 
+        review_events = [
+            event for event in self.store.list_events(REVIEW_NAMESPACE)
+            if event.get("payload", {}).get("protocol_id") == protocol_id
+            and event.get("payload", {}).get("version") == version
+        ]
+        valid_reviews = []
+        author_id = events[0].get("payload", {}).get("actor_id") if events else None
+        for index, event in enumerate(review_events):
+            payload = event.get("payload", {})
+            prefix = f"review[{index}]"
+            review_valid = True
+            if event.get("event_type") != "PROTOCOL_REVIEW_RECORDED":
+                violations.append(f"{prefix}:event_type_mismatch")
+                review_valid = False
+            if payload.get("protocol_id") != protocol_id or payload.get("version") != version:
+                violations.append(f"{prefix}:identity_mismatch")
+                review_valid = False
+            if payload.get("definition_hash") != snapshot.payload_hash:
+                violations.append(f"{prefix}:definition_hash_mismatch")
+                review_valid = False
+            if payload.get("author_id") != author_id:
+                violations.append(f"{prefix}:author_identity_mismatch")
+                review_valid = False
+            reviewer_id = payload.get("reviewer_id")
+            if not isinstance(reviewer_id, str) or not reviewer_id.strip():
+                violations.append(f"{prefix}:reviewer_missing")
+                review_valid = False
+            elif reviewer_id == author_id:
+                violations.append(f"{prefix}:self_review")
+                review_valid = False
+            if payload.get("outcome") not in {"APPROVED", "REJECTED"}:
+                violations.append(f"{prefix}:outcome_invalid")
+                review_valid = False
+            if not isinstance(payload.get("reason"), str) or not payload.get("reason", "").strip():
+                violations.append(f"{prefix}:reason_missing")
+                review_valid = False
+            timestamp = payload.get("recorded_at")
+            if not isinstance(timestamp, str) or not timestamp:
+                violations.append(f"{prefix}:timestamp_missing")
+                review_valid = False
+            if event.get("output_hash") != content_hash(payload):
+                violations.append(f"{prefix}:output_hash_mismatch")
+                review_valid = False
+            if event.get("event_id") != "protocol-review-" + content_hash(payload):
+                violations.append(f"{prefix}:event_id_mismatch")
+                review_valid = False
+            if event.get("provenance_record_id") != f"{protocol_id}@{version}":
+                violations.append(f"{prefix}:provenance_mismatch")
+                review_valid = False
+            if review_valid:
+                valid_reviews.append(event)
+
+        for index, event in enumerate(events):
+            payload = event.get("payload", {})
+            if payload.get("status") != "ACTIVE":
+                continue
+            activation_time = payload.get("recorded_at")
+            has_prior_approval = any(
+                review.get("payload", {}).get("outcome") == "APPROVED"
+                and review.get("payload", {}).get("definition_hash") == snapshot.payload_hash
+                and review.get("payload", {}).get("reviewer_id") != payload.get("actor_id")
+                and isinstance(review.get("payload", {}).get("recorded_at"), str)
+                and isinstance(activation_time, str)
+                and review["payload"]["recorded_at"] <= activation_time
+                for review in valid_reviews
+            )
+            if not has_prior_approval:
+                violations.append(f"event[{index}]:activation_without_valid_review")
+
         history_valid = not any(
             item != "definition_hash_mismatch" and item != "definition_identity_mismatch"
             for item in violations
         ) and bool(events)
+        review_history_valid = not any(item.startswith("review[") or ":activation_without_valid_review" in item
+                                        for item in violations)
         return {
             "protocol_id": protocol_id, "version": version,
             "valid": not violations, "definition_hash_valid": definition_hash_valid,
-            "history_valid": history_valid, "event_count": len(events),
+            "history_valid": history_valid, "review_history_valid": review_history_valid,
+            "event_count": len(events), "review_event_count": len(review_events),
             "current_status": events[-1]["payload"].get("status") if events else None,
             "violations": violations,
         }
