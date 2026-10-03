@@ -117,7 +117,11 @@ def test_publish_rechecks_qc_after_claim_graph_changes():
         service.bind_claim("rr-stale-qc", "c")
         assert service.qc_run("rr-stale-qc")["status"] == "QC_PASSED"
 
-        graph.nodes["c"].metadata["state"] = "CONTRADICTED"
+        from cte.evidence_graph import register_node
+        graph.nodes["c"] = register_node(
+            "c", "CLAIM", "c", "DRV", "1",
+            {"current_state": "REGISTERED", "state": "CONTRADICTED", "result_id": "r"},
+        )
         with pytest.raises(ValueError, match="current-state QC failed"):
             service.publish("rr-stale-qc")
 
