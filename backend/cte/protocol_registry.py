@@ -6,6 +6,7 @@ Callers must enforce an authenticated actor and role policy before mutations.
 """
 from __future__ import annotations
 
+from datetime import datetime, timezone
 from typing import Any, Mapping
 from .persistence import content_hash
 from .protocol_selection import _validate_protocol
@@ -38,6 +39,10 @@ class ProtocolRegistry:
         if not isinstance(actor_id, str) or not actor_id.strip():
             raise ValueError("actor_id is required")
         protocol = _validate_protocol(definition)
+        # The selector validator normalizes tag arrays to sets for matching; snapshots
+        # must use deterministic JSON-compatible lists.
+        for field in ("required_measurements", "contraindications", "goal_tags", "context_tags"):
+            protocol[field] = sorted(protocol[field])
         protocol["status"] = "DRAFT"
         protocol_id, version = protocol["protocol_id"], protocol["version"]
         key = f"{protocol_id}@{version}"
@@ -81,15 +86,17 @@ class ProtocolRegistry:
         return result
 
     def history(self, protocol_id: str, version: str) -> list[dict[str, Any]]:
-        return [event for event in self.store.list_events(EVENT_NAMESPACE)
-                if event["payload"].get("protocol_id") == protocol_id
-                and event["payload"].get("version") == version]
+        events = [event for event in self.store.list_events(EVENT_NAMESPACE)
+                  if event["payload"].get("protocol_id") == protocol_id
+                  and event["payload"].get("version") == version]
+        return sorted(events, key=lambda event: event["payload"].get("recorded_at", ""))
 
     def _append_lifecycle(self, protocol_id: str, version: str, status: str,
                           actor_id: str, reason: str) -> dict[str, Any]:
         payload = {"protocol_id": protocol_id, "version": version, "status": status,
-                   "actor_id": actor_id, "reason": reason}
-        event_id = _event_id(protocol_id, version, status, actor_id, reason)
+                   "actor_id": actor_id, "reason": reason,
+                   "recorded_at": datetime.now(timezone.utc).isoformat(timespec="microseconds")}
+        event_id = "protocol-lifecycle-" + content_hash(payload)
         self.store.append_event(event_id, EVENT_NAMESPACE, "PROTOCOL_LIFECYCLE_CHANGED",
                                 payload, output_hash=content_hash(payload),
                                 provenance_record_id=f"{protocol_id}@{version}")
