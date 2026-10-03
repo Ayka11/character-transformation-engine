@@ -37,3 +37,14 @@ candidate's definition hash and marks the registry source. Existing selector saf
 remain in force: no ranking, no scalar score, unknown safety remains conditional, and
 candidate selection never authorizes execution. This endpoint is read-only; it does not
 expose registry mutation operations.
+
+
+## Atomic lifecycle transitions (v1.1 implementation)
+
+Lifecycle transitions use a storage-level compare-and-append operation. SQLite acquires a
+write reservation before checking the latest status; PostgreSQL serializes updates for each
+protocol version with a transaction-scoped advisory lock. The expected status is checked
+inside the same transaction that appends the event. A competing transition based on stale
+state fails with `concurrent lifecycle transition conflict` and must be re-read and explicitly
+retried by the caller. This provides concurrency control, not caller authentication or role
+authorization; those remain required before exposing mutation APIs.

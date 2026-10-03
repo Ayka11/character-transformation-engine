@@ -293,6 +293,38 @@ class PostgreSQLRuntimeStore:
                             return
                     raise ValueError("immutable event conflict")
 
+    def append_event_if_latest_status(
+        self, namespace: str, protocol_id: str, version: str, expected_status: str,
+        event_id: str, event_type: str, payload: dict, output_hash: str | None = None,
+        provenance_record_id: str | None = None,
+    ) -> None:
+        """Serialize transitions for one protocol version and append atomically."""
+        payload = json_safe(payload)
+        lock_key = f"{namespace}:{protocol_id}@{version}"
+        with self.transaction() as conn:
+            with conn.cursor() as cur:
+                # Transaction-scoped advisory lock serializes even when no row is locked yet.
+                cur.execute("SELECT pg_advisory_xact_lock(hashtextextended(%s, 0))", (lock_key,))
+                cur.execute(
+                    """SELECT payload_json->>'status'
+                       FROM runtime_events
+                       WHERE namespace=%s AND payload_json->>'protocol_id'=%s
+                         AND payload_json->>'version'=%s
+                       ORDER BY payload_json->>'recorded_at' DESC
+                       LIMIT 1""",
+                    (namespace, protocol_id, version),
+                )
+                row = cur.fetchone()
+                current = row[0] if row else None
+                if current != expected_status:
+                    raise ValueError("concurrent lifecycle transition conflict")
+                cur.execute(
+                    """INSERT INTO runtime_events
+                       (event_id,namespace,event_type,payload_json,output_hash,provenance_record_id)
+                       VALUES (%s,%s,%s,%s,%s,%s)""",
+                    (event_id, namespace, event_type, Jsonb(payload), output_hash, provenance_record_id),
+                )
+
     def get_event(self, event_id: str) -> dict | None:
         with self._connect() as conn:
             with conn.cursor() as cur:

@@ -78,3 +78,47 @@ def test_same_lifecycle_event_is_idempotent(registry):
                                    actor_id="safety-1", reason="incident")
     assert repeated["lifecycle"] == "SUSPENDED"
     assert len(registry.history("regulation.pause", "1.0")) == 3
+
+
+def test_concurrent_lifecycle_transitions_use_compare_and_append(registry, monkeypatch):
+    import threading
+
+    registry.register(definition(protocol_id="regulation.race"), actor_id="author")
+    barrier = threading.Barrier(2)
+    original = registry._current_status
+
+    def synchronized_status(protocol_id, version):
+        status = original(protocol_id, version)
+        if status == "DRAFT":
+            barrier.wait(timeout=5)
+        return status
+
+    monkeypatch.setattr(registry, "_current_status", synchronized_status)
+    outcomes = []
+
+    def transition(target, actor):
+        try:
+            outcomes.append(("ok", registry.transition(
+                "regulation.race", "1.0", target_status=target,
+                actor_id=actor, reason="concurrency regression test",
+            )["lifecycle"]))
+        except ValueError as exc:
+            outcomes.append(("conflict", str(exc)))
+
+    threads = [
+        threading.Thread(target=transition, args=("ACTIVE", "approver-a")),
+        threading.Thread(target=transition, args=("RETIRED", "approver-b")),
+    ]
+    for thread in threads:
+        thread.start()
+    for thread in threads:
+        thread.join(timeout=10)
+
+    assert all(not thread.is_alive() for thread in threads)
+    assert sum(kind == "ok" for kind, _ in outcomes) == 1
+    assert sum(kind == "conflict" for kind, _ in outcomes) == 1
+    assert any(message == "concurrent lifecycle transition conflict"
+               for kind, message in outcomes if kind == "conflict")
+    history = registry.history("regulation.race", "1.0")
+    assert len(history) == 2
+    assert history[-1]["payload"]["status"] in {"ACTIVE", "RETIRED"}
