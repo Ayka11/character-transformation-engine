@@ -196,7 +196,6 @@ class GraphRegistry:
                         ),
                     }
                     for edge in registry.edges.values()
-                    if edge.from_node_id in registry.nodes and edge.to_node_id in registry.nodes
                 },
                 **{
                     f"graph:contradiction:{item.contradiction_set_id}": {
