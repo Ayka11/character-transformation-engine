@@ -66,3 +66,35 @@ def test_report_qc_fails_closed_when_section_source_node_is_missing():
     assert result["status"] == "QC_FAILED"
     assert "SOURCE_MANIFEST" in result["blocking_checks"]
     assert "PROVENANCE" in result["blocking_checks"]
+
+
+def test_report_qc_fails_closed_when_bound_claim_disappears():
+    service = _service()
+    service.specs["rs"] = register_spec("rs", "Missing claim test")
+    service.create("rr-missing-claim", "rs", "study-1", ["r"])
+    for ordinal, code in enumerate(SECTION_CODES):
+        service.add_section("rr-missing-claim", code, {"section": code}, ["r"], ordinal)
+    service.bind_claim("rr-missing-claim", "c1")
+
+    del service.registry.nodes["c1"]
+    result = service.qc_run("rr-missing-claim")
+
+    assert result["status"] == "QC_FAILED"
+    assert "CLAIM_BINDINGS" in result["blocking_checks"]
+
+
+def test_report_qc_fails_closed_when_claim_binding_is_tampered():
+    service = _service()
+    service.specs["rs"] = register_spec("rs", "Tampered binding test")
+    service.create("rr-tampered-binding", "rs", "study-1", ["r"])
+    for ordinal, code in enumerate(SECTION_CODES):
+        service.add_section("rr-tampered-binding", code, {"section": code}, ["r"], ordinal)
+    service.bind_claim("rr-tampered-binding", "c1")
+    service.runs["rr-tampered-binding"].bindings["c1"] = service.runs["rr-tampered-binding"].bindings["c1"].__class__(
+        **{**service.runs["rr-tampered-binding"].bindings["c1"].__dict__, "generated_statement": "tampered"}
+    )
+
+    result = service.qc_run("rr-tampered-binding")
+
+    assert result["status"] == "QC_FAILED"
+    assert "CLAIM_BINDINGS" in result["blocking_checks"]

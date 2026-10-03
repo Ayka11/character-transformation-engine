@@ -299,6 +299,39 @@ class ReportService:
             for aid in section.source_artifacts
         )
         add("PROVENANCE","PASS" if provenance_ok else "FAIL",{"complete":provenance_ok},{"complete":True},"source provenance completeness")
+        # A report must not retain a stale claim binding after the evidence graph changes.
+        bindings_ok=True
+        binding_errors=[]
+        for claim_id,binding in run.bindings.items():
+            claim=self.registry.nodes.get(binding.claim_id)
+            if claim is None or claim.node_type!="CLAIM":
+                bindings_ok=False
+                binding_errors.append({"claim_id":claim_id,"reason":"claim missing or wrong type"})
+                continue
+            status=claim.metadata.get("state","REGISTERED")
+            try:
+                _nodes,edges=self.registry.claim_subgraph(binding.claim_id)
+            except (KeyError,ValueError):
+                bindings_ok=False
+                binding_errors.append({"claim_id":claim_id,"reason":"claim subgraph unavailable"})
+                continue
+            support=tuple(sorted(e.from_node_id for e in edges if e.to_node_id==binding.claim_id and e.edge_type=="SUPPORTS"))
+            limits=tuple(sorted(e.from_node_id for e in edges if e.to_node_id==binding.claim_id and e.edge_type in {"LIMITS","QUALIFIES"}))
+            contradictions=tuple(sorted(e.from_node_id for e in edges if e.to_node_id==binding.claim_id and e.edge_type=="CONTRADICTS"))
+            rule,statement=claim_language(status)
+            payload={"binding_id":binding.binding_id,"report_run_id":binding.report_run_id,"claim_id":binding.claim_id,
+                     "claim_status":binding.claim_status,"supporting_nodes":binding.supporting_nodes,
+                     "limiting_nodes":binding.limiting_nodes,"contradiction_nodes":binding.contradiction_nodes,
+                     "allowed_language_rule_id":binding.allowed_language_rule_id,"generated_statement":binding.generated_statement}
+            if (binding.report_run_id!=run_id or binding.claim_id!=claim_id or binding.claim_status!=status
+                    or binding.supporting_nodes!=support or binding.limiting_nodes!=limits
+                    or binding.contradiction_nodes!=contradictions or binding.allowed_language_rule_id!=rule
+                    or binding.generated_statement!=statement or binding.immutable_hash!=content_hash(payload)):
+                bindings_ok=False
+                binding_errors.append({"claim_id":claim_id,"reason":"binding does not match current claim graph or immutable hash"})
+        add("CLAIM_BINDINGS","PASS" if bindings_ok else "FAIL",
+            {"valid":bindings_ok,"errors":binding_errors},{"valid":True},
+            "claim bindings must match current claim status, graph references, and immutable hash")
         has_rep=any(n.node_type=="REPLICATION" for n in self.registry.nodes.values())
         has_gen=any(n.node_type=="GENERALIZATION" for n in self.registry.nodes.values())
         section_codes=set(run.sections)
