@@ -82,14 +82,18 @@ class GraphRegistry:
                         f"evidence graph edge references missing node: {edge.edge_id}"
                     )
                     continue
-                canonical_hash = content_hash({
-                    "edge_id": edge.edge_id,
-                    "from": edge.from_node_id,
-                    "to": edge.to_node_id,
-                    "type": edge.edge_type,
-                    "rationale": edge.rationale,
-                })
-                if canonical_hash != edge.input_hash:
+                # Rebuild the complete canonical edge, not just input_hash.
+                # relation_status is deliberately excluded from the legacy
+                # input_hash, but it is still immutable envelope data and must
+                # not be silently altered in a persisted snapshot.
+                canonical_edge = register_edge(
+                    edge.edge_id,
+                    registry.nodes[edge.from_node_id],
+                    registry.nodes[edge.to_node_id],
+                    edge.edge_type,
+                    rationale=edge.rationale,
+                )
+                if canonical_edge != edge:
                     raise ValueError(f"evidence graph edge integrity failure: {edge.edge_id}")
             for item in registry.contradiction_sets.values():
                 canonical_payload = {
