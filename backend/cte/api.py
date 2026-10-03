@@ -39,8 +39,9 @@ from .metrics import METRICS
 from .ops_api import install_ops_api
 from .transformation_api import install_transformation_api
 from .persistence import SQLiteRuntimeStore, build_runtime_store
+from . import __version__
 
-app = FastAPI(title="Character Transformation Engine", version="2.4.0")
+app = FastAPI(title="Character Transformation Engine", version=__version__)
 
 FRONTEND_DIR = Path(__file__).resolve().parents[2] / "frontend"
 if FRONTEND_DIR.exists():
@@ -331,7 +332,7 @@ def metrics():
 
 @app.get("/health")
 def health():
-    return {"status":"ok","version":"2.4.0","scientific_status":"implementation_baseline","runtime_persistence":{"backend":"postgresql" if RUNTIME_STORE.__class__.__name__=="PostgreSQLRuntimeStore" else "sqlite","path":getattr(RUNTIME_STORE,"dsn",RUNTIME_DB_PATH)},"security":{"auth_enabled":bool(os.getenv("CTE_API_KEY") or os.getenv("CTE_READ_API_KEY") or os.getenv("CTE_WRITE_API_KEY")),"ops_api_enabled":bool(os.getenv("CTE_OPS_API_KEY")),"rate_limit_per_minute":int(os.getenv("CTE_RATE_LIMIT_PER_MINUTE","0"))},"ci_workflow":"backend-tests"}
+    return {"status":"ok","version":__version__,"scientific_status":"implementation_baseline","runtime_persistence":{"backend":"postgresql" if RUNTIME_STORE.__class__.__name__=="PostgreSQLRuntimeStore" else "sqlite","path":getattr(RUNTIME_STORE,"dsn",RUNTIME_DB_PATH)},"security":{"auth_enabled":bool(os.getenv("CTE_API_KEY") or os.getenv("CTE_READ_API_KEY") or os.getenv("CTE_WRITE_API_KEY")),"ops_api_enabled":bool(os.getenv("CTE_OPS_API_KEY")),"rate_limit_per_minute":int(os.getenv("CTE_RATE_LIMIT_PER_MINUTE","0"))},"ci_workflow":"backend-tests"}
 
 @app.get("/matrix")
 def matrix_catalog():
