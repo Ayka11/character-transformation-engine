@@ -116,7 +116,7 @@ def test_science_lab_matrix_provenance_endpoint_exposes_integrity():
     from cte.persistence import SQLiteRuntimeStore
 
     db=SQLiteRuntimeStore(":memory:")
-    registry=GraphRegistry(db)
+    registry=GraphRegistry.empty(db)
 
     class DummyResearch:
         pass
