@@ -11,6 +11,7 @@ from .capacity import compute_capacity
 from .compatibility import compatibility_report
 from .compatibility_matrix_adapter import evaluate_canonical_compatibility
 from .protocol_selection import select_protocol_candidates
+from .protocol_registry import ProtocolRegistry
 from .recovery import evaluate_recovery_gate, evaluate_bio_reset, build_recovery_plan, isolate_compromised_state_from_traits
 from .catalog import ADAPTIVE_LEVELS, MASTER_MATRIX, MATRIX_VERSION, SPRINT_TEMPLATE
 from .assessment import build_profile
@@ -135,6 +136,22 @@ class ProtocolSelectionInput(BaseModel):
     constraints: list[str] = Field(default_factory=list)
     capacity: float | None = Field(None, ge=0, le=10)
     safety_status: str = "UNKNOWN"
+
+class RegisteredProtocolRef(BaseModel):
+    protocol_id: str = Field(min_length=1)
+    version: str = Field(min_length=1)
+
+
+class RegisteredProtocolSelectionInput(BaseModel):
+    protocol_refs: list[RegisteredProtocolRef] = Field(default_factory=list, min_length=1)
+    profile: dict[str, Any] = Field(default_factory=dict)
+    state: dict[str, Any] = Field(default_factory=dict)
+    goals: list[str] = Field(default_factory=list)
+    contexts: list[str] = Field(default_factory=list)
+    constraints: list[str] = Field(default_factory=list)
+    capacity: float | None = Field(None, ge=0, le=10)
+    safety_status: str = "UNKNOWN"
+
 
 class RecoveryWindowInput(BaseModel):
     recovery_indices: list[float | None]
@@ -653,6 +670,44 @@ def protocol_candidate_selection(p: ProtocolSelectionInput):
         )
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+@app.post("/protocols/v1/select-registered-candidates")
+def registered_protocol_candidate_selection(p: RegisteredProtocolSelectionInput):
+    """Select review candidates only from immutable, registered protocol versions."""
+    registry = ProtocolRegistry(RUNTIME_STORE)
+    protocols = []
+    definition_hashes = {}
+    seen = set()
+    for ref in p.protocol_refs:
+        key = (ref.protocol_id.strip(), ref.version.strip())
+        if key in seen:
+            raise HTTPException(status_code=422, detail=f"duplicate protocol reference: {key[0]}@{key[1]}")
+        seen.add(key)
+        registered = registry.get(*key)
+        if registered is None:
+            raise HTTPException(status_code=404, detail=f"unknown registered protocol version: {key[0]}@{key[1]}")
+        # Lifecycle state is recorded separately from the immutable definition snapshot.
+        # Project the current governed state into the selector input without mutating
+        # the stored snapshot or changing its definition hash.
+        protocol = dict(registered["protocol"])
+        protocol["status"] = registered["lifecycle"]
+        protocols.append(protocol)
+        definition_hashes[key] = registered["definition_hash"]
+    try:
+        result = select_protocol_candidates(
+            protocols, p.profile, p.state,
+            goals=p.goals, contexts=p.contexts, constraints=p.constraints,
+            capacity=p.capacity, safety_status=p.safety_status,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    for candidate in result["candidates"]:
+        key = (candidate["protocol_id"], candidate["version"])
+        candidate["definition_hash"] = definition_hashes[key]
+        candidate["registry_source"] = "immutable_protocol_registry"
+    result["registry_backed"] = True
+    return result
+
 
 @app.post("/runtime/recovery-gate")
 def runtime_recovery_gate(p: StateInput):

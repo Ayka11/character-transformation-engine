@@ -26,3 +26,14 @@ Protocol activation is a governance state, not evidence of efficacy or safety. R
 status does not authorize execution. Candidate selection remains review-only and must be
 re-evaluated with current profile/state/safety inputs. `SCIENTIFIC_STATUS` remains
 `IMPLEMENTATION_BASELINE` until empirical validation and replication criteria are met.
+
+
+## Registry-backed candidate selection
+
+`POST /protocols/v1/select-registered-candidates` accepts explicit `protocol_id` and
+`version` references and resolves each against the immutable registry. Unknown versions
+fail closed with HTTP 404; duplicate references are rejected. The response includes each
+candidate's definition hash and marks the registry source. Existing selector safeguards
+remain in force: no ranking, no scalar score, unknown safety remains conditional, and
+candidate selection never authorizes execution. This endpoint is read-only; it does not
+expose registry mutation operations.
