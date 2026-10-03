@@ -1,4 +1,3 @@
-import pytest
 from fastapi.testclient import TestClient
 from hashlib import sha256
 from json import dumps
