@@ -190,8 +190,12 @@ class GraphRegistry:
                         "edge_id": edge.edge_id,
                         "payload_hash": edge.input_hash,
                         "claim_id": (
-                            edge.to_node_id if registry.nodes[edge.to_node_id].node_type == "CLAIM"
-                            else edge.from_node_id if registry.nodes[edge.from_node_id].node_type == "CLAIM"
+                            edge.to_node_id
+                            if edge.to_node_id in registry.nodes
+                            and registry.nodes[edge.to_node_id].node_type == "CLAIM"
+                            else edge.from_node_id
+                            if edge.from_node_id in registry.nodes
+                            and registry.nodes[edge.from_node_id].node_type == "CLAIM"
                             else None
                         ),
                     }
