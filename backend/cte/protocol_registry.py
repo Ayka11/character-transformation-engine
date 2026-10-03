@@ -100,6 +100,74 @@ class ProtocolRegistry:
                   and event["payload"].get("version") == version]
         return sorted(events, key=lambda event: event["payload"].get("recorded_at", ""))
 
+    def verify_integrity(self, protocol_id: str, version: str) -> dict[str, Any]:
+        """Audit a version's immutable definition and append-only lifecycle chain."""
+        snapshot = self.store.get_snapshot(NAMESPACE, f"{protocol_id}@{version}")
+        violations: list[str] = []
+        if snapshot is None:
+            return {
+                "protocol_id": protocol_id, "version": version, "valid": False,
+                "definition_hash_valid": False, "history_valid": False,
+                "event_count": 0, "current_status": None,
+                "violations": ["definition_missing"],
+            }
+
+        definition_hash_valid = content_hash(snapshot.payload) == snapshot.payload_hash
+        if not definition_hash_valid:
+            violations.append("definition_hash_mismatch")
+        if (snapshot.payload.get("protocol_id") != protocol_id
+                or snapshot.payload.get("version") != version):
+            violations.append("definition_identity_mismatch")
+
+        events = self.history(protocol_id, version)
+        if not events:
+            violations.append("lifecycle_history_missing")
+        previous_status = None
+        previous_time = None
+        for index, event in enumerate(events):
+            payload = event.get("payload", {})
+            prefix = f"event[{index}]"
+            if event.get("event_type") != "PROTOCOL_LIFECYCLE_CHANGED":
+                violations.append(f"{prefix}:event_type_mismatch")
+            if payload.get("protocol_id") != protocol_id or payload.get("version") != version:
+                violations.append(f"{prefix}:identity_mismatch")
+            if event.get("output_hash") != content_hash(payload):
+                violations.append(f"{prefix}:output_hash_mismatch")
+            if event.get("event_id") != "protocol-lifecycle-" + content_hash(payload):
+                violations.append(f"{prefix}:event_id_mismatch")
+            if event.get("provenance_record_id") != f"{protocol_id}@{version}":
+                violations.append(f"{prefix}:provenance_mismatch")
+            if payload.get("status") not in LIFECYCLE:
+                violations.append(f"{prefix}:unknown_status")
+            elif index == 0:
+                if payload.get("status") != "DRAFT":
+                    violations.append("lifecycle_initial_status_not_draft")
+            elif previous_status is not None and payload.get("status") not in _ALLOWED[previous_status]:
+                violations.append(f"{prefix}:invalid_transition")
+            if not isinstance(payload.get("actor_id"), str) or not payload.get("actor_id", "").strip():
+                violations.append(f"{prefix}:actor_missing")
+            if not isinstance(payload.get("reason"), str) or not payload.get("reason", "").strip():
+                violations.append(f"{prefix}:reason_missing")
+            timestamp = payload.get("recorded_at")
+            if not isinstance(timestamp, str) or not timestamp:
+                violations.append(f"{prefix}:timestamp_missing")
+            elif previous_time is not None and timestamp < previous_time:
+                violations.append(f"{prefix}:timestamp_order_invalid")
+            previous_status = payload.get("status")
+            previous_time = timestamp if isinstance(timestamp, str) else previous_time
+
+        history_valid = not any(
+            item != "definition_hash_mismatch" and item != "definition_identity_mismatch"
+            for item in violations
+        ) and bool(events)
+        return {
+            "protocol_id": protocol_id, "version": version,
+            "valid": not violations, "definition_hash_valid": definition_hash_valid,
+            "history_valid": history_valid, "event_count": len(events),
+            "current_status": events[-1]["payload"].get("status") if events else None,
+            "violations": violations,
+        }
+
     def _lifecycle_payload(self, protocol_id: str, version: str, status: str,
                            actor_id: str, reason: str) -> dict[str, Any]:
         return {"protocol_id": protocol_id, "version": version, "status": status,

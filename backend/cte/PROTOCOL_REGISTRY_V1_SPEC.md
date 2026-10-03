@@ -48,3 +48,13 @@ inside the same transaction that appends the event. A competing transition based
 state fails with `concurrent lifecycle transition conflict` and must be re-read and explicitly
 retried by the caller. This provides concurrency control, not caller authentication or role
 authorization; those remain required before exposing mutation APIs.
+
+
+## Integrity audit (read-only)
+
+The registry service exposes a read-only integrity audit for a protocol version. It recomputes
+the immutable definition hash, validates lifecycle event identity/output hashes and provenance,
+checks the initial DRAFT event and allowed transition sequence, and reports structured
+violation codes. A passing audit establishes internal consistency of stored records only; it
+does not establish that protocol content is scientifically valid, effective, safe, or correctly
+attributed to a real person. The audit is a service method, not a new HTTP endpoint.
