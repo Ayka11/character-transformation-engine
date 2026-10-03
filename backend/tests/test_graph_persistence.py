@@ -1161,7 +1161,7 @@ def test_graph_recovery_rejects_semantically_invalid_contradiction_snapshot_with
                 ("graph.contradiction", "recovery-invalid-contradiction"),
             ).fetchone()
             payload = json.loads(row[0])
-            payload["resolution_status"] = "UNKNOWN"
+            payload["resolution_status"] = ["UNKNOWN"]
             canonical_payload = {
                 "contradiction_set_id": payload["contradiction_set_id"],
                 "claim_id": payload["claim_id"],
