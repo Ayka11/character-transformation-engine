@@ -54,15 +54,31 @@ class GraphRegistry:
         if store is not None:
             for snap in store.list_snapshots("graph.node"):
                 p=snap.payload
+                if content_hash(p) != snap.payload_hash:
+                    raise ValueError(f"evidence graph node storage hash failure: {snap.key}")
+                if snap.key != p.get("node_id") or snap.version != p.get("version"):
+                    raise ValueError(f"evidence graph node snapshot envelope failure: {snap.key}")
                 registry.nodes[p["node_id"]]=GraphNode(**p)
             for snap in store.list_snapshots("graph.edge"):
                 p=snap.payload
+                if content_hash(p) != snap.payload_hash:
+                    raise ValueError(f"evidence graph edge storage hash failure: {snap.key}")
+                if snap.key != p.get("edge_id") or snap.version != "1.4":
+                    raise ValueError(f"evidence graph edge snapshot envelope failure: {snap.key}")
                 registry.edges[p["edge_id"]]=GraphEdge(**p)
             for snap in store.list_snapshots("graph.contradiction"):
                 p=snap.payload
+                if content_hash(p) != snap.payload_hash:
+                    raise ValueError(f"evidence graph contradiction storage hash failure: {snap.key}")
+                if snap.key != p.get("contradiction_set_id") or snap.version != p.get("version"):
+                    raise ValueError(f"evidence graph contradiction snapshot envelope failure: {snap.key}")
                 registry.contradiction_sets[p["contradiction_set_id"]]=ContradictionSet(**p)
             for snap in store.list_snapshots("graph.inference"):
                 p=snap.payload
+                if content_hash(p) != snap.payload_hash:
+                    raise ValueError(f"evidence graph inference storage hash failure: {snap.key}")
+                if snap.key != p.get("inference_block_id") or snap.version != "1.4":
+                    raise ValueError(f"evidence graph inference snapshot envelope failure: {snap.key}")
                 registry.inference_blocks[p["inference_block_id"]]=InferenceBlock(**p)
             # Recompute canonical fingerprints during recovery instead of
             # trusting persisted envelope fields. A backup/database attacker
