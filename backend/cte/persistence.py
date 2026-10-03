@@ -11,7 +11,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from .provenance import content_hash
 
-MUTABLE_SNAPSHOT_NAMESPACES = {"orchestrator.execution", "intervention.assignment", "report.run", "research.study", "research.experiment", "research.participant", "research.assignment", "research.analysis", "science_lab.matrix", "integration.mutable"}
+MUTABLE_SNAPSHOT_NAMESPACES = {"orchestrator.execution", "intervention.assignment", "report.run", "research.study", "research.experiment", "research.participant", "research.assignment", "research.analysis", "science_lab.matrix", "science_lab.run", "integration.mutable"}
 
 @dataclass(frozen=True)
 class Snapshot:
