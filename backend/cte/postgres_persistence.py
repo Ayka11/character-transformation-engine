@@ -17,7 +17,7 @@ except ImportError:  # pragma: no cover - dependency is optional outside install
     psycopg = None
     Jsonb = None
 
-from .persistence import MUTABLE_SNAPSHOT_NAMESPACES
+from .persistence import MUTABLE_SNAPSHOT_NAMESPACES, SnapshotConflictError
 from .provenance import content_hash, json_safe
 
 
@@ -183,7 +183,7 @@ class PostgreSQLRuntimeStore:
                         (version, Jsonb(payload), payload_hash, namespace, key, expected_hash),
                     )
                 if cur.rowcount != 1:
-                    raise ValueError("snapshot concurrent update conflict")
+                    raise SnapshotConflictError("snapshot concurrent update conflict")
         return Snapshot(namespace, key, version, payload, payload_hash)
 
     def put_snapshots_atomic(self, items: list[tuple[str, str, dict, str]]) -> list[Snapshot]:

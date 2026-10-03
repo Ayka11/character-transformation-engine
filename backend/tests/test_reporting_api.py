@@ -27,3 +27,29 @@ def test_source_manifest_is_preserved():
     r=s.create("rr","rs","study-1",["r"])
     assert r.source_artifacts==("r",)
     assert r.source_manifest_hash
+
+
+
+def test_publish_endpoint_maps_snapshot_conflict_to_http_409(monkeypatch):
+    from fastapi import FastAPI, HTTPException
+    from cte.persistence import SQLiteRuntimeStore, SnapshotConflictError
+    from cte.reporting_api import install_reporting_api
+
+    app = FastAPI()
+    service = install_reporting_api(app, build_registry(), SQLiteRuntimeStore(":memory:"))
+
+    def conflict(_report_id):
+        raise SnapshotConflictError("snapshot concurrent update conflict")
+
+    monkeypatch.setattr(service, "publish", conflict)
+    endpoint = next(
+        route.endpoint for route in app.routes
+        if getattr(route, "path", None) == "/reports/{report_id}/publish"
+    )
+    try:
+        endpoint("report-1")
+    except HTTPException as exc:
+        assert exc.status_code == 409
+        assert "concurrent update conflict" in exc.detail
+    else:
+        raise AssertionError("snapshot conflict must map to HTTP 409")
