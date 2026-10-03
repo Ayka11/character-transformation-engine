@@ -42,3 +42,33 @@ def test_role_rules_are_heuristic_and_unregistered_pairs_unknown():
 def test_non_finite_or_non_numeric_profile_values_rejected(value):
     with pytest.raises(ValueError):
         evaluate_compatibility_matrix({"trait": value}, {})
+
+
+
+def test_result_semantics_labels_descriptive_only_without_calling_it_compatibility():
+    result = evaluate_compatibility_matrix({"Honesty": 9}, {"Honesty": 2})
+    semantics = result["result_semantics"]
+    assert semantics["interpretation"] == "DESCRIPTIVE_ONLY"
+    assert semantics["descriptive_row_count"] == 1
+    assert semantics["heuristic_row_count"] == 0
+    assert semantics["unknown_row_count"] == 0
+    assert semantics["context_semantics"] == "ANNOTATION_ONLY"
+    assert "not a validated compatibility estimate" in semantics["warning"]
+
+
+def test_context_labels_do_not_silently_change_rule_outcomes():
+    baseline = evaluate_compatibility_matrix({"Order": 8, "Autonomy": 3}, {"Order": 7, "Autonomy": 4})
+    contextual = evaluate_compatibility_matrix(
+        {"Order": 8, "Autonomy": 3}, {"Order": 7, "Autonomy": 4}, contexts=["work", "family"]
+    )
+    assert [(r["kind"], r["status"], r.get("rule_id")) for r in baseline["rows"]] == [
+        (r["kind"], r["status"], r.get("rule_id")) for r in contextual["rows"]
+    ]
+    assert contextual["contexts"] == ["family", "work"]
+    assert contextual["result_semantics"]["context_semantics"] == "ANNOTATION_ONLY"
+
+
+def test_unknown_only_result_is_not_described_as_a_compatibility_estimate():
+    result = evaluate_compatibility_matrix({"Honesty": 4}, {"Autonomy": 3})
+    assert result["result_semantics"]["interpretation"] == "UNKNOWN_ONLY"
+    assert result["result_semantics"]["unknown_row_count"] == 2
