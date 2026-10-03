@@ -19,6 +19,9 @@ class GraphNode:
     version: str
     immutable_hash: str
     metadata: dict
+    # Added separately so provenance/version envelope tampering can be detected
+    # without changing the legacy content hash used by existing graph records.
+    envelope_hash: str | None = None
 
 @dataclass(frozen=True)
 class GraphEdge:
@@ -36,7 +39,16 @@ def register_node(node_id: str, node_type: str, entity_id: str, provenance_class
     if provenance_class not in {x.value for x in ProvenanceTag}:
         raise ValueError("unsupported provenance class")
     payload={"node_id":node_id,"node_type":node_type,"entity_id":entity_id,"metadata":metadata}
-    return GraphNode(node_id,node_type,entity_id,provenance_class,version,content_hash(payload),metadata)
+    immutable_hash = content_hash(payload)
+    envelope_hash = content_hash({
+        "immutable_hash": immutable_hash,
+        "provenance_class": provenance_class,
+        "version": version,
+    })
+    return GraphNode(
+        node_id, node_type, entity_id, provenance_class, version,
+        immutable_hash, metadata, envelope_hash,
+    )
 
 def register_edge(edge_id: str, from_node: GraphNode, to_node: GraphNode, edge_type: str, *, rationale: str="") -> GraphEdge:
     if edge_type not in EDGE_TYPES:
