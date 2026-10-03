@@ -105,8 +105,16 @@ class PostgreSQLRuntimeStore:
                 row = cur.fetchone()
                 if row is not None:
                     if row[1] == payload_hash:
-                        existing = row[2] if isinstance(row[2], dict) else json.loads(row[2])
-                        return Snapshot(namespace, key, row[0], existing, row[1])
+                        if row[0] == version:
+                            existing = row[2] if isinstance(row[2], dict) else json.loads(row[2])
+                            return Snapshot(namespace, key, row[0], existing, row[1])
+                        if namespace in MUTABLE_SNAPSHOT_NAMESPACES:
+                            cur.execute(
+                                "UPDATE runtime_snapshots SET version=%s WHERE namespace=%s AND key=%s",
+                                (version, namespace, key),
+                            )
+                            return Snapshot(namespace, key, version, payload, payload_hash)
+                        raise ValueError("immutable snapshot conflict")
                     if namespace not in MUTABLE_SNAPSHOT_NAMESPACES:
                         raise ValueError("immutable snapshot conflict")
                     cur.execute(
@@ -135,7 +143,7 @@ class PostgreSQLRuntimeStore:
                             (namespace, key),
                         )
                         existing = cur.fetchone()
-                        if existing is not None and existing[1] == payload_hash:
+                        if existing is not None and existing[1] == payload_hash and existing[0] == version:
                             existing_payload = existing[2] if isinstance(existing[2], dict) else json.loads(existing[2])
                             return Snapshot(namespace, key, existing[0], existing_payload, existing[1])
                         raise ValueError("immutable snapshot conflict")
@@ -180,7 +188,7 @@ class PostgreSQLRuntimeStore:
                     existing = cur.fetchone()
                     if existing is None:
                         raise ValueError("snapshot disappeared during atomic write")
-                    if existing[1] != payload_hash:
+                    if existing[1] != payload_hash or existing[0] != version:
                         raise ValueError("immutable snapshot conflict")
                     existing_payload = existing[2] if isinstance(existing[2], dict) else json.loads(existing[2])
                     results.append(
