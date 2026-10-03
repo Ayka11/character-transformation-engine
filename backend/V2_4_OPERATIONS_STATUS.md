@@ -32,7 +32,7 @@ Status: **IMPLEMENTED / CI-TESTED / NOT FULLY PRODUCTION-HARDENED**
 - All Ops routes require `CTE_OPS_API_KEY`.
 
 ## CI
-- GitHub Actions run #168 completed successfully.
+- GitHub Actions run #397 completed successfully.
 - The main backend pytest job passed.
 - The live PostgreSQL integration job passed.
 
