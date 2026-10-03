@@ -585,6 +585,40 @@ class ScienceLabService:
             },
         }
 
+    def scenario_comparison(self, matrix_id: str) -> dict:
+        matrix=self.matrices.get(matrix_id)
+        if matrix is None:
+            raise ValueError("experiment matrix is not registered")
+        rows=[]
+        for scenario_id in matrix.scenario_ids:
+            scenario=self.scenarios.get(scenario_id)
+            runs=[r for r in self.runs.values() if r.matrix_id==matrix_id and r.scenario_id==scenario_id and r.status=="COMPLETED"]
+            values=[r.estimate_by_outcome.get(matrix.primary_outcome) for r in runs]
+            values=[float(v) for v in values if isinstance(v,(int,float))]
+            rows.append({
+                "scenario_id":scenario_id,
+                "name":scenario.name if scenario else scenario_id,
+                "conditions":scenario.conditions if scenario else {},
+                "run_count":len(runs),
+                "estimate_mean":sum(values)/len(values) if values else None,
+                "estimate_count":len(values),
+            })
+        reference=next((r for r in rows if r["estimate_mean"] is not None),None)
+        reference_value=reference["estimate_mean"] if reference else None
+        for row in rows:
+            if row["estimate_mean"] is None or reference_value is None:
+                row["difference_from_reference"]=None
+            else:
+                row["difference_from_reference"]=row["estimate_mean"]-reference_value
+        return {
+            "matrix_id":matrix_id,
+            "primary_outcome":matrix.primary_outcome,
+            "reference_scenario_id":reference["scenario_id"] if reference else None,
+            "scenarios":rows,
+            "scientific_status":"DESCRIPTIVE_ONLY_MODEL_DERIVED_RUNTIME",
+            "interpretation":"Scenario differences are descriptive and do not establish causality or empirical validity.",
+            "provenance":{"tag":"EXP","input_hash":content_hash(rows)},
+        }
     def claim_validation(self, matrix_id: str) -> dict:
         matrix = self.matrices.get(matrix_id)
         if matrix is None:
@@ -720,6 +754,7 @@ class ScienceLabService:
             "generalization_assessments": generalizations,
             "claim_validation": claims,
             "descriptive_statistics": self.descriptive_statistics(matrix_id),
+            "scenario_comparison": self.scenario_comparison(matrix_id),
             "downstream_transformation_provenance": downstream_provenance,
             "transformation_provenance": {
                 "run_count": len(transformation_provenance),
