@@ -9,7 +9,7 @@ from .persistence import SQLiteRuntimeStore
 from .claim_gate import CLAIM_LEVELS
 
 def _registry_locked(method):
-    """Serialize registry mutations while allowing nested mutation calls."""
+    """Guard registry reads and writes while allowing nested calls via RLock."""
     @wraps(method)
     def wrapped(self, *args, **kwargs):
         with self._registry_lock:
