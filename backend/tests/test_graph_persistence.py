@@ -1257,6 +1257,27 @@ def test_graph_recovery_rejects_semantically_invalid_inference_snapshot_with_reh
 
 
 
+def test_graph_node_metadata_matches_json_shape_after_restart():
+    with TemporaryDirectory() as d:
+        path = str(Path(d) / "runtime.sqlite3")
+        store = SQLiteRuntimeStore(path)
+        graph = build_registry(store)
+        node = register_node(
+            "json-normalized-metadata", "DATASET", "entity", "DRV", "1",
+            {1: {"values": (1, 2)}},
+        )
+
+        graph.add_node(node)
+        expected = {"1": {"values": [1, 2]}}
+        assert graph.nodes["json-normalized-metadata"].metadata == expected
+        snapshot = store.get_snapshot("graph.node", "json-normalized-metadata")
+        assert snapshot is not None
+        assert snapshot.payload["metadata"] == expected
+
+        restored = build_registry(SQLiteRuntimeStore(path))
+        assert restored.nodes["json-normalized-metadata"].metadata == expected
+
+
 def test_graph_node_metadata_is_detached_from_caller_after_registration():
     import pytest
 
