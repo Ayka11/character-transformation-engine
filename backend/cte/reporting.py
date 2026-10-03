@@ -196,7 +196,17 @@ class ReportService:
                 raise ValueError(f"report snapshot integrity failure: report.spec/{snap.key} envelope mismatch")
             if content_hash(p) != snap.payload_hash:
                 raise ValueError(f"report snapshot integrity failure: {snap.namespace}/{snap.key}")
-            sections = tuple(p["section_order"])
+            raw_sections = p.get("section_order")
+            if (
+                not isinstance(raw_sections, list)
+                or any(not isinstance(code, str) for code in raw_sections)
+                or len(raw_sections) != len(SECTION_CODES)
+                or set(raw_sections) != set(SECTION_CODES)
+            ):
+                raise ValueError(
+                    f"report snapshot integrity failure: report.spec/{snap.key} section order invalid"
+                )
+            sections = tuple(raw_sections)
             rendering_rules = _freeze_json(p.get("rendering_rules", {}))
             language_rules = _freeze_json(p.get("claim_language_rules", {}))
             spec_payload = {"report_spec_id": p["report_spec_id"], "name": p["name"],
