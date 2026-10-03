@@ -143,3 +143,32 @@ def test_event_listing_preserves_insertion_order_when_timestamps_tie(monkeypatch
 
     assert [event["event_id"] for event in events] == ["z-first", "a-second"]
     assert all(event["created_at"].endswith(".123456") for event in events)
+
+def test_sqlite_operation_connections_are_closed_on_success_and_failure(monkeypatch):
+    import sqlite3
+    import pytest
+
+    store = SQLiteRuntimeStore(":memory:")
+    connections = []
+
+    class TrackingConnection(sqlite3.Connection):
+        def __init__(self, *args, **kwargs):
+            super().__init__(*args, **kwargs)
+            self.was_closed = False
+
+        def close(self):
+            self.was_closed = True
+            return super().close()
+
+    def tracked_connect():
+        connection = sqlite3.connect(store.path, factory=TrackingConnection)
+        connections.append(connection)
+        return connection
+
+    monkeypatch.setattr(store, "_connect", tracked_connect)
+    store.put_snapshot("graph", "close-check", {"value": 1}, "1")
+    with pytest.raises(ValueError, match="immutable snapshot conflict"):
+        store.put_snapshot("graph", "close-check", {"value": 2}, "1")
+
+    assert connections
+    assert all(connection.was_closed for connection in connections)

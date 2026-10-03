@@ -8,6 +8,7 @@ import json
 import sqlite3
 import tempfile
 import weakref
+from contextlib import contextmanager
 from datetime import datetime, timezone
 from dataclasses import dataclass
 from pathlib import Path
@@ -74,8 +75,21 @@ class SQLiteRuntimeStore:
     def _connect(self):
         return sqlite3.connect(self.path)
 
+    @contextmanager
+    def _connection(self):
+        """Commit/roll back and always close one operation-scoped connection."""
+        conn = self._connect()
+        try:
+            yield conn
+            conn.commit()
+        except BaseException:
+            conn.rollback()
+            raise
+        finally:
+            conn.close()
+
     def _initialize(self):
-        with self._connect() as conn:
+        with self._connection() as conn:
             conn.execute("""
                 CREATE TABLE IF NOT EXISTS runtime_snapshots (
                     namespace TEXT NOT NULL,
@@ -106,7 +120,7 @@ class SQLiteRuntimeStore:
         payload_hash=content_hash(payload)
         payload=json_safe(payload)
         payload_json=json.dumps(payload,sort_keys=True,separators=(",",":"))
-        with self._connect() as conn:
+        with self._connection() as conn:
             conn.execute(
                 "INSERT OR IGNORE INTO runtime_snapshots(namespace,key,version,payload_json,payload_hash) VALUES(?,?,?,?,?)",
                 (namespace,key,version,payload_json,payload_hash)
@@ -145,7 +159,7 @@ class SQLiteRuntimeStore:
         payload = json_safe(payload)
         payload_hash = content_hash(payload)
         payload_json = json.dumps(payload, sort_keys=True, separators=(",", ":"))
-        with self._connect() as conn:
+        with self._connection() as conn:
             if expected_hash is None:
                 try:
                     conn.execute(
@@ -169,7 +183,7 @@ class SQLiteRuntimeStore:
     def put_snapshots_atomic(self, items:list[tuple[str,str,dict,str]])->list[Snapshot]:
         """Insert immutable snapshots atomically; identical existing rows are idempotent."""
         prepared=[(ns,key,json_safe(payload),version,content_hash(payload)) for ns,key,payload,version in items]
-        with self._connect() as conn:
+        with self._connection() as conn:
             results=[]
             try:
                 for namespace,key,payload,version,payload_hash in prepared:
@@ -193,7 +207,7 @@ class SQLiteRuntimeStore:
         return results
 
     def get_snapshot(self, namespace:str, key:str)->Snapshot|None:
-        with self._connect() as conn:
+        with self._connection() as conn:
             row=conn.execute(
                 "SELECT version,payload_json,payload_hash FROM runtime_snapshots WHERE namespace=? AND key=?",
                 (namespace,key)
@@ -203,17 +217,17 @@ class SQLiteRuntimeStore:
         return Snapshot(namespace,key,row[0],json.loads(row[1]),row[2])
 
     def list_snapshot_namespaces(self) -> list[str]:
-        with self._connect() as conn:
+        with self._connection() as conn:
             rows=conn.execute("SELECT DISTINCT namespace FROM runtime_snapshots ORDER BY namespace").fetchall()
         return [row[0] for row in rows]
 
     def list_event_namespaces(self) -> list[str]:
-        with self._connect() as conn:
+        with self._connection() as conn:
             rows=conn.execute("SELECT DISTINCT namespace FROM runtime_events ORDER BY namespace").fetchall()
         return [row[0] for row in rows]
 
     def prune_events_before(self, cutoff: str, namespace: str | None = None) -> int:
-        with self._connect() as conn:
+        with self._connection() as conn:
             if namespace is None:
                 cursor=conn.execute("DELETE FROM runtime_events WHERE created_at < ?", (cutoff,))
             else:
@@ -222,7 +236,7 @@ class SQLiteRuntimeStore:
             return cursor.rowcount
 
     def list_snapshots(self, namespace:str)->list[Snapshot]:
-        with self._connect() as conn:
+        with self._connection() as conn:
             rows=conn.execute(
                 "SELECT key,version,payload_json,payload_hash FROM runtime_snapshots WHERE namespace=? ORDER BY key",
                 (namespace,)
@@ -237,7 +251,7 @@ class SQLiteRuntimeStore:
         # microsecond timestamp so audit records created in a burst retain
         # chronological order rather than falling back to event-ID sorting.
         created_at = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S.%f")
-        with self._connect() as conn:
+        with self._connection() as conn:
             conn.execute(
                 "INSERT OR IGNORE INTO runtime_events(event_id,namespace,event_type,payload_json,input_hash,output_hash,provenance_record_id,created_at) VALUES(?,?,?,?,?,?,?,?)",
                 (event_id,namespace,event_type,payload_json,input_hash,output_hash,provenance_record_id,created_at)
@@ -264,7 +278,7 @@ class SQLiteRuntimeStore:
     ) -> None:
         """Atomically compare lifecycle state and append one event, or fail on a race."""
         payload_json = json.dumps(payload, sort_keys=True, separators=(",", ":"))
-        with self._connect() as conn:
+        with self._connection() as conn:
             conn.execute("BEGIN IMMEDIATE")
             try:
                 row = conn.execute(
@@ -291,14 +305,14 @@ class SQLiteRuntimeStore:
                 raise
 
     def get_event(self, event_id: str) -> dict | None:
-        with self._connect() as conn:
+        with self._connection() as conn:
             row=conn.execute("SELECT event_type,namespace,payload_json,input_hash,output_hash,provenance_record_id,created_at FROM runtime_events WHERE event_id=?", (event_id,)).fetchone()
         if row is None:
             return None
         return {"event_id":event_id,"event_type":row[0],"namespace":row[1],"payload":json.loads(row[2]),"input_hash":row[3],"output_hash":row[4],"provenance_record_id":row[5],"created_at":row[6]}
 
     def list_events(self, namespace:str)->list[dict]:
-        with self._connect() as conn:
+        with self._connection() as conn:
             rows=conn.execute(
                 "SELECT event_id,event_type,payload_json,input_hash,output_hash,provenance_record_id,created_at FROM runtime_events WHERE namespace=? ORDER BY created_at,rowid,event_id",
                 (namespace,)
