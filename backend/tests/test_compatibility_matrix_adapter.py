@@ -73,3 +73,29 @@ def test_all_domain_evaluation_preserves_provenance_and_unknowns():
 def test_all_domain_adapter_enforces_canonical_scale(item_id, value):
     with pytest.raises(ValueError):
         canonical_measurement_profile({item_id: value})
+
+
+def test_catalog_coverage_exposes_unmeasured_domains_without_scoring_them():
+    result = evaluate_canonical_compatibility(
+        {"P1.sleep_quality": 7},
+        {"P1.sleep_quality": 6},
+    )
+    coverage = result["catalog_coverage"]
+    assert coverage["matrix_version"] == "1.0"
+    assert coverage["complete_for_both_profiles"] is False
+    assert coverage["domains"]["P1"]["shared_present"] == ["P1.sleep_quality"]
+    assert coverage["domains"]["P2"]["profile_a_present"] == []
+    assert coverage["domains"]["P2"]["missing_from_both"]
+    assert "not evidence of compatibility or incompatibility" in coverage["interpretation"]
+
+
+def test_catalog_coverage_marks_complete_only_when_both_profiles_cover_catalog():
+    from cte.master_matrix import MASTER_MATRIX
+
+    complete_profile = {item.id: 5 for item in MASTER_MATRIX}
+    result = evaluate_canonical_compatibility(complete_profile, complete_profile)
+    assert result["catalog_coverage"]["complete_for_both_profiles"] is True
+    assert all(
+        len(domain["shared_present"]) == domain["catalog_item_count"]
+        for domain in result["catalog_coverage"]["domains"].values()
+    )
