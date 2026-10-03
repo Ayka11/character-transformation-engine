@@ -134,6 +134,31 @@ class GraphRegistry:
                     raise ValueError(
                         f"evidence graph contradiction integrity failure: {item.contradiction_set_id}"
                     )
+                if (
+                    not isinstance(item.contradiction_set_id, str)
+                    or not item.contradiction_set_id.strip()
+                    or not isinstance(item.claim_id, str)
+                    or not item.claim_id.strip()
+                    or not isinstance(item.contradiction_type, str)
+                    or not item.contradiction_type.strip()
+                    or not isinstance(item.node_ids, (list, tuple))
+                    or not item.node_ids
+                    or any(not isinstance(node_id, str) or not node_id.strip() for node_id in item.node_ids)
+                    or len(set(item.node_ids)) != len(item.node_ids)
+                ):
+                    raise ValueError(
+                        f"evidence graph contradiction rule invalid: {item.contradiction_set_id}"
+                    )
+                if item.resolution_status not in {
+                    "OPEN", "EXPLAINED", "UNRESOLVED", "RESOLVED_BY_NEW_EVIDENCE"
+                }:
+                    raise ValueError(
+                        f"evidence graph contradiction status invalid: {item.contradiction_set_id}"
+                    )
+                if item.resolution_note is not None and not isinstance(item.resolution_note, str):
+                    raise ValueError(
+                        f"evidence graph contradiction note invalid: {item.contradiction_set_id}"
+                    )
                 claim = registry.nodes.get(item.claim_id)
                 if claim is None or claim.node_type != "CLAIM":
                     registry.integrity_errors.append(
@@ -156,6 +181,20 @@ class GraphRegistry:
                 if content_hash(canonical_payload) != item.immutable_hash:
                     raise ValueError(
                         f"evidence graph inference integrity failure: {item.inference_block_id}"
+                    )
+                if any(
+                    not isinstance(value, str) or not value.strip()
+                    for value in (
+                        item.inference_block_id, item.from_node_type, item.to_claim_level,
+                        item.blocked_inference, item.reason_code, item.rule_id,
+                    )
+                ):
+                    raise ValueError(
+                        f"evidence graph inference rule invalid: {item.inference_block_id}"
+                    )
+                if item.to_claim_level not in CLAIM_LEVELS:
+                    raise ValueError(
+                        f"evidence graph inference claim level invalid: {item.inference_block_id}"
                     )
             # Validate the existing event stream before reconciliation writes.
             # Otherwise append_event could mask a deterministic event-type mismatch

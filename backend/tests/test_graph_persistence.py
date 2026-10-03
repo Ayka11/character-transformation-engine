@@ -1135,3 +1135,95 @@ def test_contradiction_set_rejects_malformed_inputs():
         with pytest.raises(ValueError, match=message):
             graph.register_contradiction_set(**values)
         assert "invalid-contradiction-set" not in graph.contradiction_sets
+
+
+
+def test_graph_recovery_rejects_semantically_invalid_contradiction_snapshot_with_rehashed_envelopes():
+    import json
+    import pytest
+    from cte.provenance import content_hash
+
+    with TemporaryDirectory() as d:
+        path = str(Path(d) / "runtime.sqlite3")
+        store = SQLiteRuntimeStore(path)
+        graph = build_registry(store)
+        claim = register_node("recovery-rule-claim", "CLAIM", "claim", "DRV", "1", {})
+        evidence = register_node("recovery-rule-evidence", "DATASET", "evidence", "DRV", "1", {})
+        graph.add_node(claim)
+        graph.add_node(evidence)
+        graph.register_contradiction_set(
+            "recovery-invalid-contradiction", claim.node_id, [evidence.node_id], "CONFLICT"
+        )
+
+        with store._connect() as conn:
+            row = conn.execute(
+                "SELECT payload_json FROM runtime_snapshots WHERE namespace=? AND key=?",
+                ("graph.contradiction", "recovery-invalid-contradiction"),
+            ).fetchone()
+            payload = json.loads(row[0])
+            payload["resolution_status"] = "UNKNOWN"
+            canonical_payload = {
+                "contradiction_set_id": payload["contradiction_set_id"],
+                "claim_id": payload["claim_id"],
+                "node_ids": payload["node_ids"],
+                "contradiction_type": payload["contradiction_type"],
+                "resolution_status": payload["resolution_status"],
+                "resolution_note": payload["resolution_note"],
+            }
+            payload["immutable_hash"] = content_hash(canonical_payload)
+            payload_json = json.dumps(payload, sort_keys=True, separators=(",", ":"))
+            conn.execute(
+                "UPDATE runtime_snapshots SET payload_json=?, payload_hash=? WHERE namespace=? AND key=?",
+                (payload_json, content_hash(payload), "graph.contradiction", "recovery-invalid-contradiction"),
+            )
+            conn.commit()
+
+        with pytest.raises(
+            ValueError,
+            match="evidence graph contradiction status invalid: recovery-invalid-contradiction",
+        ):
+            build_registry(SQLiteRuntimeStore(path))
+
+
+def test_graph_recovery_rejects_semantically_invalid_inference_snapshot_with_rehashed_envelopes():
+    import json
+    import pytest
+    from cte.provenance import content_hash
+
+    with TemporaryDirectory() as d:
+        path = str(Path(d) / "runtime.sqlite3")
+        store = SQLiteRuntimeStore(path)
+        graph = build_registry(store)
+        graph.register_inference_block(
+            "recovery-invalid-inference", "MODEL_OUTPUT", "EVIDENCE_SUPPORTED",
+            "Do not infer evidence support from model output", "MODEL_ONLY", "RULE-1"
+        )
+
+        with store._connect() as conn:
+            row = conn.execute(
+                "SELECT payload_json FROM runtime_snapshots WHERE namespace=? AND key=?",
+                ("graph.inference", "recovery-invalid-inference"),
+            ).fetchone()
+            payload = json.loads(row[0])
+            payload["to_claim_level"] = "NOT_A_CLAIM_LEVEL"
+            canonical_payload = {
+                "inference_block_id": payload["inference_block_id"],
+                "from_node_type": payload["from_node_type"],
+                "to_claim_level": payload["to_claim_level"],
+                "blocked_inference": payload["blocked_inference"],
+                "reason_code": payload["reason_code"],
+                "rule_id": payload["rule_id"],
+            }
+            payload["immutable_hash"] = content_hash(canonical_payload)
+            payload_json = json.dumps(payload, sort_keys=True, separators=(",", ":"))
+            conn.execute(
+                "UPDATE runtime_snapshots SET payload_json=?, payload_hash=? WHERE namespace=? AND key=?",
+                (payload_json, content_hash(payload), "graph.inference", "recovery-invalid-inference"),
+            )
+            conn.commit()
+
+        with pytest.raises(
+            ValueError,
+            match="evidence graph inference claim level invalid: recovery-invalid-inference",
+        ):
+            build_registry(SQLiteRuntimeStore(path))
