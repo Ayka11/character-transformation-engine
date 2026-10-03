@@ -1,10 +1,21 @@
 """In-memory executable registry for the evidence graph lineage contract."""
 from __future__ import annotations
 from dataclasses import dataclass, field
+from functools import wraps
+from threading import RLock
 from .evidence_graph import GraphNode, GraphEdge, register_node, register_edge
 from .provenance import content_hash
 from .persistence import SQLiteRuntimeStore
 from .claim_gate import CLAIM_LEVELS
+
+def _serialized_mutation(method):
+    """Serialize registry mutations while allowing nested mutation calls."""
+    @wraps(method)
+    def wrapped(self, *args, **kwargs):
+        with self._mutation_lock:
+            return method(self, *args, **kwargs)
+    return wrapped
+
 
 @dataclass(frozen=True)
 class GraphAuditEvent:
@@ -48,6 +59,7 @@ class GraphRegistry:
     inference_blocks: dict[str, InferenceBlock] = field(default_factory=dict)
     store: SQLiteRuntimeStore | None = None
     integrity_errors: list[str] = field(default_factory=list)
+    _mutation_lock: RLock = field(default_factory=RLock, init=False, repr=False, compare=False)
 
     @classmethod
     def empty(cls, store: SQLiteRuntimeStore | None = None) -> "GraphRegistry":
@@ -408,6 +420,7 @@ class GraphRegistry:
                 ))
         return registry
 
+    @_serialized_mutation
     def add_node(self, node: GraphNode) -> GraphNode:
         canonical_node = register_node(
             node.node_id, node.node_type, node.entity_id,
@@ -467,6 +480,7 @@ class GraphRegistry:
         self.audit_events.append(audit)
         return node
 
+    @_serialized_mutation
     def add_edge(self, edge: GraphEdge) -> GraphEdge:
         if edge.edge_id in self.edges:
             existing=self.edges[edge.edge_id]
@@ -513,6 +527,7 @@ class GraphRegistry:
         return edge
 
 
+    @_serialized_mutation
     def register_contradiction_set(self, contradiction_set_id: str, claim_id: str,
                                     node_ids: list[str], contradiction_type: str,
                                     resolution_status: str = "UNRESOLVED",
@@ -592,6 +607,7 @@ class GraphRegistry:
                 self.nodes[node_id],claim,"CONTRADICTS",rationale=contradiction_type))
         return item
 
+    @_serialized_mutation
     def register_inference_block(self, inference_block_id: str, from_node_type: str,
                                  to_claim_level: str, blocked_inference: str,
                                  reason_code: str, rule_id: str) -> InferenceBlock:
@@ -823,6 +839,7 @@ class GraphRegistry:
                     break
         return blocked
 
+    @_serialized_mutation
     def register_claim(self, claim_id: str, result_id: str | None, current_state: str,
                        target_state: str, provenance_class: str, metadata: dict,
                        previous_claim_id: str | None = None) -> GraphNode:

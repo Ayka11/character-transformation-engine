@@ -1257,6 +1257,24 @@ def test_graph_recovery_rejects_semantically_invalid_inference_snapshot_with_reh
 
 
 
+def test_concurrent_node_registration_keeps_one_audit_entry():
+    from concurrent.futures import ThreadPoolExecutor
+
+    with TemporaryDirectory() as d:
+        store = SQLiteRuntimeStore(str(Path(d) / "runtime.sqlite3"))
+        graph = build_registry(store)
+        node = register_node("concurrent-node", "DATASET", "entity", "DRV", "1", {"k": [1, 2]})
+
+        with ThreadPoolExecutor(max_workers=8) as pool:
+            registered = list(pool.map(lambda _: graph.add_node(node), range(24)))
+
+        assert all(item.node_id == "concurrent-node" for item in registered)
+        assert len([event for event in store.list_events("graph")
+                    if event["event_type"] == "NODE_REGISTERED"]) == 1
+        assert len([event for event in graph.audit_events
+                    if event.node_id == "concurrent-node"]) == 1
+
+
 def test_graph_node_metadata_matches_json_shape_after_restart():
     with TemporaryDirectory() as d:
         path = str(Path(d) / "runtime.sqlite3")
