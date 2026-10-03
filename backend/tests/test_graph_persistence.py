@@ -1257,6 +1257,58 @@ def test_graph_recovery_rejects_semantically_invalid_inference_snapshot_with_reh
 
 
 
+def test_graph_reads_wait_for_in_progress_mutation(monkeypatch):
+    from concurrent.futures import ThreadPoolExecutor
+    from threading import Event
+
+    with TemporaryDirectory() as d:
+        store = SQLiteRuntimeStore(str(Path(d) / "runtime.sqlite3"))
+        graph = build_registry(store)
+        claim = register_node("read-claim", "CLAIM", "claim", "DRV", "1", {})
+        graph.add_node(claim)
+
+        append_started = Event()
+        release_append = Event()
+        original_append = store.append_event
+
+        def pause_during_node_audit(event_id, *args, **kwargs):
+            if event_id == "graph:node:slow-node":
+                append_started.set()
+                if not release_append.wait(timeout=3):
+                    raise TimeoutError("test did not release paused audit append")
+            return original_append(event_id, *args, **kwargs)
+
+        monkeypatch.setattr(store, "append_event", pause_during_node_audit)
+        with ThreadPoolExecutor(max_workers=2) as pool:
+            writer = pool.submit(
+                graph.add_node,
+                register_node("slow-node", "DATASET", "entity", "DRV", "1", {}),
+            )
+            assert append_started.wait(timeout=1)
+            reader_started = Event()
+            reader_done = Event()
+
+            def read_claim():
+                reader_started.set()
+                try:
+                    return graph.claim_subgraph("read-claim")
+                finally:
+                    reader_done.set()
+
+            reader = pool.submit(read_claim)
+            try:
+                assert reader_started.wait(timeout=1)
+                assert not reader_done.wait(timeout=0.1), (
+                    "read observed registry during an in-progress mutation"
+                )
+            finally:
+                release_append.set()
+
+            assert writer.result(timeout=2).node_id == "slow-node"
+            nodes, _ = reader.result(timeout=2)
+            assert [node.node_id for node in nodes] == ["read-claim"]
+
+
 def test_concurrent_node_registration_keeps_one_audit_entry():
     from concurrent.futures import ThreadPoolExecutor
 

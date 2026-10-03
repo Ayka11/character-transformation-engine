@@ -8,11 +8,11 @@ from .provenance import content_hash
 from .persistence import SQLiteRuntimeStore
 from .claim_gate import CLAIM_LEVELS
 
-def _serialized_mutation(method):
-    """Serialize registry mutations while allowing nested mutation calls."""
+def _registry_locked(method):
+    """Guard registry reads and writes while allowing nested calls via RLock."""
     @wraps(method)
     def wrapped(self, *args, **kwargs):
-        with self._mutation_lock:
+        with self._registry_lock:
             return method(self, *args, **kwargs)
     return wrapped
 
@@ -59,7 +59,7 @@ class GraphRegistry:
     inference_blocks: dict[str, InferenceBlock] = field(default_factory=dict)
     store: SQLiteRuntimeStore | None = None
     integrity_errors: list[str] = field(default_factory=list)
-    _mutation_lock: RLock = field(default_factory=RLock, init=False, repr=False, compare=False)
+    _registry_lock: RLock = field(default_factory=RLock, init=False, repr=False, compare=False)
 
     @classmethod
     def empty(cls, store: SQLiteRuntimeStore | None = None) -> "GraphRegistry":
@@ -420,7 +420,7 @@ class GraphRegistry:
                 ))
         return registry
 
-    @_serialized_mutation
+    @_registry_locked
     def add_node(self, node: GraphNode) -> GraphNode:
         canonical_node = register_node(
             node.node_id, node.node_type, node.entity_id,
@@ -480,7 +480,7 @@ class GraphRegistry:
         self.audit_events.append(audit)
         return node
 
-    @_serialized_mutation
+    @_registry_locked
     def add_edge(self, edge: GraphEdge) -> GraphEdge:
         if edge.edge_id in self.edges:
             existing=self.edges[edge.edge_id]
@@ -527,7 +527,7 @@ class GraphRegistry:
         return edge
 
 
-    @_serialized_mutation
+    @_registry_locked
     def register_contradiction_set(self, contradiction_set_id: str, claim_id: str,
                                     node_ids: list[str], contradiction_type: str,
                                     resolution_status: str = "UNRESOLVED",
@@ -607,7 +607,7 @@ class GraphRegistry:
                 self.nodes[node_id],claim,"CONTRADICTS",rationale=contradiction_type))
         return item
 
-    @_serialized_mutation
+    @_registry_locked
     def register_inference_block(self, inference_block_id: str, from_node_type: str,
                                  to_claim_level: str, blocked_inference: str,
                                  reason_code: str, rule_id: str) -> InferenceBlock:
@@ -663,6 +663,7 @@ class GraphRegistry:
             self.audit_events.append(audit)
         return item
 
+    @_registry_locked
     def _validate_contradiction_evidence(self, claim_ids: set[str]) -> None:
         # Recovery preserves a degraded graph for diagnostics, so enforce this
         # invariant at every claim gate that relies on contradiction records.
@@ -676,12 +677,14 @@ class GraphRegistry:
                         f"{item.contradiction_set_id}:{node_id}"
                     )
 
+    @_registry_locked
     def contradiction_requirements(self, claim_ids: set[str]) -> set[str]:
         self._validate_contradiction_evidence(claim_ids)
         return {"unresolved_material_contradiction"} if any(
             s.claim_id in claim_ids and s.resolution_status in {"OPEN", "UNRESOLVED"}
             for s in self.contradiction_sets.values()) else set()
 
+    @_registry_locked
     def claim_subgraph(self, claim_id: str) -> tuple[list[GraphNode], list[GraphEdge]]:
         claim=self.nodes.get(claim_id)
         if claim is None or claim.node_type!="CLAIM":
@@ -702,6 +705,7 @@ class GraphRegistry:
         )
         return nodes,edges
 
+    @_registry_locked
     def claim_audit(self, claim_id: str) -> list[GraphAuditEvent]:
         nodes,edges=self.claim_subgraph(claim_id)
         ids={n.node_id for n in nodes}
@@ -713,12 +717,14 @@ class GraphRegistry:
             e.claim_id or "", e.payload_hash
         ))
     
+    @_registry_locked
     def upstream_types(self, node_id: str) -> set[str]:
         if node_id not in self.nodes:
             raise ValueError("node is not registered")
         return {self.nodes[e.from_node_id].node_type for e in self.edges.values()
                 if e.to_node_id == node_id and e.from_node_id in self.nodes}
 
+    @_registry_locked
     def _lineage_neighbors(self, current: str) -> list[str]:
         """Return research-lineage neighbors with edge semantics respected."""
         neighbors=[]
@@ -735,6 +741,7 @@ class GraphRegistry:
         # Canonicalize traversal so downstream lists and diagnostics are stable.
         return sorted(set(neighbors))
 
+    @_registry_locked
     def claim_upstream_types(self, result_id: str) -> set[str]:
         """Return lineage types reachable from a RESULT using typed edge semantics."""
         if result_id not in self.nodes or self.nodes[result_id].node_type != "RESULT":
@@ -752,6 +759,7 @@ class GraphRegistry:
                 frontier.append(node_id)
         return found
 
+    @_registry_locked
     def _upstream_nodes(self, result_id: str) -> list[GraphNode]:
         if result_id not in self.nodes or self.nodes[result_id].node_type != "RESULT":
             raise ValueError("RESULT node is not registered")
@@ -769,6 +777,7 @@ class GraphRegistry:
                 frontier.append(node_id)
         return sorted(found, key=lambda node: node.node_id)
 
+    @_registry_locked
     def claim_requirements(self, result_id: str, claim_ids: set[str] | None = None) -> set[str]:
         """Derive V1.4 transition prerequisites from registered graph metadata/lineage."""
         self.require_lineage_for_result(result_id)
@@ -808,6 +817,7 @@ class GraphRegistry:
             req.add("complete_provenance")
         return req
 
+    @_registry_locked
     def indeterminate_requirements(self, claim_ids: set[str], result_id: str | None) -> set[str]:
         self._validate_contradiction_evidence(claim_ids)
         has_conflict=any(
@@ -824,6 +834,7 @@ class GraphRegistry:
         has_not_estimable=bool(result and result.metadata.get("qc_status")=="NOT_ESTIMABLE")
         return {"insufficient_or_conflicting_information"} if (has_conflict or has_insufficient or has_not_estimable) else set()
 
+    @_registry_locked
     def blocked_by_inference_rules(self, result_id: str, target_state: str) -> list[InferenceBlock]:
         if result_id not in self.nodes or self.nodes[result_id].node_type!="RESULT":
             raise ValueError("RESULT node is not registered")
@@ -839,7 +850,7 @@ class GraphRegistry:
                     break
         return blocked
 
-    @_serialized_mutation
+    @_registry_locked
     def register_claim(self, claim_id: str, result_id: str | None, current_state: str,
                        target_state: str, provenance_class: str, metadata: dict,
                        previous_claim_id: str | None = None) -> GraphNode:
@@ -936,6 +947,7 @@ class GraphRegistry:
             ))
         return claim
 
+    @_registry_locked
     def require_transformation_lineage_for_result(self, result_id: str, execution_id: str) -> None:
         """Require an intact graph path from the result to its transformation execution."""
         self.require_lineage_for_result(result_id)
@@ -968,6 +980,7 @@ class GraphRegistry:
                 return
         raise ValueError("RESULT transformation lineage is incomplete")
 
+    @_registry_locked
     def require_lineage_for_result(self, result_id: str) -> None:
         result=self.nodes.get(result_id)
         if result is None or result.node_type != "RESULT":
