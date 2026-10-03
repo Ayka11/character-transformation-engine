@@ -461,16 +461,31 @@ class GraphRegistry:
                                     node_ids: list[str], contradiction_type: str,
                                     resolution_status: str = "UNRESOLVED",
                                     resolution_note: str | None = None) -> ContradictionSet:
+        for field_name, value in (
+            ("contradiction_set_id", contradiction_set_id),
+            ("claim_id", claim_id),
+            ("contradiction_type", contradiction_type),
+        ):
+            if not isinstance(value, str) or not value.strip():
+                raise ValueError(f"{field_name} must be a non-empty string")
+        if not isinstance(node_ids, (list, tuple)) or not node_ids:
+            raise ValueError("contradiction set requires at least one node")
+        if any(not isinstance(node_id, str) or not node_id.strip() for node_id in node_ids):
+            raise ValueError("contradiction set node IDs must be non-empty strings")
+        if len(set(node_ids)) != len(node_ids):
+            raise ValueError("contradiction set node IDs must be unique")
+        if not isinstance(resolution_status, str) or resolution_status not in {
+            "OPEN", "EXPLAINED", "UNRESOLVED", "RESOLVED_BY_NEW_EVIDENCE"
+        }:
+            raise ValueError("unsupported contradiction resolution status")
+        if resolution_note is not None and not isinstance(resolution_note, str):
+            raise ValueError("contradiction resolution note must be a string")
         claim=self.nodes.get(claim_id)
         if claim is None or claim.node_type!="CLAIM":
             raise ValueError("claim is not registered")
-        if not node_ids:
-            raise ValueError("contradiction set requires at least one node")
         for node_id in node_ids:
             if node_id not in self.nodes:
                 raise ValueError("contradiction references unknown node")
-        if resolution_status not in {"OPEN","EXPLAINED","UNRESOLVED","RESOLVED_BY_NEW_EVIDENCE"}:
-            raise ValueError("unsupported contradiction resolution status")
         payload={"contradiction_set_id":contradiction_set_id,"claim_id":claim_id,
                  "node_ids":node_ids,"contradiction_type":contradiction_type,
                  "resolution_status":resolution_status,"resolution_note":resolution_note}
