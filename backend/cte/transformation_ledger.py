@@ -44,9 +44,9 @@ class TransformationLedgerEntry:
         payload_hash=content_hash(payload)
         return cls(content_hash(payload), execution.execution_id, character_id,
                    contract.contract_id, contract.version, result.status,
-                   result.failure_code, result.before_snapshot_id,
-                   result.after_snapshot_id, result.before_hash, result.after_hash,
-                   certificate_id, payload_hash, request_hash)
+                   result.failure_code, result.before_snapshot_id or "",
+                   result.after_snapshot_id or None, result.before_hash or "",
+                   result.after_hash or "", certificate_id, payload_hash, request_hash)
 
 class TransformationLedger:
     def __init__(self, runtime_store=None):
