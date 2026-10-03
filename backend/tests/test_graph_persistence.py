@@ -197,3 +197,69 @@ def test_edge_replay_repairs_audit_event_after_partial_write(monkeypatch):
         events = store.list_events("graph")
         assert len([e for e in events if e["event_type"] == "EDGE_REGISTERED"]) == 1
         assert len([e for e in graph.audit_events if e.edge_id == "retry-edge"]) == 1
+
+
+def test_graph_recovery_repairs_missing_node_audit_event_after_restart(monkeypatch):
+    with TemporaryDirectory() as d:
+        path = str(Path(d) / "runtime.sqlite3")
+        store = SQLiteRuntimeStore(path)
+        graph = build_registry(store)
+        node = register_node("restart-retry-node", "DATASET", "entity", "DRV", "1", {})
+        original = store.append_event
+
+        def fail_node_event(event_id, namespace, event_type, payload, *args, **kwargs):
+            if event_type == "NODE_REGISTERED" and payload.get("node_id") == node.node_id:
+                raise OSError("simulated process interruption after snapshot write")
+            return original(event_id, namespace, event_type, payload, *args, **kwargs)
+
+        monkeypatch.setattr(store, "append_event", fail_node_event)
+        try:
+            graph.add_node(node)
+        except OSError:
+            pass
+        else:
+            raise AssertionError("first audit append should fail")
+
+        assert store.list_events("graph") == []
+        recovered = build_registry(SQLiteRuntimeStore(path))
+        events = SQLiteRuntimeStore(path).list_events("graph")
+        assert "restart-retry-node" in recovered.nodes
+        assert len([e for e in events if e["event_type"] == "NODE_REGISTERED"
+                    and e["payload"].get("node_id") == "restart-retry-node"]) == 1
+        assert len([e for e in recovered.audit_events if e.node_id == "restart-retry-node"]) == 1
+
+
+def test_graph_recovery_repairs_missing_edge_audit_event_after_restart(monkeypatch):
+    with TemporaryDirectory() as d:
+        path = str(Path(d) / "runtime.sqlite3")
+        store = SQLiteRuntimeStore(path)
+        graph = build_registry(store)
+        source = register_node("restart-retry-source", "ANALYSIS", "source", "DRV", "1", {})
+        target = register_node("restart-retry-target", "RESULT", "target", "DRV", "1", {})
+        graph.add_node(source)
+        graph.add_node(target)
+        edge = register_edge("restart-retry-edge", source, target, "RESULTS_IN")
+        original = store.append_event
+
+        def fail_edge_event(event_id, namespace, event_type, payload, *args, **kwargs):
+            if event_type == "EDGE_REGISTERED" and payload.get("edge_id") == edge.edge_id:
+                raise OSError("simulated process interruption after snapshot write")
+            return original(event_id, namespace, event_type, payload, *args, **kwargs)
+
+        monkeypatch.setattr(store, "append_event", fail_edge_event)
+        try:
+            graph.add_edge(edge)
+        except OSError:
+            pass
+        else:
+            raise AssertionError("first audit append should fail")
+
+        assert not any(e["event_type"] == "EDGE_REGISTERED"
+                       and e["payload"].get("edge_id") == edge.edge_id
+                       for e in store.list_events("graph"))
+        recovered = build_registry(SQLiteRuntimeStore(path))
+        events = SQLiteRuntimeStore(path).list_events("graph")
+        assert edge.edge_id in recovered.edges
+        assert len([e for e in events if e["event_type"] == "EDGE_REGISTERED"
+                    and e["payload"].get("edge_id") == edge.edge_id]) == 1
+        assert len([e for e in recovered.audit_events if e.edge_id == edge.edge_id]) == 1
