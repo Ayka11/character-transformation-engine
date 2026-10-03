@@ -122,3 +122,45 @@ def test_concurrent_lifecycle_transitions_use_compare_and_append(registry, monke
     history = registry.history("regulation.race", "1.0")
     assert len(history) == 2
     assert history[-1]["payload"]["status"] in {"ACTIVE", "RETIRED"}
+
+
+def test_integrity_audit_accepts_untampered_definition_and_history(registry):
+    registry.register(definition(protocol_id="regulation.audit"), actor_id="author")
+    registry.transition("regulation.audit", "1.0", target_status="ACTIVE",
+                        actor_id="approver", reason="review complete")
+    result = registry.verify_integrity("regulation.audit", "1.0")
+    assert result["valid"] is True
+    assert result["definition_hash_valid"] is True
+    assert result["history_valid"] is True
+    assert result["event_count"] == 2
+    assert result["current_status"] == "ACTIVE"
+    assert result["violations"] == []
+
+
+def test_integrity_audit_detects_definition_hash_tampering(registry):
+    registered = registry.register(definition(protocol_id="regulation.tampered"), actor_id="author")
+    with registry.store._connect() as conn:
+        conn.execute(
+            "UPDATE runtime_snapshots SET payload_hash=? WHERE namespace=? AND key=?",
+            ("forged-hash", "protocol.registry.definition", "regulation.tampered@1.0"),
+        )
+        conn.commit()
+    result = registry.verify_integrity("regulation.tampered", "1.0")
+    assert result["valid"] is False
+    assert result["definition_hash_valid"] is False
+    assert "definition_hash_mismatch" in result["violations"]
+
+
+def test_integrity_audit_detects_lifecycle_event_hash_tampering(registry):
+    registry.register(definition(protocol_id="regulation.event-tampered"), actor_id="author")
+    event = registry.history("regulation.event-tampered", "1.0")[0]
+    with registry.store._connect() as conn:
+        conn.execute(
+            "UPDATE runtime_events SET output_hash=? WHERE event_id=?",
+            ("forged-hash", event["event_id"]),
+        )
+        conn.commit()
+    result = registry.verify_integrity("regulation.event-tampered", "1.0")
+    assert result["valid"] is False
+    assert result["history_valid"] is False
+    assert "event[0]:output_hash_mismatch" in result["violations"]
