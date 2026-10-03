@@ -50,6 +50,10 @@ def test_registered_selection_uses_active_immutable_definition_and_hash():
     assert payload["ranked"] is False
     assert candidate["status"] == "ELIGIBLE_FOR_REVIEW"
     assert candidate["definition_hash"]
+    # The immutable snapshot remains DRAFT; selection uses the separately governed ACTIVE state.
+    stored = registry.get("api.registry.pause", "1.0")
+    assert stored["protocol"]["status"] == "DRAFT"
+    assert stored["lifecycle"] == "ACTIVE"
     assert candidate["registry_source"] == "immutable_protocol_registry"
     assert candidate["selection_authorized"] is False
 

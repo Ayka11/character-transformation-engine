@@ -686,7 +686,12 @@ def registered_protocol_candidate_selection(p: RegisteredProtocolSelectionInput)
         registered = registry.get(*key)
         if registered is None:
             raise HTTPException(status_code=404, detail=f"unknown registered protocol version: {key[0]}@{key[1]}")
-        protocols.append(registered["protocol"])
+        # Lifecycle state is recorded separately from the immutable definition snapshot.
+        # Project the current governed state into the selector input without mutating
+        # the stored snapshot or changing its definition hash.
+        protocol = dict(registered["protocol"])
+        protocol["status"] = registered["lifecycle"]
+        protocols.append(protocol)
         definition_hashes[key] = registered["definition_hash"]
     try:
         result = select_protocol_candidates(
