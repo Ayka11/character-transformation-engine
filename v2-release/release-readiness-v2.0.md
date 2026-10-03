@@ -52,7 +52,7 @@ As of the current V2.1 backend baseline:
 - V1.6 scientific reporting has executable snapshot/QC/publish runtime.
 - V1.7 decision/intervention has executable safety-first runtime.
 - V1.8 orchestration has executable lifecycle/event runtime.
-- V1.9 synthetic E2E contract coverage and the V2.2 Research E2E coordinator are executed successfully in GitHub Actions run #86.
+- V1.9 synthetic E2E contract coverage, V2.2 Research E2E and Science Lab V2.3 are executed successfully in GitHub Actions run #397.
 - Durable SQLite runtime adapters are implemented for graph, orchestration, reporting, intervention and Research/Science Lab state; a PostgreSQL production adapter and runtime migration are implemented, and live snapshot/event integration is CI-tested against postgres:16 in run #124.
 - Production deployment/rollback operations, authentication/authorization, observability, backup/recovery, rate limits and empirical validation remain open release gates.
 - GitHub CI workflow is registered; run #168 completed successfully with the main backend suite plus live PostgreSQL integration.
