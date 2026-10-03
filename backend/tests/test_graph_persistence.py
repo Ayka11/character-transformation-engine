@@ -158,6 +158,8 @@ def test_node_replay_repairs_audit_event_after_partial_write(monkeypatch):
             raise AssertionError("first audit append should fail")
 
         assert store.list_events("graph") == []
+        assert "retry-node" not in graph.nodes
+        assert not any(e.node_id == "retry-node" for e in graph.audit_events)
         graph.add_node(node)
         events = store.list_events("graph")
         assert len([e for e in events if e["event_type"] == "NODE_REGISTERED"]) == 1
@@ -193,6 +195,8 @@ def test_edge_replay_repairs_audit_event_after_partial_write(monkeypatch):
         assert not any(
             e["event_type"] == "EDGE_REGISTERED" for e in store.list_events("graph")
         )
+        assert "retry-edge" not in graph.edges
+        assert not any(e.edge_id == "retry-edge" for e in graph.audit_events)
         graph.add_edge(edge)
         events = store.list_events("graph")
         assert len([e for e in events if e["event_type"] == "EDGE_REGISTERED"]) == 1
@@ -263,3 +267,53 @@ def test_graph_recovery_repairs_missing_edge_audit_event_after_restart(monkeypat
         assert len([e for e in events if e["event_type"] == "EDGE_REGISTERED"
                     and e["payload"].get("edge_id") == edge.edge_id]) == 1
         assert len([e for e in recovered.audit_events if e.edge_id == edge.edge_id]) == 1
+
+
+def test_failed_node_audit_write_does_not_publish_node_in_memory(monkeypatch):
+    with TemporaryDirectory() as d:
+        store = SQLiteRuntimeStore(str(Path(d) / "runtime.sqlite3"))
+        graph = build_registry(store)
+        node = register_node("atomic-memory-node", "DATASET", "entity", "DRV", "1", {})
+        original = store.append_event
+
+        def fail_node_event(event_id, namespace, event_type, payload, *args, **kwargs):
+            if event_type == "NODE_REGISTERED" and payload.get("node_id") == node.node_id:
+                raise OSError("simulated audit event failure")
+            return original(event_id, namespace, event_type, payload, *args, **kwargs)
+
+        monkeypatch.setattr(store, "append_event", fail_node_event)
+        import pytest
+        with pytest.raises(OSError, match="simulated audit event failure"):
+            graph.add_node(node)
+        assert node.node_id not in graph.nodes
+        assert not any(e.node_id == node.node_id for e in graph.audit_events)
+        assert store.get_snapshot("graph.node", node.node_id) is not None
+        assert not any(e["payload"].get("node_id") == node.node_id
+                       for e in store.list_events("graph"))
+
+
+def test_failed_edge_audit_write_does_not_publish_edge_in_memory(monkeypatch):
+    with TemporaryDirectory() as d:
+        store = SQLiteRuntimeStore(str(Path(d) / "runtime.sqlite3"))
+        graph = build_registry(store)
+        source = register_node("atomic-memory-source", "ANALYSIS", "source", "DRV", "1", {})
+        target = register_node("atomic-memory-target", "RESULT", "target", "DRV", "1", {})
+        graph.add_node(source)
+        graph.add_node(target)
+        edge = register_edge("atomic-memory-edge", source, target, "RESULTS_IN")
+        original = store.append_event
+
+        def fail_edge_event(event_id, namespace, event_type, payload, *args, **kwargs):
+            if event_type == "EDGE_REGISTERED" and payload.get("edge_id") == edge.edge_id:
+                raise OSError("simulated audit event failure")
+            return original(event_id, namespace, event_type, payload, *args, **kwargs)
+
+        monkeypatch.setattr(store, "append_event", fail_edge_event)
+        import pytest
+        with pytest.raises(OSError, match="simulated audit event failure"):
+            graph.add_edge(edge)
+        assert edge.edge_id not in graph.edges
+        assert not any(e.edge_id == edge.edge_id for e in graph.audit_events)
+        assert store.get_snapshot("graph.edge", edge.edge_id) is not None
+        assert not any(e["payload"].get("edge_id") == edge.edge_id
+                       for e in store.list_events("graph"))
