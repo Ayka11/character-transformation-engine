@@ -4,6 +4,7 @@ This renders registered artifacts; it does not create new evidence.
 """
 from __future__ import annotations
 from dataclasses import dataclass, field
+from copy import deepcopy
 from .provenance import content_hash
 from .persistence import SQLiteRuntimeStore
 
@@ -143,6 +144,7 @@ class ReportService:
         self.specs={}
         self.runs={}
         self._run_snapshot_hashes={}
+        self._persisted_runs={}
         self._hydrate()
 
     def _hydrate(self):
@@ -176,6 +178,7 @@ class ReportService:
             )
             run=self.runs[p["report_run_id"]]
             self._validate_recovered_run(run)
+            self._persisted_runs[run.report_run_id]=deepcopy(run)
 
         self._validate_supersession_lineage()
 
@@ -269,11 +272,21 @@ class ReportService:
             } for k,v in run.qc.items()},
             "report_output_hash":run.report_output_hash,"report_output_hash_version":run.report_output_hash_version,
             "superseded_by":run.superseded_by,"execution_id":run.execution_id}
-        snapshot=self.store.put_snapshot_if_hash(
-            "report.run",run.report_run_id,payload,"1.6",
-            expected_hash=self._run_snapshot_hashes.get(run.report_run_id)
-        )
+        try:
+            snapshot=self.store.put_snapshot_if_hash(
+                "report.run",run.report_run_id,payload,"1.6",
+                expected_hash=self._run_snapshot_hashes.get(run.report_run_id)
+            )
+        except Exception:
+            persisted=self._persisted_runs.get(run.report_run_id)
+            if persisted is None:
+                self.runs.pop(run.report_run_id,None)
+            else:
+                run.__dict__.clear()
+                run.__dict__.update(deepcopy(persisted.__dict__))
+            raise
         self._run_snapshot_hashes[run.report_run_id]=snapshot.payload_hash
+        self._persisted_runs[run.report_run_id]=deepcopy(run)
 
 
     def register_spec(self,spec:ReportSpec)->ReportSpec:
