@@ -171,6 +171,23 @@ class GraphRegistry:
                         f"{item.contradiction_set_id}:contradicts:{node_id}:{item.claim_id}",
                         node, claim, "CONTRADICTS", rationale=item.contradiction_type,
                     ))
+            # Validate the existing event stream before reconciliation writes.
+            # Otherwise append_event could mask a deterministic event-type mismatch
+            # with a generic immutable-event conflict before recovery reports the
+            # precise graph integrity error.
+            expected_event_types = {
+                **{f"graph:node:{node_id}": "NODE_REGISTERED" for node_id in registry.nodes},
+                **{f"graph:edge:{edge_id}": "EDGE_REGISTERED" for edge_id in registry.edges},
+                **{f"graph:contradiction:{item_id}": "CONTRADICTION_SET_REGISTERED" for item_id in registry.contradiction_sets},
+                **{f"graph:inference:{item_id}": "INFERENCE_BLOCK_REGISTERED" for item_id in registry.inference_blocks},
+            }
+            for event in store.list_events("graph"):
+                expected_type = expected_event_types.get(event["event_id"])
+                if expected_type is None:
+                    raise ValueError(f"orphan graph audit event: {event['event_id']}")
+                if event["event_type"] != expected_type:
+                    raise ValueError(f"graph audit event type mismatch: {event['event_id']}")
+
             # Reconcile deterministic audit events from validated snapshots before
             # loading the event stream. A process may have crashed after writing a
             # snapshot but before appending its corresponding event; restart must
@@ -215,7 +232,9 @@ class GraphRegistry:
                 )
             # Edge replay above may have populated the in-memory audit list;
             # rebuild it from the reconciled durable event stream to avoid
-            # duplicate in-memory entries.
+            # duplicate in-memory entries. Every durable graph event must map
+            # to a validated snapshot: this registry has no graph deletion
+            # operation, so an event without its immutable object is orphaned.
             registry.audit_events.clear()
             for event in store.list_events("graph"):
                 payload = event["payload"]
