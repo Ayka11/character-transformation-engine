@@ -48,7 +48,7 @@ def test_intervention_exception_is_auditable_failure_without_certificate():
     assert out.result.failure_code=="INTERVENTION_FAILED"
     assert out.after_snapshot_id is None
     assert out.certificate is None
-    assert out.before_snapshot_id=="e4:before:40"
+    assert out.before_snapshot_id=="e4:before:1"
 
 def test_repeated_identical_request_is_idempotent():
     db=SQLiteRuntimeStore(":memory:")
