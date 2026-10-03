@@ -83,3 +83,27 @@ def test_concurrent_conflicting_snapshot_writes_report_contract_conflict():
     assert len(errors) == 1
     assert isinstance(errors[0], ValueError)
     assert str(errors[0]) == "immutable snapshot conflict"
+
+
+def test_immutable_snapshot_version_conflict_is_rejected():
+    import pytest
+    store=SQLiteRuntimeStore(":memory:")
+    store.put_snapshot("graph","node-version",{"x":1},"schema-v1")
+    with pytest.raises(ValueError, match="immutable snapshot conflict"):
+        store.put_snapshot("graph","node-version",{"x":1},"schema-v2")
+
+
+def test_atomic_snapshot_replay_requires_matching_version():
+    import pytest
+    store=SQLiteRuntimeStore(":memory:")
+    store.put_snapshot("graph","atomic-version",{"x":1},"schema-v1")
+    with pytest.raises(ValueError, match="immutable snapshot conflict"):
+        store.put_snapshots_atomic([("graph","atomic-version",{"x":1},"schema-v2")])
+
+
+def test_mutable_snapshot_can_advance_version_without_payload_change():
+    store=SQLiteRuntimeStore(":memory:")
+    store.put_snapshot("report.run","report-1",{"status":"READY"},"1")
+    updated=store.put_snapshot("report.run","report-1",{"status":"READY"},"2")
+    assert updated.version == "2"
+    assert store.get_snapshot("report.run","report-1").version == "2"
