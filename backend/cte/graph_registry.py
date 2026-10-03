@@ -13,6 +13,8 @@ class GraphAuditEvent:
     claim_id: str | None
     payload_hash: str
     actor_type: str
+    contradiction_set_id: str | None = None
+    inference_block_id: str | None = None
 
 @dataclass(frozen=True)
 class ContradictionSet:
@@ -151,10 +153,28 @@ class GraphRegistry:
                      "claim_id": claim_id},
                     input_hash=edge.input_hash, provenance_record_id="1.4",
                 )
+            for item in registry.contradiction_sets.values():
+                store.append_event(
+                    f"graph:contradiction:{item.contradiction_set_id}", "graph",
+                    "CONTRADICTION_SET_REGISTERED",
+                    {"contradiction_set_id": item.contradiction_set_id,
+                     "claim_id": item.claim_id, "payload_hash": item.immutable_hash},
+                    provenance_record_id=item.version,
+                )
+            for item in registry.inference_blocks.values():
+                store.append_event(
+                    f"graph:inference:{item.inference_block_id}", "graph",
+                    "INFERENCE_BLOCK_REGISTERED",
+                    {"inference_block_id": item.inference_block_id,
+                     "payload_hash": item.immutable_hash},
+                    provenance_record_id="1.4",
+                )
             for event in store.list_events("graph"):
+                payload = event["payload"]
                 registry.audit_events.append(GraphAuditEvent(
-                    event["event_type"],event["payload"].get("node_id"),event["payload"].get("edge_id"),
-                    event["payload"].get("claim_id"),event["payload"].get("payload_hash",""),"runtime"
+                    event["event_type"], payload.get("node_id"), payload.get("edge_id"),
+                    payload.get("claim_id"), payload.get("payload_hash", ""), "runtime",
+                    payload.get("contradiction_set_id"), payload.get("inference_block_id"),
                 ))
         return registry
 
@@ -266,6 +286,21 @@ class GraphRegistry:
         if existing is not None:
             if existing != item:
                 raise ValueError("immutable contradiction set conflict")
+            # Repair the rule's audit event as well as any partially created
+            # derived edges when an identical registration is replayed.
+            if self.store is not None:
+                self.store.append_event(
+                    f"graph:contradiction:{existing.contradiction_set_id}", "graph",
+                    "CONTRADICTION_SET_REGISTERED",
+                    {"contradiction_set_id": existing.contradiction_set_id,
+                     "claim_id": existing.claim_id, "payload_hash": existing.immutable_hash},
+                    provenance_record_id=existing.version,
+                )
+            audit = GraphAuditEvent("CONTRADICTION_SET_REGISTERED", None, None,
+                existing.claim_id, existing.immutable_hash, "runtime",
+                contradiction_set_id=existing.contradiction_set_id)
+            if audit not in self.audit_events:
+                self.audit_events.append(audit)
             # A previous attempt may have persisted the set and only some of
             # its derived edges. Replaying identical content completes the set.
             for node_id in node_ids:
@@ -274,7 +309,19 @@ class GraphRegistry:
             return existing
         if self.store is not None:
             self.store.put_snapshot("graph.contradiction",contradiction_set_id,{"contradiction_set_id":item.contradiction_set_id,"claim_id":item.claim_id,"node_ids":list(item.node_ids),"contradiction_type":item.contradiction_type,"resolution_status":item.resolution_status,"resolution_note":item.resolution_note,"provenance_class":item.provenance_class,"version":item.version,"immutable_hash":item.immutable_hash},item.version)
+            self.store.append_event(
+                f"graph:contradiction:{item.contradiction_set_id}", "graph",
+                "CONTRADICTION_SET_REGISTERED",
+                {"contradiction_set_id": item.contradiction_set_id,
+                 "claim_id": item.claim_id, "payload_hash": item.immutable_hash},
+                provenance_record_id=item.version,
+            )
         self.contradiction_sets[contradiction_set_id]=item
+        audit = GraphAuditEvent("CONTRADICTION_SET_REGISTERED", None, None,
+            item.claim_id, item.immutable_hash, "runtime",
+            contradiction_set_id=item.contradiction_set_id)
+        if audit not in self.audit_events:
+            self.audit_events.append(audit)
         for node_id in node_ids:
             self.add_edge(register_edge(f"{contradiction_set_id}:contradicts:{node_id}:{claim_id}",
                 self.nodes[node_id],claim,"CONTRADICTS",rationale=contradiction_type))
@@ -292,10 +339,35 @@ class GraphRegistry:
         if existing is not None:
             if existing != item:
                 raise ValueError("immutable inference block conflict")
+            if self.store is not None:
+                self.store.append_event(
+                    f"graph:inference:{existing.inference_block_id}", "graph",
+                    "INFERENCE_BLOCK_REGISTERED",
+                    {"inference_block_id": existing.inference_block_id,
+                     "payload_hash": existing.immutable_hash},
+                    provenance_record_id="1.4",
+                )
+            audit = GraphAuditEvent("INFERENCE_BLOCK_REGISTERED", None, None,
+                None, existing.immutable_hash, "runtime",
+                inference_block_id=existing.inference_block_id)
+            if audit not in self.audit_events:
+                self.audit_events.append(audit)
             return existing
         if self.store is not None:
             self.store.put_snapshot("graph.inference",inference_block_id,{"inference_block_id":item.inference_block_id,"from_node_type":item.from_node_type,"to_claim_level":item.to_claim_level,"blocked_inference":item.blocked_inference,"reason_code":item.reason_code,"rule_id":item.rule_id,"immutable_hash":item.immutable_hash},"1.4")
+            self.store.append_event(
+                f"graph:inference:{item.inference_block_id}", "graph",
+                "INFERENCE_BLOCK_REGISTERED",
+                {"inference_block_id": item.inference_block_id,
+                 "payload_hash": item.immutable_hash},
+                provenance_record_id="1.4",
+            )
         self.inference_blocks[inference_block_id]=item
+        audit = GraphAuditEvent("INFERENCE_BLOCK_REGISTERED", None, None,
+            None, item.immutable_hash, "runtime",
+            inference_block_id=item.inference_block_id)
+        if audit not in self.audit_events:
+            self.audit_events.append(audit)
         return item
 
     def contradiction_requirements(self, claim_ids: set[str]) -> set[str]:

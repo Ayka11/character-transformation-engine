@@ -473,3 +473,51 @@ def test_graph_recovery_rejects_semantically_tampered_inference_even_with_rehash
 
         with pytest.raises(ValueError, match="evidence graph inference integrity failure: tamper-inference"):
             build_registry(SQLiteRuntimeStore(path))
+
+
+
+def test_graph_recovery_repairs_missing_rule_audit_events():
+    with TemporaryDirectory() as d:
+        path = str(Path(d) / "runtime.sqlite3")
+        store = SQLiteRuntimeStore(path)
+        graph = build_registry(store)
+        claim = register_node("audit-rule-claim", "CLAIM", "claim", "DRV", "1", {})
+        evidence = register_node("audit-rule-evidence", "DATASET", "evidence", "DRV", "1", {})
+        graph.add_node(claim)
+        graph.add_node(evidence)
+        graph.register_contradiction_set(
+            "audit-rule-contradiction", claim.node_id, [evidence.node_id], "CONFLICT",
+        )
+        graph.register_inference_block(
+            "audit-rule-inference", "MODEL_OUTPUT", "EVIDENCE_SUPPORTED",
+            "blocked", "MODEL", "RULE-1",
+        )
+
+        with store._connect() as conn:
+            conn.execute("DELETE FROM runtime_events WHERE event_id IN (?, ?)", (
+                "graph:contradiction:audit-rule-contradiction",
+                "graph:inference:audit-rule-inference",
+            ))
+            conn.commit()
+
+        recovered = build_registry(SQLiteRuntimeStore(path))
+        events = SQLiteRuntimeStore(path).list_events("graph")
+        contradiction_events = [
+            event for event in events
+            if event["event_type"] == "CONTRADICTION_SET_REGISTERED"
+            and event["payload"].get("contradiction_set_id") == "audit-rule-contradiction"
+        ]
+        inference_events = [
+            event for event in events
+            if event["event_type"] == "INFERENCE_BLOCK_REGISTERED"
+            and event["payload"].get("inference_block_id") == "audit-rule-inference"
+        ]
+        assert len(contradiction_events) == 1
+        assert len(inference_events) == 1
+        assert any(event.contradiction_set_id == "audit-rule-contradiction"
+                   for event in recovered.audit_events)
+        assert any(event.inference_block_id == "audit-rule-inference"
+                   for event in recovered.audit_events)
+        assert any(event.claim_id == claim.node_id
+                   and event.operation == "CONTRADICTION_SET_REGISTERED"
+                   for event in recovered.claim_audit(claim.node_id))
