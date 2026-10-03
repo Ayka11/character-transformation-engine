@@ -173,7 +173,8 @@ def evaluate_compatibility_matrix(
             ),
         },
         "coverage": {"known_rows": known, "total_rows": len(rows), "unknown_rows": len(rows) - known},
-        "domains": DOMAINS.copy(), "rows": rows, "contexts": context_list,\n        "rule_catalog": _rule_catalog(),
+        "domains": DOMAINS.copy(), "rows": rows, "contexts": context_list,
+        "rule_catalog": _rule_catalog(),
         "limitations": [
             "No authoritative compatibility percentage is produced.",
             "Heuristic rules are not empirically validated predictions.",
