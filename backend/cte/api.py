@@ -10,6 +10,7 @@ from .models import DailyState
 from .capacity import compute_capacity
 from .compatibility import compatibility_report
 from .compatibility_matrix_adapter import evaluate_canonical_compatibility
+from .protocol_selection import select_protocol_candidates
 from .recovery import evaluate_recovery_gate, evaluate_bio_reset, build_recovery_plan, isolate_compromised_state_from_traits
 from .catalog import ADAPTIVE_LEVELS, MASTER_MATRIX, MATRIX_VERSION, SPRINT_TEMPLATE
 from .assessment import build_profile
@@ -124,6 +125,16 @@ class CanonicalCompatibilityInput(BaseModel):
     roles_a: list[str] = Field(default_factory=list)
     roles_b: list[str] = Field(default_factory=list)
     contexts: list[str] = Field(default_factory=list)
+
+class ProtocolSelectionInput(BaseModel):
+    protocols: list[dict[str, Any]] = Field(default_factory=list)
+    profile: dict[str, Any] = Field(default_factory=dict)
+    state: dict[str, Any] = Field(default_factory=dict)
+    goals: list[str] = Field(default_factory=list)
+    contexts: list[str] = Field(default_factory=list)
+    constraints: list[str] = Field(default_factory=list)
+    capacity: float | None = Field(None, ge=0, le=10)
+    safety_status: str = "UNKNOWN"
 
 class RecoveryWindowInput(BaseModel):
     recovery_indices: list[float | None]
@@ -627,6 +638,18 @@ def canonical_compatibility(p: CanonicalCompatibilityInput):
         return evaluate_canonical_compatibility(
             p.profile_a, p.profile_b,
             roles_a=p.roles_a, roles_b=p.roles_b, contexts=p.contexts,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+@app.post("/protocols/v1/select-candidates")
+def protocol_candidate_selection(p: ProtocolSelectionInput):
+    """Return explainable review candidates; this endpoint never authorizes execution."""
+    try:
+        return select_protocol_candidates(
+            p.protocols, p.profile, p.state,
+            goals=p.goals, contexts=p.contexts, constraints=p.constraints,
+            capacity=p.capacity, safety_status=p.safety_status,
         )
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
