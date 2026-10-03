@@ -71,3 +71,17 @@ registered rule remain `UNKNOWN` and have no fabricated rule ID.
 
 The catalog makes implementation status auditable; it is not empirical evidence and does
 not turn heuristics into validated findings.
+
+
+## Rule catalog version and fingerprint
+
+Every response includes `rule_catalog_version` and `rule_catalog_hash`. The version is
+an explicit semantic version for the rule catalog. The hash is SHA-256 over the catalog's
+canonical JSON representation (sorted keys, compact separators, UTF-8). Consumers can
+store both values with an assessment to identify the exact rule definitions used and
+detect catalog changes across deployments.
+
+The fingerprint establishes content identity only. It does not attest to author identity,
+deployment provenance, scientific validation, or the integrity of the surrounding service.
+A catalog change should be reviewed and versioned deliberately; a matching hash alone is
+not evidence that any rule is empirically valid.
