@@ -41,6 +41,10 @@ def test_publish_endpoint_maps_snapshot_conflict_to_http_409(monkeypatch):
     def conflict(_report_id):
         raise SnapshotConflictError("snapshot concurrent update conflict")
 
+    from cte.reporting import ReportRun
+    service.runs["report-1"] = ReportRun(
+        "report-1", "spec-1", "study-1", "manifest", "input", status="QC_PASSED"
+    )
     monkeypatch.setattr(service, "publish", conflict)
     endpoint = next(
         route.endpoint for route in app.routes
