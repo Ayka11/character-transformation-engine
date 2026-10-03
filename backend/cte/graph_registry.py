@@ -211,8 +211,6 @@ class GraphRegistry:
                                     node_ids: list[str], contradiction_type: str,
                                     resolution_status: str = "UNRESOLVED",
                                     resolution_note: str | None = None) -> ContradictionSet:
-        if contradiction_set_id in self.contradiction_sets:
-            raise ValueError("contradiction set already registered")
         claim=self.nodes.get(claim_id)
         if claim is None or claim.node_type!="CLAIM":
             raise ValueError("claim is not registered")
@@ -228,6 +226,16 @@ class GraphRegistry:
                  "resolution_status":resolution_status,"resolution_note":resolution_note}
         item=ContradictionSet(contradiction_set_id,claim_id,tuple(node_ids),contradiction_type,
             resolution_status,resolution_note,"DRV","1.4",content_hash(payload))
+        existing = self.contradiction_sets.get(contradiction_set_id)
+        if existing is not None:
+            if existing != item:
+                raise ValueError("immutable contradiction set conflict")
+            # A previous attempt may have persisted the set and only some of
+            # its derived edges. Replaying identical content completes the set.
+            for node_id in node_ids:
+                self.add_edge(register_edge(f"{contradiction_set_id}:contradicts:{node_id}:{claim_id}",
+                    self.nodes[node_id],claim,"CONTRADICTS",rationale=contradiction_type))
+            return existing
         if self.store is not None:
             self.store.put_snapshot("graph.contradiction",contradiction_set_id,{"contradiction_set_id":item.contradiction_set_id,"claim_id":item.claim_id,"node_ids":list(item.node_ids),"contradiction_type":item.contradiction_type,"resolution_status":item.resolution_status,"resolution_note":item.resolution_note,"provenance_class":item.provenance_class,"version":item.version,"immutable_hash":item.immutable_hash},item.version)
         self.contradiction_sets[contradiction_set_id]=item
@@ -239,13 +247,16 @@ class GraphRegistry:
     def register_inference_block(self, inference_block_id: str, from_node_type: str,
                                  to_claim_level: str, blocked_inference: str,
                                  reason_code: str, rule_id: str) -> InferenceBlock:
-        if inference_block_id in self.inference_blocks:
-            raise ValueError("inference block already registered")
         payload={"inference_block_id":inference_block_id,"from_node_type":from_node_type,
                  "to_claim_level":to_claim_level,"blocked_inference":blocked_inference,
                  "reason_code":reason_code,"rule_id":rule_id}
         item=InferenceBlock(inference_block_id,from_node_type,to_claim_level,blocked_inference,
             reason_code,rule_id,content_hash(payload))
+        existing = self.inference_blocks.get(inference_block_id)
+        if existing is not None:
+            if existing != item:
+                raise ValueError("immutable inference block conflict")
+            return existing
         if self.store is not None:
             self.store.put_snapshot("graph.inference",inference_block_id,{"inference_block_id":item.inference_block_id,"from_node_type":item.from_node_type,"to_claim_level":item.to_claim_level,"blocked_inference":item.blocked_inference,"reason_code":item.reason_code,"rule_id":item.rule_id,"immutable_hash":item.immutable_hash},"1.4")
         self.inference_blocks[inference_block_id]=item

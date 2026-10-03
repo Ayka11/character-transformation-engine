@@ -317,3 +317,91 @@ def test_failed_edge_audit_write_does_not_publish_edge_in_memory(monkeypatch):
         assert store.get_snapshot("graph.edge", edge.edge_id) is not None
         assert not any(e["payload"].get("edge_id") == edge.edge_id
                        for e in store.list_events("graph"))
+
+
+
+def test_contradiction_set_replay_completes_edges_after_partial_failure(monkeypatch):
+    import pytest
+
+    with TemporaryDirectory() as d:
+        store = SQLiteRuntimeStore(str(Path(d) / "runtime.sqlite3"))
+        graph = build_registry(store)
+        claim = register_node("retry-contradiction-claim", "CLAIM", "claim", "DRV", "1", {})
+        evidence_a = register_node("retry-contradiction-a", "DATASET", "a", "DRV", "1", {})
+        evidence_b = register_node("retry-contradiction-b", "DATASET", "b", "DRV", "1", {})
+        for node in (claim, evidence_a, evidence_b):
+            graph.add_node(node)
+
+        original_add_edge = graph.add_edge
+        failed = {"once": False}
+
+        def fail_second_edge_once(edge):
+            if edge.edge_id.endswith(f":{evidence_b.node_id}:{claim.node_id}") and not failed["once"]:
+                failed["once"] = True
+                raise OSError("simulated interruption during contradiction edge creation")
+            return original_add_edge(edge)
+
+        monkeypatch.setattr(graph, "add_edge", fail_second_edge_once)
+        with pytest.raises(OSError, match="simulated interruption"):
+            graph.register_contradiction_set(
+                "retry-contradiction-set", claim.node_id,
+                [evidence_a.node_id, evidence_b.node_id], "CONFLICT",
+            )
+
+        assert "retry-contradiction-set" in graph.contradiction_sets
+        assert "retry-contradiction-set:contradicts:retry-contradiction-a:retry-contradiction-claim" in graph.edges
+        assert "retry-contradiction-set:contradicts:retry-contradiction-b:retry-contradiction-claim" not in graph.edges
+
+        monkeypatch.setattr(graph, "add_edge", original_add_edge)
+        replayed = graph.register_contradiction_set(
+            "retry-contradiction-set", claim.node_id,
+            [evidence_a.node_id, evidence_b.node_id], "CONFLICT",
+        )
+        assert replayed.contradiction_set_id == "retry-contradiction-set"
+        assert "retry-contradiction-set:contradicts:retry-contradiction-a:retry-contradiction-claim" in graph.edges
+        assert "retry-contradiction-set:contradicts:retry-contradiction-b:retry-contradiction-claim" in graph.edges
+        assert len([e for e in store.list_events("graph")
+                    if e["event_type"] == "EDGE_REGISTERED"
+                    and e["payload"].get("edge_id", "").startswith("retry-contradiction-set:")]) == 2
+
+
+def test_inference_block_replay_recovers_after_snapshot_write_then_error(monkeypatch):
+    import pytest
+
+    with TemporaryDirectory() as d:
+        store = SQLiteRuntimeStore(str(Path(d) / "runtime.sqlite3"))
+        graph = build_registry(store)
+        original_put_snapshot = store.put_snapshot
+        failed = {"once": False}
+
+        def persist_then_fail(namespace, key, payload, version):
+            result = original_put_snapshot(namespace, key, payload, version)
+            if namespace == "graph.inference" and key == "retry-inference-block" and not failed["once"]:
+                failed["once"] = True
+                raise OSError("simulated interruption after inference snapshot write")
+            return result
+
+        monkeypatch.setattr(store, "put_snapshot", persist_then_fail)
+        with pytest.raises(OSError, match="after inference snapshot"):
+            graph.register_inference_block(
+                "retry-inference-block", "MODEL_OUTPUT", "EVIDENCE_SUPPORTED",
+                "blocked", "MODEL", "RULE-1",
+            )
+        assert "retry-inference-block" not in graph.inference_blocks
+        assert store.get_snapshot("graph.inference", "retry-inference-block") is not None
+
+        recovered = graph.register_inference_block(
+            "retry-inference-block", "MODEL_OUTPUT", "EVIDENCE_SUPPORTED",
+            "blocked", "MODEL", "RULE-1",
+        )
+        assert recovered.inference_block_id in graph.inference_blocks
+        assert graph.register_inference_block(
+            "retry-inference-block", "MODEL_OUTPUT", "EVIDENCE_SUPPORTED",
+            "blocked", "MODEL", "RULE-1",
+        ) == recovered
+
+        with pytest.raises(ValueError, match="immutable inference block conflict"):
+            graph.register_inference_block(
+                "retry-inference-block", "MODEL_OUTPUT", "EVIDENCE_SUPPORTED",
+                "different blocked inference", "MODEL", "RULE-1",
+            )
