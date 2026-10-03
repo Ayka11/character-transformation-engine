@@ -154,6 +154,10 @@ def install_science_lab_api(
     def matrix_statistics(matrix_id: str):
         return service.descriptive_statistics(matrix_id)
 
+    @app.get("/science-lab/matrices/{matrix_id}/comparison")
+    def scenario_comparison(matrix_id: str):
+        return service.scenario_comparison(matrix_id)
+
     @app.get("/science-lab/matrices/{matrix_id}/report")
     def build_report_bundle(matrix_id: str):
         return service.report_bundle(matrix_id)
