@@ -197,3 +197,9 @@ boot();
 
 $("loadOverview").onclick = loadOverview;
 $("loadClaims").onclick = loadClaims;
+$("loadComparison").onclick = async () => {
+  try{
+    const id=encodeURIComponent($("matrixId").value);
+    $("comparison").textContent=JSON.stringify(await api("/science-lab/matrices/"+id+"/comparison"),null,2);
+  }catch(e){$("comparison").textContent="ERROR: "+e.message}
+};
