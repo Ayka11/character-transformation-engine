@@ -40,6 +40,7 @@ def body(protocol_id="api.registry.pause", version="1.0", **overrides):
 def test_registered_selection_uses_active_immutable_definition_and_hash():
     registry = ProtocolRegistry(RUNTIME_STORE)
     registry.register(definition(), actor_id="test-author")
+    registry.record_review("api.registry.pause", "1.0", reviewer_id="test-reviewer", outcome="APPROVED", reason="independent test review")
     registry.transition("api.registry.pause", "1.0", target_status="ACTIVE",
                         actor_id="test-approver", reason="test activation")
 
@@ -77,6 +78,7 @@ def test_registered_selection_rejects_duplicate_refs():
 def test_registered_selection_keeps_unknown_safety_conditional():
     registry = ProtocolRegistry(RUNTIME_STORE)
     registry.register(definition(protocol_id="api.registry.unknown-safety"), actor_id="test-author")
+    registry.record_review("api.registry.unknown-safety", "1.0", reviewer_id="test-reviewer", outcome="APPROVED", reason="independent test review")
     registry.transition("api.registry.unknown-safety", "1.0", target_status="ACTIVE",
                         actor_id="test-approver", reason="test activation")
     response = client.post(
@@ -95,6 +97,7 @@ def test_non_active_registry_lifecycle_never_becomes_review_eligible(lifecycle):
     registry.register(definition(protocol_id=protocol_id), actor_id="test-author")
 
     if lifecycle != "DRAFT":
+        registry.record_review(protocol_id, "1.0", reviewer_id="test-reviewer", outcome="APPROVED", reason="independent test review")
         registry.transition(protocol_id, "1.0", target_status="ACTIVE",
                             actor_id="test-approver", reason="test activation")
         if lifecycle in {"SUSPENDED", "RETIRED"}:
