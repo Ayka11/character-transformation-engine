@@ -25,5 +25,5 @@ Production boundary:
 - API key authentication is a lightweight deployment safeguard, not a replacement for enterprise IAM.
 
 CI:
-- GitHub Actions run #133 passed the backend suite with the security middleware tests.
+- GitHub Actions run #397 passed the backend suite with the security/observability tests.
 - The live PostgreSQL integration job in the same run also passed.
