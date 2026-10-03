@@ -148,3 +148,26 @@ def test_supersede_rejects_unpublished_successor():
 
         assert service.runs["rr-old"].status == "PUBLISHED"
         assert service.runs["rr-old"].superseded_by is None
+
+
+def test_qc_cannot_mutate_published_report():
+    import pytest
+
+    with TemporaryDirectory() as d:
+        path = str(Path(d) / "runtime.sqlite3")
+        store = SQLiteRuntimeStore(path)
+        graph = _graph(store)
+        service = ReportService(graph, store)
+        service.register_spec(register_spec("rs", "Immutable QC"))
+        service.create("rr-immutable-qc", "rs", "study", ["r"])
+        for ordinal, code in enumerate(SECTION_CODES):
+            service.add_section("rr-immutable-qc", code, {"section": code}, ["r"], ordinal)
+        service.bind_claim("rr-immutable-qc", "c")
+        assert service.qc_run("rr-immutable-qc")["status"] == "QC_PASSED"
+        service.publish("rr-immutable-qc")
+        before_hash = service.runs["rr-immutable-qc"].report_output_hash
+        before_status = service.runs["rr-immutable-qc"].status
+        with pytest.raises(ValueError, match="immutable report cannot be rechecked"):
+            service.qc_run("rr-immutable-qc")
+        assert service.runs["rr-immutable-qc"].report_output_hash == before_hash
+        assert service.runs["rr-immutable-qc"].status == before_status
