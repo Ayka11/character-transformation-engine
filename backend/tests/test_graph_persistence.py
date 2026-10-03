@@ -1286,15 +1286,21 @@ def test_graph_reads_wait_for_in_progress_mutation(monkeypatch):
             )
             assert append_started.wait(timeout=1)
             reader_started = Event()
+            reader_done = Event()
 
             def read_claim():
                 reader_started.set()
-                return graph.claim_subgraph("read-claim")
+                try:
+                    return graph.claim_subgraph("read-claim")
+                finally:
+                    reader_done.set()
 
             reader = pool.submit(read_claim)
             try:
                 assert reader_started.wait(timeout=1)
-                assert not reader.done(), "read observed registry during an in-progress mutation"
+                assert not reader_done.wait(timeout=0.1), (
+                    "read observed registry during an in-progress mutation"
+                )
             finally:
                 release_append.set()
 
