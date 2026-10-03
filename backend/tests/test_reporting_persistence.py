@@ -424,3 +424,55 @@ def test_report_service_serializes_concurrent_run_mutations():
         assert set(service.runs["rr-concurrent"].decisions) == {"decision-z", "decision-a"}
         persisted = store.get_snapshot("report.run", "rr-concurrent").payload
         assert set(persisted["decisions"]) == {"decision-z", "decision-a"}
+
+def test_report_spec_section_and_decision_payloads_are_immutable():
+    import pytest
+
+    graph = _graph(None)
+    service = ReportService(graph)
+    rendering_rules = {"nested": {"items": [1]}}
+    spec = register_spec("rs-frozen", "Frozen", rendering_rules=rendering_rules)
+    registered = service.register_spec(spec)
+    rendering_rules["nested"]["items"].append(2)
+    assert list(registered.rendering_rules["nested"]["items"]) == [1]
+    with pytest.raises(TypeError, match="immutable"):
+        registered.rendering_rules["nested"]["items"].append(3)
+    service.create("rr-frozen", "rs-frozen", "study", ["r"])
+    section_content = {"nested": {"items": [1]}}
+    section = service.add_section("rr-frozen", "EXECUTIVE_SUMMARY", section_content, ["r"], 0)
+    section_content["nested"]["items"].append(2)
+    assert list(section.content["nested"]["items"]) == [1]
+    with pytest.raises(TypeError, match="immutable"):
+        section.content["nested"]["items"].append(3)
+    decision_inputs = {"nested": {"items": [1]}}
+    decision = service.add_decision("rr-frozen", "decision-frozen", "REVIEW", "keep", "RULE", decision_inputs, "test")
+    decision_inputs["nested"]["items"].append(2)
+    assert list(decision["inputs"]["nested"]["items"]) == [1]
+    with pytest.raises(TypeError, match="immutable"):
+        decision["inputs"]["nested"]["items"].append(3)
+    with pytest.raises(TypeError, match="immutable"):
+        decision["decision"] = "mutated"
+
+
+def test_recovery_validates_report_spec_hash_even_without_report_runs():
+    import json
+    import sqlite3
+    import pytest
+    from cte.provenance import content_hash
+
+    with TemporaryDirectory() as d:
+        path = str(Path(d) / "runtime.sqlite3")
+        store = SQLiteRuntimeStore(path)
+        service = ReportService(_graph(store), store)
+        service.register_spec(register_spec("rs-unreferenced", "Unreferenced"))
+        with sqlite3.connect(path) as conn:
+            row = conn.execute("SELECT payload_json FROM runtime_snapshots WHERE namespace=? AND key=?",
+                ("report.spec", "rs-unreferenced")).fetchone()
+            payload = json.loads(row[0])
+            payload["rendering_rules"] = {"tampered": True}
+            conn.execute("UPDATE runtime_snapshots SET payload_json=?, payload_hash=? WHERE namespace=? AND key=?",
+                (json.dumps(payload, sort_keys=True, separators=(",", ":")), content_hash(payload),
+                 "report.spec", "rs-unreferenced"))
+            conn.commit()
+        with pytest.raises(ValueError, match="report.spec/rs-unreferenced immutable hash"):
+            ReportService(_graph(SQLiteRuntimeStore(path)), SQLiteRuntimeStore(path))
