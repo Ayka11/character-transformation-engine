@@ -476,3 +476,41 @@ def test_recovery_validates_report_spec_hash_even_without_report_runs():
             conn.commit()
         with pytest.raises(ValueError, match="report.spec/rs-unreferenced immutable hash"):
             ReportService(_graph(SQLiteRuntimeStore(path)), SQLiteRuntimeStore(path))
+
+
+def test_recovery_rejects_report_snapshot_key_or_version_envelope_mismatch():
+    import sqlite3
+    import pytest
+
+    cases = [
+        ("report.spec", "key", "wrong-report-spec", "report.spec/wrong-report-spec envelope mismatch"),
+        ("report.spec", "version", "2.0", "report.spec/rs-envelope envelope mismatch"),
+        ("report.run", "key", "wrong-report-run", "report.run/wrong-report-run envelope mismatch"),
+        ("report.run", "version", "2.0", "report.run/rr-envelope envelope mismatch"),
+    ]
+    for namespace, field, replacement, message in cases:
+        with TemporaryDirectory() as d:
+            path = str(Path(d) / "runtime.sqlite3")
+            store = SQLiteRuntimeStore(path)
+            graph = _graph(store)
+            service = ReportService(graph, store)
+            service.register_spec(register_spec("rs-envelope", "Envelope integrity"))
+            if namespace == "report.run":
+                service.create("rr-envelope", "rs-envelope", "study", ["r"])
+
+            original_key = "rs-envelope" if namespace == "report.spec" else "rr-envelope"
+            with sqlite3.connect(path) as conn:
+                if field == "key":
+                    conn.execute(
+                        "UPDATE runtime_snapshots SET key=? WHERE namespace=? AND key=?",
+                        (replacement, namespace, original_key),
+                    )
+                else:
+                    conn.execute(
+                        "UPDATE runtime_snapshots SET version=? WHERE namespace=? AND key=?",
+                        (replacement, namespace, original_key),
+                    )
+                conn.commit()
+
+            with pytest.raises(ValueError, match=message):
+                ReportService(build_registry(SQLiteRuntimeStore(path)), SQLiteRuntimeStore(path))
