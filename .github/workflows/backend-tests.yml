@@ -81,3 +81,24 @@ jobs:
           CTE_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/cte
         run: |
           python -m pytest -vv --timeout=120 --durations=20 --maxfail=1 backend/tests/test_postgres_integration.py
+      - name: Rehearse PostgreSQL migration and rollback
+        run: |
+          python -m pip install psycopg[binary]
+          python - <<'PY'
+          import psycopg
+          from pathlib import Path
+          admin="postgresql://postgres:postgres@localhost:5432/postgres"
+          rehearsal="postgresql://postgres:postgres@localhost:5432/cte_migration_rehearsal"
+          with psycopg.connect(admin, autocommit=True) as conn:
+              conn.execute("DROP DATABASE IF EXISTS cte_migration_rehearsal")
+              conn.execute("CREATE DATABASE cte_migration_rehearsal")
+          up=Path("backend/migrations/002_runtime_postgres.sql").read_text()
+          down=Path("backend/migrations/002_runtime_postgres.down.sql").read_text()
+          with psycopg.connect(rehearsal, autocommit=True) as conn:
+              conn.execute(up)
+              tables={row[0] for row in conn.execute("SELECT table_name FROM information_schema.tables WHERE table_schema='public'")}
+              assert {"runtime_snapshots","runtime_events"}.issubset(tables)
+              conn.execute(down)
+              tables={row[0] for row in conn.execute("SELECT table_name FROM information_schema.tables WHERE table_schema='public'")}
+              assert "runtime_snapshots" not in tables and "runtime_events" not in tables
+          PY
