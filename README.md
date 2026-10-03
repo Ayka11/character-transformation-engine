@@ -43,7 +43,7 @@ Question → Hypothesis → Study → Protocol → Experiment
 
 - **V2.2 Research E2E** composes profile, assessment, state, capacity, safety, research execution, QC, analysis, claim and audit under one execution ID.
 - **Science Lab V2.3** adds Experiment Matrix, scenario definitions/runs, descriptive statistics, replication/generalization assessment, claim validation, provenance report bundle and a static browser UI at `/science-lab/ui`.
-- Current CI baseline: GitHub Actions run #106, 140 backend tests passing.
+- Current CI baseline: GitHub Actions run #393, 251 tests passed and 12 skipped; PostgreSQL integration and migration rehearsal also passed.
 
 
 ## V2.4 Operations
