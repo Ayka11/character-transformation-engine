@@ -84,6 +84,7 @@ class SQLiteRuntimeStore:
     def put_snapshot(self, namespace:str, key:str, payload:dict, version:str)->Snapshot:
         payload=json_safe(payload)
         payload_hash=content_hash(payload)
+        payload=json_safe(payload)
         payload_json=json.dumps(payload,sort_keys=True,separators=(",",":"))
         with self._connect() as conn:
             conn.execute(
