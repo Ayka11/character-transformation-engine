@@ -1248,4 +1248,4 @@ def test_graph_node_metadata_is_detached_from_caller_after_registration():
         assert snapshot.payload["metadata"] == {"nested": {"values": [1, 2]}}
 
         restored = build_registry(SQLiteRuntimeStore(path))
-        assert restored.nodes["detached-metadata"].metadata == {"nested": {"values": [1, 2]}
+        assert restored.nodes["detached-metadata"].metadata == {"nested": {"values": [1, 2]}}
