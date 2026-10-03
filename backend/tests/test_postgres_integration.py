@@ -157,11 +157,11 @@ def test_postgres_transformation_executor_and_provenance_roundtrip():
         lambda state: {"tempo": 6},
     )
 
-    assert result.status == "VALIDATED"
+    assert result.result.status == "VALIDATED"
     binding = TransformationProvenanceBinder(store).bind_execution(execution_id)
     assert binding["validated"] is True
     assert binding["integrity_status"] == "PASS"
-    assert binding["ledger_id"] == result.ledger_id
+    assert binding["ledger_id"] == ledger.list()[0].ledger_id
     assert binding["certificate_id"]
 
     with store.transaction() as conn:
