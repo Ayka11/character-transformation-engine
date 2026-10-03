@@ -51,3 +51,18 @@ def test_legacy_compatibility_endpoint_remains_available():
     assert response.status_code == 200
     payload = response.json()
     assert {"v1", "v2", "v3", "authoritative_scalar"} <= set(payload)
+
+
+
+def test_canonical_endpoint_exposes_result_semantics_and_context_boundary():
+    response = client.post("/compatibility/v2/canonical", json={
+        "profile_a": {"P1.sleep_quality": 7},
+        "profile_b": {"P1.sleep_quality": 5},
+        "contexts": ["work"],
+    })
+    assert response.status_code == 200
+    semantics = response.json()["result_semantics"]
+    assert semantics["interpretation"] == "DESCRIPTIVE_ONLY"
+    assert semantics["context_semantics"] == "ANNOTATION_ONLY"
+    assert semantics["descriptive_row_count"] == 1
+    assert semantics["heuristic_row_count"] == 0

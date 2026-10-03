@@ -33,6 +33,7 @@ ROLE_COMPETITION_RULES = {
     frozenset(("Strategist", "Strategist")), frozenset(("Mediator", "Mediator")),
 }
 
+
 def _numeric_profile(profile: Mapping[str, Any], person: str) -> dict[str, float]:
     normalized: dict[str, float] = {}
     for key, value in profile.items():
@@ -40,6 +41,7 @@ def _numeric_profile(profile: Mapping[str, Any], person: str) -> dict[str, float
             raise ValueError(f"{person}.{key} must be a finite number")
         normalized[str(key)] = float(value)
     return normalized
+
 
 def evaluate_compatibility_matrix(
     profile_a: Mapping[str, Any], profile_b: Mapping[str, Any], *,
@@ -98,10 +100,35 @@ def evaluate_compatibility_matrix(
                 "contexts": context_list, "requires_human_review": bool(rule),
             })
     known = sum(row["status"] != "UNKNOWN" for row in rows)
+    heuristic_count = sum(row["evidence_class"] == "HEURISTIC" for row in rows)
+    descriptive_count = sum(row["evidence_class"] == "DESCRIPTIVE" for row in rows)
+    unknown_count = sum(row["status"] == "UNKNOWN" for row in rows)
+    if heuristic_count and (descriptive_count or unknown_count):
+        interpretation = "MIXED_DESCRIPTIVE_AND_CONDITIONAL"
+    elif heuristic_count:
+        interpretation = "CONDITIONAL_HEURISTICS"
+    elif descriptive_count and unknown_count:
+        interpretation = "DESCRIPTIVE_WITH_GAPS"
+    elif descriptive_count:
+        interpretation = "DESCRIPTIVE_ONLY"
+    else:
+        interpretation = "UNKNOWN_ONLY"
     return {
         "version": VERSION, "scientific_status": SCIENTIFIC_STATUS,
         "authoritative_scalar": False,
         "status": "PARTIAL" if rows and known < len(rows) else ("ESTIMATED" if rows else "UNKNOWN"),
+        "result_semantics": {
+            "interpretation": interpretation,
+            "descriptive_row_count": descriptive_count,
+            "heuristic_row_count": heuristic_count,
+            "unknown_row_count": unknown_count,
+            "context_semantics": "ANNOTATION_ONLY",
+            "warning": (
+                "This response contains descriptive observations and/or conditional heuristics, "
+                "not a validated compatibility estimate. Context labels are recorded but do not "
+                "currently alter rule outcomes."
+            ),
+        },
         "coverage": {"known_rows": known, "total_rows": len(rows), "unknown_rows": len(rows) - known},
         "domains": DOMAINS.copy(), "rows": rows, "contexts": context_list,
         "limitations": [
@@ -109,5 +136,6 @@ def evaluate_compatibility_matrix(
             "Heuristic rules are not empirically validated predictions.",
             "Missing rules or measurements remain UNKNOWN.",
             "Observed alignment gaps do not establish compatibility or incompatibility.",
+            "Context labels are annotations only; context-specific rule calibration is not implemented.",
         ],
     }
