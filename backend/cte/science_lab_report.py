@@ -36,7 +36,7 @@ pre{{padding:14px;overflow:auto}}
 @media(max-width:800px){{.grid{{grid-template-columns:repeat(2,1fr)}}}}
 </style></head>
 <body>
-<p class='muted'>CHARACTER TRANSFORMATION ENGINE / SCIENCE LAB V2.5</p>
+<p class='muted'>CHARACTER TRANSFORMATION ENGINE / SCIENCE LAB V2.6</p>
 <h1>{title}</h1>
 <p>Primary outcome: <b>{outcome}</b></p>
 <div class='grid'>
