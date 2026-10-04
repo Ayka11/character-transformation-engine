@@ -278,6 +278,7 @@ class SQLiteRuntimeStore:
     ) -> None:
         """Atomically compare lifecycle state and append one event, or fail on a race."""
         payload_json = json.dumps(payload, sort_keys=True, separators=(",", ":"))
+        created_at = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S.%f")
         with self._connection() as conn:
             conn.execute("BEGIN IMMEDIATE")
             try:
