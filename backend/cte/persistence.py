@@ -278,6 +278,7 @@ class SQLiteRuntimeStore:
     ) -> None:
         """Atomically compare lifecycle state and append one event, or fail on a race."""
         payload_json = json.dumps(payload, sort_keys=True, separators=(",", ":"))
+        created_at = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S.%f")
         with self._connection() as conn:
             conn.execute("BEGIN IMMEDIATE")
             try:
@@ -286,7 +287,7 @@ class SQLiteRuntimeStore:
                        WHERE namespace = ?
                          AND json_extract(payload_json, '$.protocol_id') = ?
                          AND json_extract(payload_json, '$.version') = ?
-                       ORDER BY json_extract(payload_json, '$.recorded_at') DESC
+                       ORDER BY created_at DESC, rowid DESC
                        LIMIT 1""",
                     (namespace, protocol_id, version),
                 ).fetchone()
@@ -295,9 +296,9 @@ class SQLiteRuntimeStore:
                     raise ValueError("concurrent lifecycle transition conflict")
                 conn.execute(
                     """INSERT INTO runtime_events
-                       (event_id,namespace,event_type,payload_json,output_hash,provenance_record_id)
-                       VALUES(?,?,?,?,?,?)""",
-                    (event_id, namespace, event_type, payload_json, output_hash, provenance_record_id),
+                       (event_id,namespace,event_type,payload_json,output_hash,provenance_record_id,created_at)
+                       VALUES(?,?,?,?,?,?,?)""",
+                    (event_id, namespace, event_type, payload_json, output_hash, provenance_record_id, created_at),
                 )
                 conn.commit()
             except Exception:

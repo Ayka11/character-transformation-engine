@@ -167,7 +167,22 @@ class ProtocolRegistry:
         events = [event for event in self.store.list_events(EVENT_NAMESPACE)
                   if event["payload"].get("protocol_id") == protocol_id
                   and event["payload"].get("version") == version]
-        return sorted(events, key=lambda event: event["payload"].get("recorded_at", ""))
+        # Order by the store's insertion timestamp, not by the payload timestamp
+        # being audited. Payload timestamps may be tampered with; using them to
+        # order the chain can hide or mislabel lifecycle violations.
+        def event_order(event: dict) -> datetime:
+            stored_at = event.get("created_at")
+            if isinstance(stored_at, str):
+                try:
+                    return datetime.fromisoformat(stored_at)
+                except ValueError:
+                    pass
+            payload_at = event.get("payload", {}).get("recorded_at", "")
+            try:
+                return datetime.fromisoformat(payload_at)
+            except (TypeError, ValueError):
+                return datetime.min.replace(tzinfo=timezone.utc)
+        return sorted(events, key=event_order)
 
     def verify_integrity(self, protocol_id: str, version: str) -> dict[str, Any]:
         """Audit a version's immutable definition and append-only lifecycle chain."""

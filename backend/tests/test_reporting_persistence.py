@@ -1,3 +1,4 @@
+from contextlib import closing
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from cte.evidence_graph import register_node, register_edge
@@ -48,7 +49,7 @@ def test_report_service_rejects_tampered_persisted_run_snapshot():
         service.register_spec(register_spec("rs", "Durable"))
         service.create("rr-tampered", "rs", "study", ["r"])
 
-        with sqlite3.connect(path) as conn:
+        with closing(sqlite3.connect(path)) as conn, conn:
             row = conn.execute(
                 "SELECT payload_json FROM runtime_snapshots WHERE namespace=? AND key=?",
                 ("report.run", "rr-tampered"),
@@ -84,7 +85,7 @@ def test_recovery_rejects_section_tampering_even_if_snapshot_hash_is_recomputed(
         assert service.qc_run("rr-section-tampered")["status"] == "QC_PASSED"
         service.publish("rr-section-tampered")
 
-        with sqlite3.connect(path) as conn:
+        with closing(sqlite3.connect(path)) as conn, conn:
             row = conn.execute(
                 "SELECT payload_json FROM runtime_snapshots WHERE namespace=? AND key=?",
                 ("report.run", "rr-section-tampered"),
@@ -253,7 +254,7 @@ def test_recovery_rejects_missing_supersession_successor():
             service.publish(run_id)
         service.supersede("rr-lineage-old", "rr-lineage-new")
 
-        with sqlite3.connect(path) as conn:
+        with closing(sqlite3.connect(path)) as conn, conn:
             row = conn.execute(
                 "SELECT payload_json FROM runtime_snapshots WHERE namespace=? AND key=?",
                 ("report.run", "rr-lineage-old"),
@@ -292,7 +293,7 @@ def test_recovery_rejects_supersession_cycle():
             service.publish(run_id)
         service.supersede("rr-cycle-a", "rr-cycle-b")
 
-        with sqlite3.connect(path) as conn:
+        with closing(sqlite3.connect(path)) as conn, conn:
             row = conn.execute(
                 "SELECT payload_json FROM runtime_snapshots WHERE namespace=? AND key=?",
                 ("report.run", "rr-cycle-b"),
@@ -465,7 +466,7 @@ def test_recovery_validates_report_spec_hash_even_without_report_runs():
         store = SQLiteRuntimeStore(path)
         service = ReportService(_graph(store), store)
         service.register_spec(register_spec("rs-unreferenced", "Unreferenced"))
-        with sqlite3.connect(path) as conn:
+        with closing(sqlite3.connect(path)) as conn, conn:
             row = conn.execute("SELECT payload_json FROM runtime_snapshots WHERE namespace=? AND key=?",
                 ("report.spec", "rs-unreferenced")).fetchone()
             payload = json.loads(row[0])
@@ -499,7 +500,7 @@ def test_recovery_rejects_report_snapshot_key_or_version_envelope_mismatch():
                 service.create("rr-envelope", "rs-envelope", "study", ["r"])
 
             original_key = "rs-envelope" if namespace == "report.spec" else "rr-envelope"
-            with sqlite3.connect(path) as conn:
+            with closing(sqlite3.connect(path)) as conn, conn:
                 if field == "key":
                     conn.execute(
                         "UPDATE runtime_snapshots SET key=? WHERE namespace=? AND key=?",
@@ -579,7 +580,7 @@ def test_recovery_rejects_report_children_owned_by_another_run():
             )
             service.qc_run("rr-child-owner")
 
-            with sqlite3.connect(path) as conn:
+            with closing(sqlite3.connect(path)) as conn, conn:
                 row = conn.execute(
                     "SELECT payload_json FROM runtime_snapshots WHERE namespace=? AND key=?",
                     ("report.run", "rr-child-owner"),
@@ -612,7 +613,7 @@ def test_recovery_rejects_duplicate_sections_in_report_spec_even_with_recomputed
         store = SQLiteRuntimeStore(path)
         service = ReportService(_graph(store), store)
         service.register_spec(register_spec("rs-duplicate-recovery", "Duplicate recovery"))
-        with sqlite3.connect(path) as conn:
+        with closing(sqlite3.connect(path)) as conn, conn:
             row = conn.execute(
                 "SELECT payload_json FROM runtime_snapshots WHERE namespace=? AND key=?",
                 ("report.spec", "rs-duplicate-recovery"),
@@ -636,4 +637,41 @@ def test_recovery_rejects_duplicate_sections_in_report_spec_even_with_recomputed
             conn.commit()
 
         with pytest.raises(ValueError, match="report.spec/rs-duplicate-recovery section order invalid"):
+            ReportService(build_registry(SQLiteRuntimeStore(path)), SQLiteRuntimeStore(path))
+
+
+def test_recovery_rejects_duplicate_report_section_ordinals_even_with_recomputed_hashes():
+    import json
+    import sqlite3
+    import pytest
+    from cte.provenance import content_hash
+
+    with TemporaryDirectory() as d:
+        path = str(Path(d) / "runtime.sqlite3")
+        store = SQLiteRuntimeStore(path)
+        service = ReportService(_graph(store), store)
+        service.register_spec(register_spec("rs-ordinal-recovery", "Ordinal recovery"))
+        service.create("rr-ordinal-recovery", "rs-ordinal-recovery", "study", ["r"])
+        for ordinal, code in enumerate(SECTION_CODES):
+            service.add_section("rr-ordinal-recovery", code, {"section": code}, ["r"], ordinal)
+
+        with closing(sqlite3.connect(path)) as conn, conn:
+            row = conn.execute(
+                "SELECT payload_json FROM runtime_snapshots WHERE namespace=? AND key=?",
+                ("report.run", "rr-ordinal-recovery"),
+            ).fetchone()
+            payload = json.loads(row[0])
+            payload["sections"][SECTION_CODES[1]]["ordinal"] = payload["sections"][SECTION_CODES[0]]["ordinal"]
+            section = payload["sections"][SECTION_CODES[1]]
+            section["immutable_hash"] = content_hash({
+                key: value for key, value in section.items() if key != "immutable_hash"
+            })
+            conn.execute(
+                "UPDATE runtime_snapshots SET payload_json=?, payload_hash=? WHERE namespace=? AND key=?",
+                (json.dumps(payload, sort_keys=True, separators=(",", ":")), content_hash(payload),
+                 "report.run", "rr-ordinal-recovery"),
+            )
+            conn.commit()
+
+        with pytest.raises(ValueError, match="section ordinals invalid"):
             ReportService(build_registry(SQLiteRuntimeStore(path)), SQLiteRuntimeStore(path))

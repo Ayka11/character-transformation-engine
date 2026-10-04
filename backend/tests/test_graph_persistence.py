@@ -1,3 +1,4 @@
+from contextlib import closing
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from cte.evidence_graph import register_node, register_edge
@@ -72,7 +73,7 @@ def test_graph_recovery_rejects_semantically_tampered_node_even_with_rehashed_sn
         graph = build_registry(store)
         graph.add_node(register_node("integrity-node", "DATASET", "entity", "DRV", "1", {"x": 1}))
 
-        with store._connect() as conn:
+        with closing(store._connect()) as conn, conn:
             row = conn.execute(
                 "SELECT payload_json FROM runtime_snapshots WHERE namespace=? AND key=?",
                 ("graph.node", "integrity-node"),
@@ -105,7 +106,7 @@ def test_graph_recovery_rejects_edge_with_missing_endpoint():
         graph.add_node(target)
         graph.add_edge(register_edge("integrity-edge", source, target, "RESULTS_IN"))
 
-        with store._connect() as conn:
+        with closing(store._connect()) as conn, conn:
             row = conn.execute(
                 "SELECT payload_json FROM runtime_snapshots WHERE namespace=? AND key=?",
                 ("graph.edge", "integrity-edge"),
@@ -452,7 +453,7 @@ def test_graph_recovery_rejects_semantically_tampered_contradiction_even_with_re
             "tamper-contradiction", claim.node_id, [evidence.node_id], "CONFLICT",
         )
 
-        with store._connect() as conn:
+        with closing(store._connect()) as conn, conn:
             row = conn.execute(
                 "SELECT payload_json FROM runtime_snapshots WHERE namespace=? AND key=?",
                 ("graph.contradiction", "tamper-contradiction"),
@@ -484,7 +485,7 @@ def test_graph_recovery_rejects_semantically_tampered_inference_even_with_rehash
             "blocked", "MODEL", "RULE-1",
         )
 
-        with store._connect() as conn:
+        with closing(store._connect()) as conn, conn:
             row = conn.execute(
                 "SELECT payload_json FROM runtime_snapshots WHERE namespace=? AND key=?",
                 ("graph.inference", "tamper-inference"),
@@ -520,7 +521,7 @@ def test_graph_recovery_repairs_missing_rule_audit_events():
             "blocked", "MODEL", "RULE-1",
         )
 
-        with store._connect() as conn:
+        with closing(store._connect()) as conn, conn:
             conn.execute("DELETE FROM runtime_events WHERE event_id IN (?, ?)", (
                 "graph:contradiction:audit-rule-contradiction",
                 "graph:inference:audit-rule-inference",
@@ -608,7 +609,7 @@ def test_graph_recovery_rejects_tampered_edge_relation_status_even_with_rehashed
         graph.add_node(target)
         graph.add_edge(register_edge("tamper-status-edge", source, target, "RESULTS_IN"))
 
-        with store._connect() as conn:
+        with closing(store._connect()) as conn, conn:
             row = conn.execute(
                 "SELECT payload_json FROM runtime_snapshots WHERE namespace=? AND key=?",
                 ("graph.edge", "tamper-status-edge"),
@@ -640,7 +641,7 @@ def test_graph_recovery_rejects_tampered_node_provenance_even_with_rehashed_snap
             "tamper-envelope-node", "DATASET", "entity", "DRV", "1", {"x": 1},
         ))
 
-        with store._connect() as conn:
+        with closing(store._connect()) as conn, conn:
             row = conn.execute(
                 "SELECT payload_json FROM runtime_snapshots WHERE namespace=? AND key=?",
                 ("graph.node", "tamper-envelope-node"),
@@ -670,7 +671,7 @@ def test_graph_recovery_accepts_legacy_node_snapshot_without_envelope_hash():
             "legacy-envelope-node", "DATASET", "entity", "DRV", "1", {"x": 1},
         ))
 
-        with store._connect() as conn:
+        with closing(store._connect()) as conn, conn:
             row = conn.execute(
                 "SELECT payload_json FROM runtime_snapshots WHERE namespace=? AND key=?",
                 ("graph.node", "legacy-envelope-node"),
@@ -738,7 +739,7 @@ def test_graph_recovery_rejects_snapshot_version_column_mismatch():
         graph = build_registry(store)
         graph.add_node(register_node("envelope-version-node", "DATASET", "entity", "DRV", "1", {}))
 
-        with store._connect() as conn:
+        with closing(store._connect()) as conn, conn:
             conn.execute(
                 "UPDATE runtime_snapshots SET version=? WHERE namespace=? AND key=?",
                 ("2", "graph.node", "envelope-version-node"),
@@ -758,7 +759,7 @@ def test_graph_recovery_rejects_snapshot_storage_hash_mismatch():
         graph = build_registry(store)
         graph.add_node(register_node("storage-hash-node", "DATASET", "entity", "DRV", "1", {}))
 
-        with store._connect() as conn:
+        with closing(store._connect()) as conn, conn:
             conn.execute(
                 "UPDATE runtime_snapshots SET payload_hash=? WHERE namespace=? AND key=?",
                 ("incorrect-storage-hash", "graph.node", "storage-hash-node"),
@@ -787,7 +788,7 @@ def test_graph_recovery_rejects_tampered_contradiction_envelope_metadata():
             "envelope-contradiction", claim.node_id, [evidence.node_id], "CONFLICT",
         )
 
-        with store._connect() as conn:
+        with closing(store._connect()) as conn, conn:
             row = conn.execute(
                 "SELECT payload_json FROM runtime_snapshots WHERE namespace=? AND key=?",
                 ("graph.contradiction", "envelope-contradiction"),
@@ -969,7 +970,7 @@ def test_graph_recovery_rejects_audit_event_type_mismatch():
         graph = build_registry(store)
         graph.add_node(register_node("event-type-node", "DATASET", "entity", "DRV", "1", {}))
 
-        with store._connect() as conn:
+        with closing(store._connect()) as conn, conn:
             conn.execute(
                 "UPDATE runtime_events SET event_type=? WHERE event_id=?",
                 ("EDGE_REGISTERED", "graph:node:event-type-node"),
@@ -1002,7 +1003,7 @@ def test_contradiction_requirements_reject_missing_evidence_after_recovery():
 
         # Simulate loss of the evidence snapshot without leaving an orphan
         # node event, so this test isolates the contradiction gate invariant.
-        with store._connect() as conn:
+        with closing(store._connect()) as conn, conn:
             conn.execute(
                 "DELETE FROM runtime_snapshots WHERE namespace=? AND key=?",
                 ("graph.node", evidence.node_id),
@@ -1050,7 +1051,7 @@ def test_graph_recovery_validates_audit_stream_before_repairing_derived_edges():
         # before its derived edge snapshot was durable, then corrupt the event
         # stream independently. Recovery must reject the stream before writing
         # the derived edge back into the database.
-        with store._connect() as conn:
+        with closing(store._connect()) as conn, conn:
             conn.execute(
                 "DELETE FROM runtime_snapshots WHERE namespace=? AND key=?",
                 ("graph.edge", derived_edge_id),
@@ -1087,7 +1088,7 @@ def test_graph_recovery_rejects_tampered_audit_payload_before_edge_repair():
         derived_edge_id = f"audit-payload-set:contradicts:{evidence.node_id}:{claim.node_id}"
         event_id = f"graph:edge:{derived_edge_id}"
 
-        with store._connect() as conn:
+        with closing(store._connect()) as conn, conn:
             conn.execute(
                 "DELETE FROM runtime_snapshots WHERE namespace=? AND key=?",
                 ("graph.edge", derived_edge_id),
@@ -1182,7 +1183,7 @@ def test_graph_recovery_rejects_semantically_invalid_contradiction_snapshot_with
             "recovery-invalid-contradiction", claim.node_id, [evidence.node_id], "CONFLICT"
         )
 
-        with store._connect() as conn:
+        with closing(store._connect()) as conn, conn:
             row = conn.execute(
                 "SELECT payload_json FROM runtime_snapshots WHERE namespace=? AND key=?",
                 ("graph.contradiction", "recovery-invalid-contradiction"),
@@ -1226,7 +1227,7 @@ def test_graph_recovery_rejects_semantically_invalid_inference_snapshot_with_reh
             "Do not infer evidence support from model output", "MODEL_ONLY", "RULE-1"
         )
 
-        with store._connect() as conn:
+        with closing(store._connect()) as conn, conn:
             row = conn.execute(
                 "SELECT payload_json FROM runtime_snapshots WHERE namespace=? AND key=?",
                 ("graph.inference", "recovery-invalid-inference"),
