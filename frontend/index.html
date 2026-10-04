@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>Character Transformation Engine — Science Lab</title>
+  <title>Character Transformation Engine — Practical Lab</title>
   <link rel="stylesheet" href="/science-lab/assets/styles.css">
 </head>
 <body>
@@ -11,89 +11,135 @@
     <header>
       <div>
         <div class="eyebrow">CHARACTER TRANSFORMATION ENGINE</div>
-        <h1>Science Lab</h1>
-        <p class="muted">Experiment Matrix → Scenario Runs → Statistics → Claim / Evidence Trace</p>
+        <h1>Practical Lab</h1>
+        <p class="muted">A guided workspace: understand the matrix, model your current state, then explore compatibility.</p>
       </div>
       <div><div class="status" id="apiStatus">API: checking…</div><label class="api-key">API key <input id="apiKey" type="password" placeholder="optional for protected deployments"></label></div>
     </header>
 
-    <section class="grid">
-      <article class="card">
-        <h2>1. Experiment Matrix</h2>
-        <label>Matrix ID <input id="matrixId" value="demo-matrix"></label>
-        <label>Study ID <input id="studyId" value="demo-study"></label>
-        <label>Name <input id="matrixName" value="Science Lab Matrix"></label>
-        <label>Primary outcome <input id="primaryOutcome" value="value"></label>
-        <button id="createMatrix">Create matrix</button>
+    <section class="start-here">
+      <div>
+        <div class="eyebrow">START HERE · 3 SHORT STEPS</div>
+        <h2>From self-observation to a practical next step</h2>
+        <p>Use your own observations or the clearly marked demo values. The outputs are prompts for reflection—not a diagnosis, personality verdict, or validated prediction.</p>
+      </div>
+      <div class="journey">
+        <a href="#masterMatrix"><span>01</span><strong>Explore Master Matrix</strong><small>What is measured, and why?</small></a>
+        <a href="#characterModel"><span>02</span><strong>Build a Character Model</strong><small>Separate today's state from stable traits.</small></a>
+        <a href="#compatibilityLab"><span>03</span><strong>Try Compatibility Lab</strong><small>Compare two profiles with transparent limits.</small></a>
+      </div>
+    </section>
+
+    <section class="practical-grid">
+      <article class="card practical-card" id="masterMatrix">
+        <div class="step-label">STEP 1 · UNDERSTAND THE MEASURES</div>
+        <h2>Master Matrix</h2>
+        <p class="help">The catalogue behind the model. P1 is current state and resources; P2 stable traits; P3 self-regulation and cognition; P4 values; P5 observable behavior. Missing values stay missing—never assume a perfect score.</p>
+        <div class="inline-controls">
+          <label class="grow">Find a measure<input id="matrixSearch" type="search" placeholder="e.g. stress, autonomy, discipline"></label>
+          <label>Domain<select id="matrixDomain"><option value="">All domains</option><option value="P1">P1 · State</option><option value="P2">P2 · Traits</option><option value="P3">P3 · Regulation</option><option value="P4">P4 · Values</option><option value="P5">P5 · Behavior</option></select></label>
+        </div>
+        <div class="matrix-summary" id="matrixSummary">Load the catalogue to see available measures.</div>
+        <div class="matrix-list" id="matrixList" aria-live="polite"><p class="muted">Choose “Load Master Matrix” to inspect the actual catalogue.</p></div>
+        <button id="loadMasterMatrix">Load Master Matrix</button>
       </article>
 
-      <article class="card">
-        <h2>2. Scenario</h2>
-        <label>Scenario ID <input id="scenarioId" value="baseline"></label>
-        <label>Name <input id="scenarioName" value="Baseline"></label>
-        <label>Description <input id="scenarioDescription" value="Baseline scenario"></label>
-        <label>Conditions JSON
-          <textarea id="conditions">{}</textarea>
+      <article class="card practical-card" id="characterModel">
+        <div class="step-label">STEP 2 · OBSERVE TODAY</div>
+        <h2>Character Model</h2>
+        <p class="help">Rate how you are doing <strong>today</strong> from 0–10. This creates a state/capacity snapshot; it does not estimate your entire personality. Use real observations rather than trying to get a “good” result.</p>
+        <div class="slider-list">
+          <label>Sleep quality <span class="range-value" id="vSleep">6</span><input id="mSleep" type="range" min="0" max="10" value="6"></label>
+          <label>Recovery <span class="range-value" id="vRecovery">6</span><input id="mRecovery" type="range" min="0" max="10" value="6"></label>
+          <label>Physical activity <span class="range-value" id="vActivity">5</span><input id="mActivity" type="range" min="0" max="10" value="5"></label>
+          <label>Metabolic stability <span class="range-value" id="vMetabolic">6</span><input id="mMetabolic" type="range" min="0" max="10" value="6"></label>
+          <label>Subjective stress <span class="range-value" id="vStress">5</span><input id="mStress" type="range" min="0" max="10" value="5"></label>
+          <label>Subjective energy <span class="range-value" id="vEnergy">5</span><input id="mEnergy" type="range" min="0" max="10" value="5"></label>
+        </div>
+        <label>Development target
+          <select id="targetTrait">
+            <option value="P3.pause_capacity">Pause before reacting</option>
+            <option value="P3.impulse_control">Impulse control</option>
+            <option value="P3.attention_regulation">Attention regulation</option>
+            <option value="P3.cognitive_reappraisal">Reframing a situation</option>
+            <option value="P5.discipline_consistency">Discipline and consistency</option>
+            <option value="P5.boundary_setting">Setting boundaries</option>
+            <option value="P5.adaptability">Adaptability</option>
+            <option value="P5.social_courage_assertiveness">Assertive communication</option>
+          </select>
         </label>
-        <button id="createScenario">Create scenario</button>
-        <label>Factorial factors JSON
-          <textarea id="factors">{"dose":[0,1],"tempo":["slow","fast"]}</textarea>
-        </label>
-        <button id="generateScenarios">Generate factorial scenarios</button>
+        <label>One small daily action<input id="dailyAction" value="Pause for 10 seconds before replying under pressure"></label>
+        <label>Supporting habit<input id="bioHabit" value="Keep a consistent sleep and recovery routine"></label>
+        <div class="button-row"><button id="assessCharacter">Assess current state</button><button id="buildSprint" class="secondary">Draft 21-day practice</button></div>
+        <div id="characterResult" class="result-panel" aria-live="polite">Your assessment and practice plan will appear here. You can adjust the values at any time.</div>
       </article>
 
-      <article class="card span2">
-        <h2>3. Scenario Run</h2>
-        <label>Execution ID <input id="executionId" value="demo-run-001"></label>
-        <label>E2E payload JSON
-          <textarea id="runPayload"></textarea>
-        </label>
-        <button id="runScenario">Run scenario</button>
-      </article>
-
-      <article class="card">
-        <h2>4. Statistics</h2>
-        <button id="loadStats">Refresh statistics</button>
-        <pre id="stats">{}</pre>
-      </article>
-
-      <article class="card">
-        <h2>5. Report Bundle</h2>
-        <button id="loadReport">Refresh report bundle</button>
-        <pre id="report">{}</pre>
+      <article class="card practical-card span2" id="compatibilityLab">
+        <div class="step-label">STEP 3 · COMPARE WITH CONTEXT</div>
+        <h2>Compatibility Lab</h2>
+        <p class="help">Enter two profiles using Master Matrix item IDs and values on the same 0–10 scale. The tool reports observed differences and registered conditional heuristics. It does <strong>not</strong> calculate a single compatibility percentage or decide whether people should be together or work together.</p>
+        <div class="compat-columns">
+          <div><h3>Profile A</h3><label>Measurements (JSON)<textarea id="profileA">{
+  "P4.value_order": 8,
+  "P4.value_autonomy": 6,
+  "P5.discipline_consistency": 7,
+  "P5.adaptability": 6
+}</textarea></label><label>Roles (comma-separated)<input id="rolesA" value="Organizer, Strategist"></label></div>
+          <div><h3>Profile B</h3><label>Measurements (JSON)<textarea id="profileB">{
+  "P4.value_order": 5,
+  "P4.value_autonomy": 9,
+  "P5.discipline_consistency": 6,
+  "P5.adaptability": 8
+}</textarea></label><label>Roles (comma-separated)<input id="rolesB" value="Mediator, Strategist"></label></div>
+        </div>
+        <label>Shared context (comma-separated)<input id="compatContexts" value="team project, decision making"></label>
+        <div class="button-row"><button id="runCompatibility">Compare profiles</button><button id="loadCompatExample" class="secondary">Restore demo example</button></div>
+        <div id="compatSummary" class="result-panel" aria-live="polite">Run a comparison to see what is observed, what is heuristic, and what remains unknown.</div>
+        <pre id="compatOutput" class="output-pre">{}</pre>
       </article>
     </section>
 
-    <section class="card">
-      <h2>Matrix overview</h2>
-      <div class="metrics" id="metrics">
-        <div><span>Scenarios</span><strong>—</strong></div>
-        <div><span>Runs</span><strong>—</strong></div>
-        <div><span>Completed</span><strong>—</strong></div>
-        <div><span>Blocked</span><strong>—</strong></div>
-        <div><span>Primary estimate</span><strong>—</strong></div>
-      </div>
-      <div class="table-wrap">
-        <table id="scenarioTable">
-          <thead><tr><th>Scenario</th><th>Conditions</th><th>Status</th><th>Estimate</th></tr></thead>
-          <tbody><tr><td colspan="4">No data loaded.</td></tr></tbody>
-        </table>
-      </div>
-      <div class="row-actions">
-        <button id="loadOverview">Refresh matrix</button>
-        <button id="loadClaims">Refresh claims</button>
-      </div>
-      <pre id="claims">{}</pre>
-      <h3>Scenario comparison</h3>
-      <button id="loadComparison">Refresh comparison</button>
-      <pre id="comparison">{}</pre>
-      <p class="muted">Descriptive differences only; they do not establish causality or empirical validity.</p>
-    </section>
-
-    <section class="card">
-      <h2>Runtime output</h2>
-      <pre id="output">Ready.</pre>
-    </section>
+    <details class="advanced">
+      <summary>Advanced Science Lab — experiment matrices, scenario runs and evidence reports</summary>
+      <p class="help">For research workflows. This area assumes familiarity with study design and JSON payloads; start with the practical modules above if you are new.</p>
+      <section class="grid">
+        <article class="card">
+          <h2>1. Experiment Matrix</h2>
+          <label>Matrix ID <input id="matrixId" value="demo-matrix"></label>
+          <label>Study ID <input id="studyId" value="demo-study"></label>
+          <label>Name <input id="matrixName" value="Science Lab Matrix"></label>
+          <label>Primary outcome <input id="primaryOutcome" value="value"></label>
+          <button id="createMatrix">Create matrix</button>
+        </article>
+        <article class="card">
+          <h2>2. Scenario</h2>
+          <label>Scenario ID <input id="scenarioId" value="baseline"></label>
+          <label>Name <input id="scenarioName" value="Baseline"></label>
+          <label>Description <input id="scenarioDescription" value="Baseline scenario"></label>
+          <label>Conditions JSON<textarea id="conditions">{}</textarea></label>
+          <button id="createScenario">Create scenario</button>
+          <label>Factorial factors JSON<textarea id="factors">{"dose":[0,1],"tempo":["slow","fast"]}</textarea></label>
+          <button id="generateScenarios">Generate factorial scenarios</button>
+        </article>
+        <article class="card span2">
+          <h2>3. Scenario Run</h2>
+          <label>Execution ID <input id="executionId" value="demo-run-001"></label>
+          <label>E2E payload JSON<textarea id="runPayload"></textarea></label>
+          <button id="runScenario">Run scenario</button>
+        </article>
+        <article class="card"><h2>4. Statistics</h2><button id="loadStats">Refresh statistics</button><pre id="stats">{}</pre></article>
+        <article class="card"><h2>5. Report Bundle</h2><button id="loadReport">Refresh report bundle</button><pre id="report">{}</pre></article>
+      </section>
+      <section class="card">
+        <h2>Experiment overview</h2>
+        <div class="metrics" id="metrics"><div><span>Scenarios</span><strong>—</strong></div><div><span>Runs</span><strong>—</strong></div><div><span>Completed</span><strong>—</strong></div><div><span>Blocked</span><strong>—</strong></div><div><span>Primary estimate</span><strong>—</strong></div></div>
+        <div class="table-wrap"><table id="scenarioTable"><thead><tr><th>Scenario</th><th>Conditions</th><th>Status</th><th>Estimate</th></tr></thead><tbody><tr><td colspan="4">No data loaded.</td></tr></tbody></table></div>
+        <div class="row-actions"><button id="loadOverview">Refresh matrix</button><button id="loadClaims">Refresh claims</button></div>
+        <pre id="claims">{}</pre><h3>Scenario comparison</h3><button id="loadComparison">Refresh comparison</button><pre id="comparison">{}</pre>
+        <p class="muted">Descriptive differences only; they do not establish causality or empirical validity.</p>
+      </section>
+    </details>
+    <section class="card runtime-card"><h2>Runtime diagnostics</h2><pre id="output">Ready.</pre></section>
   </main>
 <script src="/science-lab/assets/app.js"></script>
 </body>
