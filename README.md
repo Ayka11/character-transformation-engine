@@ -1,3 +1,13 @@
+---
+title: Character Transformation & Social Compatibility Engine
+emoji: 🧭
+colorFrom: blue
+colorTo: green
+sdk: docker
+app_port: 7860
+pinned: false
+---
+
 # Character Transformation & Social Compatibility Engine
 
 A provenance-aware architecture for measurement, adaptive behavioral intervention, compatibility analysis, reproducible research execution, and a browser-accessible Science Lab.
