@@ -295,9 +295,9 @@ class SQLiteRuntimeStore:
                     raise ValueError("concurrent lifecycle transition conflict")
                 conn.execute(
                     """INSERT INTO runtime_events
-                       (event_id,namespace,event_type,payload_json,output_hash,provenance_record_id)
-                       VALUES(?,?,?,?,?,?)""",
-                    (event_id, namespace, event_type, payload_json, output_hash, provenance_record_id),
+                       (event_id,namespace,event_type,payload_json,output_hash,provenance_record_id,created_at)
+                       VALUES(?,?,?,?,?,?,?)""",
+                    (event_id, namespace, event_type, payload_json, output_hash, provenance_record_id, created_at),
                 )
                 conn.commit()
             except Exception:
