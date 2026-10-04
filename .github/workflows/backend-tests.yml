@@ -54,6 +54,26 @@ jobs:
           GITHUB_SHA: ${{ github.sha }}
         run: python backend/scripts/verify_rc_gate.py
 
+
+  windows-sqlite-cleanup:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install backend dependencies and test tools
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r backend/requirements.txt pytest pytest-timeout
+      - name: Reproduce SQLite cleanup behavior on Windows
+        env:
+          PYTHONPATH: ${{ github.workspace }}/backend
+        run: |
+          python -m pytest -vv --timeout=120 backend/tests/test_graph_persistence.py backend/tests/test_reporting_persistence.py
+
   postgres-integration:
     runs-on: ubuntu-latest
     services:
