@@ -286,7 +286,7 @@ class SQLiteRuntimeStore:
                        WHERE namespace = ?
                          AND json_extract(payload_json, '$.protocol_id') = ?
                          AND json_extract(payload_json, '$.version') = ?
-                       ORDER BY json_extract(payload_json, '$.recorded_at') DESC
+                       ORDER BY created_at DESC, rowid DESC
                        LIMIT 1""",
                     (namespace, protocol_id, version),
                 ).fetchone()
