@@ -1,3 +1,12 @@
+---
+title: Character Transformation & Social Compatibility Engine
+emoji: 🧭
+colorFrom: blue
+colorTo: green
+sdk: docker
+app_port: 7860
+---
+
 # Character Transformation & Social Compatibility Engine
 
 A provenance-aware architecture for measurement, adaptive behavioral intervention, compatibility analysis, reproducible research execution, and a browser-accessible Science Lab.
@@ -38,13 +47,11 @@ Question → Hypothesis → Study → Protocol → Experiment
 - V1.1 — executable Runtime layer
 - V1.2 — Research Execution layer
 
-
 ## V2.2–V2.3
 
 - **V2.2 Research E2E** composes profile, assessment, state, capacity, safety, research execution, QC, analysis, claim and audit under one execution ID.
 - **Science Lab V2.3** adds Experiment Matrix, scenario definitions/runs, descriptive statistics, replication/generalization assessment, claim validation, provenance report bundle and a static browser UI at `/science-lab/ui`.
 - Current RC verification baseline: GitHub Actions run #397 passed with 251 tests, 12 skipped, PostgreSQL integration, and migration up/down rehearsal.
-
 
 ## V2.4 Operations
 
@@ -54,11 +61,10 @@ Question → Hypothesis → Study → Protocol → Experiment
 - Protected operational API for backup, restore and retention.
 - Guarded PostgreSQL rollback migration and documented rollback procedure.
 
-
 ## V2.6 Production Hardening / RC
 
 The v2.6 release candidate gate is maintained in
-v2-release/V2.6_PRODUCTION_READINESS.md.
+`v2-release/V2.6_PRODUCTION_READINESS.md`.
 
 Current release policy:
 - historical CI success does not substitute for current RC verification;
@@ -71,3 +77,7 @@ Current release policy:
 
 Scientific status remains IMPLEMENTATION_BASELINE; software execution alone is
 not empirical validation.
+
+## Deployment
+
+The Hugging Face Space is built as a Docker app on port 7860. GitHub Actions deploys the tested `main` commit after the **Backend Tests** workflow succeeds. Configure the repository secret `HF_TOKEN` with write access to the target Space; never commit the token to source control.
