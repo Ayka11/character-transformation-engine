@@ -203,3 +203,183 @@ $("loadComparison").onclick = async () => {
     $("comparison").textContent=JSON.stringify(await api("/science-lab/matrices/"+id+"/comparison"),null,2);
   }catch(e){$("comparison").textContent="ERROR: "+e.message}
 };
+
+
+// Guided practical modules --------------------------------------------------
+let masterMatrixItems = [];
+
+function observationsFromSliders(executionId) {
+  const fields = [
+    ["P1.sleep_quality", "mSleep", "sleep"],
+    ["P1.recovery_index", "mRecovery", "recovery"],
+    ["P1.physical_activity", "mActivity", "activity"],
+    ["P1.metabolic_stability", "mMetabolic", "metabolic"],
+    ["P1.subjective_stress", "mStress", "stress"],
+    ["P1.subjective_energy", "mEnergy", "energy"]
+  ];
+  return fields.map(([item_id, inputId, suffix]) => ({
+    item_id,
+    value: Number($(inputId).value),
+    observation_id: executionId + ":" + suffix
+  }));
+}
+
+function currentCharacterPayload() {
+  const id = "character-lab-" + new Date().toISOString().replace(/[^0-9]/g, "").slice(0, 14);
+  return { observations: observationsFromSliders(id), source_id: id, source_version: "1.0" };
+}
+
+function showResult(elementId, title, value, note = "") {
+  const root = $(elementId);
+  root.replaceChildren();
+  const heading = document.createElement("strong");
+  heading.textContent = title;
+  root.appendChild(heading);
+  if (note) {
+    const p = document.createElement("p");
+    p.textContent = note;
+    root.appendChild(p);
+  }
+  const pre = document.createElement("pre");
+  pre.textContent = typeof value === "string" ? value : JSON.stringify(value, null, 2);
+  root.appendChild(pre);
+}
+
+function renderMasterMatrix() {
+  const query = ($("matrixSearch").value || "").trim().toLowerCase();
+  const domain = $("matrixDomain").value;
+  const filtered = masterMatrixItems.filter(item => {
+    const text = [item.id, item.domain, item.name, item.kind, item.notes, item.scale].join(" ").toLowerCase();
+    return (!query || text.includes(query)) && (!domain || item.domain === domain);
+  });
+  $("matrixSummary").textContent = masterMatrixItems.length
+    ? filtered.length + " of " + masterMatrixItems.length + " measures shown · catalogue v" + (window.cteMatrixVersion || "1.0")
+    : "No catalogue loaded yet.";
+  const list = $("matrixList");
+  list.replaceChildren();
+  if (!filtered.length) {
+    const empty = document.createElement("p");
+    empty.className = "muted";
+    empty.textContent = "No measures match this search. Try another word or choose All domains.";
+    list.appendChild(empty);
+    return;
+  }
+  filtered.forEach(item => {
+    const row = document.createElement("article");
+    row.className = "matrix-item";
+    const title = document.createElement("div");
+    title.className = "matrix-item-title";
+    const name = document.createElement("strong");
+    name.textContent = item.name;
+    const domainTag = document.createElement("span");
+    domainTag.className = "domain-tag";
+    domainTag.textContent = item.domain;
+    title.append(name, domainTag);
+    const meta = document.createElement("p");
+    meta.textContent = item.id + " · " + item.kind + " · scale " + item.scale + " · " + item.provenance_tag;
+    const notes = document.createElement("p");
+    notes.className = "muted";
+    notes.textContent = item.notes || "Use as a defined measurement; interpret it alongside its domain and source.";
+    row.append(title, meta, notes);
+    list.appendChild(row);
+  });
+}
+
+$("loadMasterMatrix").onclick = async () => {
+  try {
+    const data = await api("/matrix");
+    masterMatrixItems = data.items || [];
+    window.cteMatrixVersion = data.version;
+    renderMasterMatrix();
+    const counts = {};
+    masterMatrixItems.forEach(item => { counts[item.domain] = (counts[item.domain] || 0) + 1; });
+    $("matrixSummary").textContent = "Loaded " + masterMatrixItems.length + " measures · version " + data.version +
+      " · " + Object.entries(counts).map(([key, count]) => key + ": " + count).join(" · ");
+  } catch (e) {
+    $("matrixSummary").textContent = "Could not load the catalogue: " + e.message;
+  }
+};
+$("matrixSearch").addEventListener("input", renderMasterMatrix);
+$("matrixDomain").addEventListener("change", renderMasterMatrix);
+
+[
+  ["mSleep", "vSleep"], ["mRecovery", "vRecovery"], ["mActivity", "vActivity"],
+  ["mMetabolic", "vMetabolic"], ["mStress", "vStress"], ["mEnergy", "vEnergy"]
+].forEach(([inputId, valueId]) => {
+  $(inputId).addEventListener("input", () => { $(valueId).textContent = $(inputId).value; });
+});
+
+$("assessCharacter").onclick = async () => {
+  try {
+    const data = await api("/runtime/state-capacity", {
+      method: "POST", body: JSON.stringify(currentCharacterPayload())
+    });
+    const capacity = data.capacity || {};
+    const state = data.state || {};
+    showResult("characterResult", "Your current-state snapshot",
+      {state, capacity, adaptive_level: data.adaptive_level, missing_state_inputs: data.missing_state_inputs},
+      "This is a snapshot of the values entered today, not a stable personality label. Reassess under comparable conditions to explore change.");
+  } catch (e) {
+    showResult("characterResult", "Assessment could not be completed", e.message,
+      "Check that the API is online and that the deployment exposes /runtime/state-capacity.");
+  }
+};
+
+$("buildSprint").onclick = async () => {
+  try {
+    const payload = {
+      ...currentCharacterPayload(),
+      requested_trait: $("targetTrait").value,
+      supporting_bio_habit: $("bioHabit").value.trim(),
+      daily_action: $("dailyAction").value.trim(),
+      blockers: {}
+    };
+    const data = await api("/runtime/intervention", {method: "POST", body: JSON.stringify(payload)});
+    showResult("characterResult", "Draft practice plan", data,
+      "Treat this as a starting draft. Choose a small action you can safely repeat, record what actually happened, and adjust based on capacity—not willpower alone.");
+  } catch (e) {
+    showResult("characterResult", "Practice plan could not be created", e.message,
+      "Check the selected target and confirm that the API exposes /runtime/intervention.");
+  }
+};
+
+function parseCsv(input) {
+  return input.split(",").map(value => value.trim()).filter(Boolean);
+}
+const exampleProfileA = {"P4.value_order":8,"P4.value_autonomy":6,"P5.discipline_consistency":7,"P5.adaptability":6};
+const exampleProfileB = {"P4.value_order":5,"P4.value_autonomy":9,"P5.discipline_consistency":6,"P5.adaptability":8};
+$("loadCompatExample").onclick = () => {
+  $("profileA").value = JSON.stringify(exampleProfileA, null, 2);
+  $("profileB").value = JSON.stringify(exampleProfileB, null, 2);
+  $("rolesA").value = "Organizer, Strategist";
+  $("rolesB").value = "Mediator, Strategist";
+  $("compatContexts").value = "team project, decision making";
+  $("compatSummary").textContent = "Demo profiles restored. Edit the values to match your scenario, then compare.";
+  $("compatOutput").textContent = "{}";
+};
+
+$("runCompatibility").onclick = async () => {
+  try {
+    const payload = {
+      profile_a: JSON.parse($("profileA").value),
+      profile_b: JSON.parse($("profileB").value),
+      roles_a: parseCsv($("rolesA").value),
+      roles_b: parseCsv($("rolesB").value),
+      contexts: parseCsv($("compatContexts").value)
+    };
+    const data = await api("/compatibility/v2/canonical", {method: "POST", body: JSON.stringify(payload)});
+    const semantics = data.result_semantics || {};
+    const coverage = data.coverage || {};
+    $("compatSummary").textContent =
+      "Status: " + (data.status || "UNKNOWN") + " · " +
+      "Observed/descriptive rows: " + (semantics.descriptive_row_count ?? "—") + " · " +
+      "Conditional heuristics: " + (semantics.heuristic_row_count ?? "—") + " · " +
+      "Unknown rows: " + (semantics.unknown_row_count ?? "—") + " · " +
+      "Coverage: " + (coverage.known_rows ?? 0) + "/" + (coverage.total_rows ?? 0) +
+      ". " + (semantics.warning || "Review each finding and discuss context with the people involved.");
+    $("compatOutput").textContent = JSON.stringify(data, null, 2);
+  } catch (e) {
+    $("compatSummary").textContent = "Comparison could not be completed: " + e.message;
+    $("compatOutput").textContent = "Check that each profile is valid JSON, values use the registered 0–10 scale, and the API exposes /compatibility/v2/canonical.";
+  }
+};
