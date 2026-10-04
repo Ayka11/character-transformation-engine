@@ -1,0 +1,123 @@
+name: Verify and deploy branch to Hugging Face
+
+on:
+  push:
+    branches:
+      - fix/validate-recovered-section-ordinals
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: cte-hf-deploy-fix-branch
+  cancel-in-progress: false
+
+jobs:
+  verify-build-deploy:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: cte
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    steps:
+      - name: Checkout exact pushed commit
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install backend dependencies and test tools
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r backend/requirements.txt pytest pytest-timeout
+
+      - name: Verify package resolution
+        env:
+          PYTHONPATH: ${{ github.workspace }}/backend
+        run: |
+          python -c "from cte.longitudinal import longitudinal_change; import cte.longitudinal as m; print(m.__file__); assert longitudinal_change([2,4],[3,6]).relative_change == 0.5"
+
+      - name: Collect backend tests
+        env:
+          PYTHONPATH: ${{ github.workspace }}/backend
+        run: |
+          cd backend
+          python -m pytest --collect-only -q
+
+      - name: Run backend tests
+        env:
+          PYTHONPATH: ${{ github.workspace }}/backend
+        run: |
+          cd backend
+          python -m pytest -vv --timeout=120 --durations=20 --maxfail=1
+
+      - name: Run PostgreSQL integration test
+        env:
+          PYTHONPATH: ${{ github.workspace }}/backend
+          CTE_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/cte
+        run: python -m pytest -vv --timeout=120 --maxfail=1 backend/tests/test_postgres_integration.py
+
+      - name: Check Science Lab UI JavaScript
+        run: node --check frontend/app.js
+
+      - name: Verify v2.6 release-candidate gate
+        env:
+          PYTHONPATH: ${{ github.workspace }}/backend
+          GITHUB_SHA: ${{ github.sha }}
+        run: python backend/scripts/verify_rc_gate.py
+
+      - name: Build Docker image before deployment
+        run: docker build --tag cte-hf-space:${{ github.sha }} .
+
+      - name: Deploy tested commit to Hugging Face Space
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ -z "${HF_TOKEN:-}" ]]; then
+            echo "::error::Repository secret HF_TOKEN is missing or empty."
+            exit 1
+          fi
+
+          hf_git() {
+            GIT_CONFIG_COUNT=1 \
+            GIT_CONFIG_KEY_0="http.https://huggingface.co/.extraheader" \
+            GIT_CONFIG_VALUE_0="AUTHORIZATION: Basic $(printf ':%s' "$HF_TOKEN" | base64 -w0)" \
+              git "$@"
+          }
+
+          hf_git clone https://huggingface.co/spaces/Aygun1489/character-transformation-engine hf-space
+
+          rsync -a --delete \
+            --exclude='.git/' \
+            --exclude='.github/' \
+            --exclude='.pytest_cache/' \
+            --exclude='__pycache__/' \
+            --exclude='*.pyc' \
+            ./ hf-space/
+
+          cd hf-space
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add --all
+          if git diff --cached --quiet; then
+            echo "Hugging Face Space already matches this commit; nothing to publish."
+            exit 0
+          fi
+          git commit -m "Deploy tested fix branch commit ${GITHUB_SHA}"
+          hf_git push origin HEAD:main
