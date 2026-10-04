@@ -117,7 +117,7 @@ jobs:
 
           # Runtime databases are ephemeral state, not source artifacts.
           rm -f hf-space/backend/data/cte-runtime.sqlite3
-          find hf-space -type f \\( -name '*.sqlite' -o -name '*.sqlite3' -o -name '*.db' \\) -delete
+          find hf-space -type f \( -name '*.sqlite' -o -name '*.sqlite3' -o -name '*.db' \) -delete
 
           cd hf-space
           git config user.name "github-actions[bot]"
