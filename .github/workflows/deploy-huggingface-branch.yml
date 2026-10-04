@@ -101,8 +101,12 @@ jobs:
               git "$@"
           }
 
-          hf_git clone https://huggingface.co/spaces/Aygun1489/character-transformation-engine hf-space
+          HF_SPACE_DIR="${RUNNER_TEMP}/cte-hf-space"
+          rm -rf "$HF_SPACE_DIR"
+          hf_git clone https://huggingface.co/spaces/Aygun1489/character-transformation-engine "$HF_SPACE_DIR"
 
+          # Keep the destination outside GITHUB_WORKSPACE. Otherwise rsync can
+          # recursively copy its own target into hf-space/hf-space/... .
           rsync -a --delete \
             --exclude='.git/' \
             --exclude='.github/' \
@@ -113,13 +117,13 @@ jobs:
             --exclude='*.sqlite3' \
             --exclude='*.db' \
             --exclude='backend/data/' \
-            ./ hf-space/
+            ./ "$HF_SPACE_DIR/"
 
           # Runtime databases are ephemeral state, not source artifacts.
-          rm -f hf-space/backend/data/cte-runtime.sqlite3
-          find hf-space -type f \( -name '*.sqlite' -o -name '*.sqlite3' -o -name '*.db' \) -delete
+          rm -f "$HF_SPACE_DIR/backend/data/cte-runtime.sqlite3"
+          find "$HF_SPACE_DIR" -type f \( -name '*.sqlite' -o -name '*.sqlite3' -o -name '*.db' \) -delete
 
-          cd hf-space
+          cd "$HF_SPACE_DIR"
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add --all
