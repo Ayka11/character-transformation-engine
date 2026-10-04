@@ -1,0 +1,69 @@
+name: Deploy to Hugging Face Space
+
+on:
+  workflow_run:
+    workflows: ["Backend Tests"]
+    types: [completed]
+    branches: ["main"]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: hf-space-deploy
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    if: >-
+      ${{ github.event.workflow_run.conclusion == 'success' &&
+          github.event.workflow_run.head_branch == 'main' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout tested commit
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+          persist-credentials: false
+
+      - name: Build Docker image before deployment
+        run: docker build --tag cte-hf-space:${{ github.event.workflow_run.head_sha }} .
+
+      - name: Configure Git identity
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+      - name: Clone Space and publish tested repository
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ -z "${HF_TOKEN:-}" ]]; then
+            echo "::error::Repository secret HF_TOKEN is missing."
+            exit 1
+          fi
+
+          export GIT_CONFIG_COUNT=1
+          export GIT_CONFIG_KEY_0="http.https://huggingface.co/.extraheader"
+          export GIT_CONFIG_VALUE_0="AUTHORIZATION: Basic $(printf ':%s' "$HF_TOKEN" | base64 -w0)"
+
+          git clone https://huggingface.co/spaces/Aygun1489/character-transformation-engine hf-space
+          unset HF_TOKEN GIT_CONFIG_VALUE_0
+
+          rsync -a --delete \
+            --exclude='.git/' \
+            --exclude='.github/' \
+            --exclude='.pytest_cache/' \
+            --exclude='__pycache__/' \
+            ./ hf-space/
+
+          cd hf-space
+          git add --all
+          if git diff --cached --quiet; then
+            echo "Space already matches the tested GitHub commit; nothing to publish."
+            exit 0
+          fi
+          git commit -m "Deploy GitHub main: ${{ github.event.workflow_run.head_sha }}"
+          git push origin HEAD:main
